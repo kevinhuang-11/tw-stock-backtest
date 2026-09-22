@@ -2,6 +2,7 @@ import json
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from stock_data import normalize_row
 
 
 def fetch_month(stock_id, month):
@@ -34,20 +35,25 @@ def fetch_month(stock_id, month):
 
 
 def main():
+    stock_id = "2330"
+
     try:
-        # 2025 年 1 月；日期中的日填 01，查詢整個月份
-        result = fetch_month("2330", "20250101")
+        result = fetch_month(stock_id, "20260901")
+
+        records = [
+            normalize_row(stock_id, result["fields"], row)
+            for row in result["data"]
+        ]
     except (HTTPError, URLError, TimeoutError, ValueError) as error:
-        print(f"下載失敗：{error}")
+        print(f"下載或整理資料失敗：{error}")
         return
 
     print("資料標題：", result.get("title"))
-    print("欄位名稱：", result["fields"])
-    print("資料筆數：", len(result["data"]))
+    print("整理後筆數：", len(records))
 
-    print("\n前 5 筆資料：")
-    for row in result["data"][:5]:
-        print(row)
+    print("\n前 16 筆整理後資料：")
+    for record in records[:16]:
+        print(record)
 
 
 if __name__ == "__main__":
