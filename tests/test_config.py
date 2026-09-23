@@ -25,6 +25,7 @@ long_window = 10
 [backtest]
 initial_cash = "1000000"
 quantity = 100
+max_positions = 2
 
 [costs]
 commission_rate = "0.001425"

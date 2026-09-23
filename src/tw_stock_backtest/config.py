@@ -27,6 +27,7 @@ REQUIRED_FIELDS = {
     "backtest": {
         "initial_cash",
         "quantity",
+        "max_positions",
     },
     "costs": {
         "commission_rate",
@@ -65,6 +66,7 @@ POSITIVE_INTEGER_FIELDS = (
     ("strategy", "short_window"),
     ("strategy", "long_window"),
     ("backtest", "quantity"),
+    ("backtest", "max_positions"),
 )
 
 
