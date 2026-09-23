@@ -2,115 +2,183 @@ import argparse
 import sqlite3
 from datetime import date
 
+from config import (
+    DEFAULT_CONFIG_PATH,
+    apply_overrides,
+    load_config,
+)
 from database import load_records
 from screening import evaluate_stock
 
 
-def main():
+def parse_arguments():
     parser = argparse.ArgumentParser(
-        description="依價格趨勢與成交量篩選候選股票"
+        description="依照趨勢與成交量條件篩選股票並排名"
     )
 
     parser.add_argument(
+        "--config",
+        default=str(DEFAULT_CONFIG_PATH),
+        help="設定檔位置，預設使用專案中的 config.toml",
+    )
+    parser.add_argument(
         "--stocks",
         nargs="+",
-        required=True,
-        help="股票代號清單，以空白分隔",
+        default=None,
+        help="股票代號；未指定時使用設定檔的股票池",
     )
     parser.add_argument(
         "--as-of",
         required=True,
-        help="分析日期，必須有當日行情",
+        help="分析日期，例如 2026-09-22",
     )
     parser.add_argument(
         "--top",
         type=int,
-        default=5,
-        help="最多列出幾檔通過條件的股票",
+        default=None,
+        help="最多顯示幾檔候選股；未指定時使用設定檔",
     )
 
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+def main():
+    args = parse_arguments()
 
     try:
         as_of = date.fromisoformat(args.as_of).isoformat()
 
-        if args.top <= 0:
-            raise ValueError("--top 必須大於 0")
+        settings = load_config(args.config)
 
-    except ValueError as error:
-        parser.error(str(error))
+        settings = apply_overrides(
+            settings,
+            {
+                "universe": {
+                    "stocks": args.stocks,
+                },
+                "screening": {
+                    "top_n": args.top,
+                },
+            },
+        )
 
-    # 去除重複代號，保留原本順序。
-    stock_ids = list(dict.fromkeys(args.stocks))
+    except (ValueError, OSError) as error:
+        print(f"設定或參數錯誤：{error}")
+        return 1
+
+    stock_ids = settings["universe"]["stocks"]
+    screening_settings = settings["screening"]
+    db_path = settings["storage"]["database_path"]
+
+    short_window = screening_settings["short_window"]
+    long_window = screening_settings["long_window"]
+    volume_window = screening_settings["volume_window"]
+    min_volume_ratio = screening_settings["min_volume_ratio"]
+    momentum_window = screening_settings["momentum_window"]
+    top_n = screening_settings["top_n"]
 
     evaluations = []
     errors = []
 
     for stock_id in stock_ids:
         try:
-            # 先讀取資料庫中截至分析日的歷史行情。
             records = load_records(
                 stock_id,
                 "1900-01-01",
                 as_of,
+                db_path=db_path,
             )
 
-            result = evaluate_stock(records, as_of)
+            result = evaluate_stock(
+                records,
+                as_of,
+                short_window=short_window,
+                long_window=long_window,
+                volume_window=volume_window,
+                min_volume_ratio=min_volume_ratio,
+                momentum_window=momentum_window,
+            )
+
             evaluations.append(result)
 
         except (ValueError, sqlite3.Error, OSError) as error:
             errors.append((stock_id, str(error)))
 
     print(f"分析日期：{as_of}")
+    print(f"資料庫位置：{db_path}")
+    print(
+        f"趨勢條件：Close > SMA{short_window} > SMA{long_window}"
+    )
+    print(
+        f"量比條件：當日量 / 前 {volume_window} 筆均量"
+        f" > {min_volume_ratio}"
+    )
+    print(
+        f"排名依據：{momentum_window} 期價格報酬率，"
+        f"最多顯示 {top_n} 檔"
+    )
     print(f"指定股票數：{len(stock_ids)}")
     print(f"成功評估：{len(evaluations)}")
     print(f"無法評估：{len(errors)}")
 
     print("\n各股票結果：")
 
-    for item in evaluations:
-        status = "通過" if item["selected"] else "未通過"
+    for result in evaluations:
+        status = "通過" if result["selected"] else "未通過"
 
         print(
-            f"{item['stock_id']} | {status} | "
-            f"收盤 {item['close']:.2f} | "
-            f"SMA5 {item['sma5']:.2f} | "
-            f"SMA20 {item['sma20']:.2f} | "
-            f"量比 {item['volume_ratio']:.2f} | "
-            f"20期價格報酬 {item['momentum20']:.2%}"
+            f"{result['stock_id']} | {status}"
+            f" | 收盤 {result['close']:.2f}"
+            f" | SMA{short_window} {result['short_ma']:.2f}"
+            f" | SMA{long_window} {result['long_ma']:.2f}"
+            f" | 量比 {result['volume_ratio']:.2f}"
+            f" | {momentum_window}期價格報酬 "
+            f"{result['momentum']:.2%}"
         )
 
-        if item["failed_conditions"]:
-            print("  原因：" + "；".join(item["failed_conditions"]))
+        if result["failed_conditions"]:
+            print(
+                "  原因："
+                + "；".join(result["failed_conditions"])
+            )
 
-    for stock_id, message in errors:
-        print(f"{stock_id} | 無法評估 | {message}")
+    if errors:
+        print("\n無法評估的股票：")
+
+        for stock_id, message in errors:
+            print(f"{stock_id}：{message}")
 
     candidates = [
-        item for item in evaluations
-        if item["selected"]
+        result
+        for result in evaluations
+        if result["selected"]
     ]
 
-    # 報酬率由高到低；相同時依代號排列。
     candidates.sort(
-        key=lambda item: (-item["momentum20"], item["stock_id"])
+        key=lambda result: (
+            -result["momentum"],
+            result["stock_id"],
+        )
     )
 
     print("\n候選股排名：")
 
     if not candidates:
-        print("沒有股票通過全部條件。")
-
-    for rank, item in enumerate(candidates[:args.top], start=1):
-        print(
-            f"{rank}. {item['stock_id']} | "
-            f"20期價格報酬 {item['momentum20']:.2%} | "
-            f"量比 {item['volume_ratio']:.2f}"
-        )
+        print("沒有符合全部條件的候選股。")
+    else:
+        for rank, result in enumerate(
+            candidates[:top_n],
+            start=1,
+        ):
+            print(
+                f"{rank}. {result['stock_id']}"
+                f" | {momentum_window}期價格報酬 "
+                f"{result['momentum']:.2%}"
+                f" | 量比 {result['volume_ratio']:.2f}"
+            )
 
     print("\n排名只代表本版規則的篩選結果，不代表獲利機率。")
 
-    # 任一股票無法評估，讓自動化流程能辨識不完整結果。
     return 1 if errors else 0
 
 

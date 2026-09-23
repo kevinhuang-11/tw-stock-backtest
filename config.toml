@@ -1,0 +1,33 @@
+[universe]
+stocks = ["2330", "2317", "2454"]
+
+[screening]
+short_window = 5
+long_window = 20
+volume_window = 20
+min_volume_ratio = "1"
+momentum_window = 20
+top_n = 3
+
+[strategy]
+short_window = 5
+long_window = 10
+
+[backtest]
+initial_cash = "1000000"
+quantity = 100
+
+[costs]
+commission_rate = "0.001425"
+commission_discount = "1"
+minimum_commission = "20"
+sell_tax_rate = "0.003"
+commission_rounding = "ROUND_DOWN"
+tax_rounding = "ROUND_DOWN"
+
+[download]
+timeout_seconds = 30
+request_interval_seconds = 3
+
+[storage]
+database_path = "data/stocks.db"

@@ -1,17 +1,26 @@
 import argparse
 import sqlite3
 
+from config import (
+    DEFAULT_CONFIG_PATH,
+    apply_overrides,
+    load_config,
+)
 from database import load_records
 from indicators import simple_moving_average
 from strategies import moving_average_crossover
 
 
-
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description="讀取股票行情並顯示短期、長期均線"
+        description="讀取股票行情，顯示均線與交叉訊號"
     )
 
+    parser.add_argument(
+        "--config",
+        default=str(DEFAULT_CONFIG_PATH),
+        help="設定檔位置，預設使用專案中的 config.toml",
+    )
     parser.add_argument(
         "--stock",
         required=True,
@@ -30,14 +39,14 @@ def parse_arguments():
     parser.add_argument(
         "--short",
         type=int,
-        default=5,
-        help="短期均線期間，預設為 5",
+        default=None,
+        help="短期均線期間；未指定時使用設定檔",
     )
     parser.add_argument(
         "--long",
         type=int,
-        default=10,
-        help="長期均線期間，預設為 10",
+        default=None,
+        help="長期均線期間；未指定時使用設定檔",
     )
 
     return parser.parse_args()
@@ -55,45 +64,71 @@ def main():
     args = parse_arguments()
 
     try:
-        if not (0 < args.short < args.long):
-            raise ValueError("均線期間必須符合：0 < 短期 < 長期")
+        settings = load_config(args.config)
+
+        settings = apply_overrides(
+            settings,
+            {
+                "strategy": {
+                    "short_window": args.short,
+                    "long_window": args.long,
+                },
+            },
+        )
+
+        short_window = settings["strategy"]["short_window"]
+        long_window = settings["strategy"]["long_window"]
+        db_path = settings["storage"]["database_path"]
+
+        stock_id = args.stock.strip()
+        if not stock_id:
+            raise ValueError("股票代號不可為空白")
 
         records = load_records(
-            args.stock,
+            stock_id,
             args.start,
             args.end,
+            db_path=db_path,
         )
 
         if not records:
             print("資料庫中沒有符合條件的行情，請先下載資料。")
             return 0
 
-        # 從每筆行情取出收盤價。
         closes = [record["close"] for record in records]
 
-        # 分別計算短期與長期均線。
-        short_ma = simple_moving_average(closes, args.short)
-        long_ma = simple_moving_average(closes, args.long)
+        short_ma = simple_moving_average(
+            closes,
+            short_window,
+        )
+        long_ma = simple_moving_average(
+            closes,
+            long_window,
+        )
 
-        # 根據兩條均線計算交叉訊號。
-        signals = moving_average_crossover(short_ma, long_ma)
+        signals = moving_average_crossover(
+            short_ma,
+            long_ma,
+        )
 
     except (ValueError, sqlite3.Error, OSError) as error:
         print(f"分析失敗：{error}")
         return 1
 
-    print(f"股票代號：{args.stock}")
+    print(f"股票代號：{stock_id}")
+    print(f"資料庫位置：{db_path}")
+    print(f"均線期間：短期 {short_window}，長期 {long_window}")
     print(f"資料筆數：{len(records)}")
     print(
-        f"實際期間：{records[0]['date']} "
-        f"～ {records[-1]['date']}"
+        f"實際期間：{records[0]['date']}"
+        f" ～ {records[-1]['date']}"
     )
 
     print(
         f"\n{'Date':<12}"
         f"{'Close':>12}"
-        f"{f'SMA{args.short}':>12}"
-        f"{f'SMA{args.long}':>12}"
+        f"{f'SMA{short_window}':>12}"
+        f"{f'SMA{long_window}':>12}"
         f"{'Signal':>10}"
     )
 
@@ -111,7 +146,7 @@ def main():
             f"{signal:>10}"
         )
 
-    if len(records) < args.long:
+    if len(records) < long_window:
         print("\n資料不足，尚無法形成完整的長期均線。")
 
     return 0
