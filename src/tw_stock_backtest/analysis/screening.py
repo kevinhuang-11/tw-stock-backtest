@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
-from indicators import simple_moving_average
+from tw_stock_backtest.analysis.indicators import simple_moving_average
 
 
 def evaluate_stock(

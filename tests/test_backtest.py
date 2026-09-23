@@ -1,7 +1,7 @@
 import unittest
 from decimal import Decimal
 
-from backtest import run_backtest
+from tw_stock_backtest.backtesting.backtest import run_backtest
 
 
 class TestBacktest(unittest.TestCase):

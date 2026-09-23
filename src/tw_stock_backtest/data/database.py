@@ -2,12 +2,12 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 from decimal import Decimal
-from date_range import parse_date_range
+from tw_stock_backtest.date_range import parse_date_range
 
 
 # 資料庫位置：專案資料夾/data/stocks.db
 DEFAULT_DB_PATH = (
-    Path(__file__).resolve().parent / "data" / "stocks.db"
+    Path(__file__).resolve().parents[3] / "data" / "stocks.db"
 )
 
 

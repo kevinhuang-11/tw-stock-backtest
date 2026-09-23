@@ -4,7 +4,7 @@ from contextlib import closing
 from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from database import save_records, load_records
+from tw_stock_backtest.data.database import save_records, load_records
 
 
 class TestSaveRecords(unittest.TestCase):

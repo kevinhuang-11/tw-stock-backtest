@@ -2,7 +2,7 @@ import unittest
 from datetime import date, timedelta
 from decimal import Decimal
 
-from screening import evaluate_stock
+from tw_stock_backtest.analysis.screening import evaluate_stock
 
 
 class TestScreening(unittest.TestCase):

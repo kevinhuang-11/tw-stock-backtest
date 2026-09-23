@@ -1,9 +1,9 @@
 import unittest
 from decimal import Decimal
 
-from stock_data import parse_twse_date, parse_price, parse_volume
-from stock_data import normalize_row
-from stock_data import parse_nonnegative_integer
+from tw_stock_backtest.data.stock_data import parse_twse_date, parse_price, parse_volume
+from tw_stock_backtest.data.stock_data import normalize_row
+from tw_stock_backtest.data.stock_data import parse_nonnegative_integer
 
 
 

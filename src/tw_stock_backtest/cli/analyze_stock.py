@@ -1,14 +1,14 @@
 import argparse
 import sqlite3
 
-from config import (
+from tw_stock_backtest.config import (
     DEFAULT_CONFIG_PATH,
     apply_overrides,
     load_config,
 )
-from database import load_records
-from indicators import simple_moving_average
-from strategies import moving_average_crossover
+from tw_stock_backtest.data.database import load_records
+from tw_stock_backtest.analysis.indicators import simple_moving_average
+from tw_stock_backtest.analysis.strategies import moving_average_crossover
 
 
 def parse_arguments():

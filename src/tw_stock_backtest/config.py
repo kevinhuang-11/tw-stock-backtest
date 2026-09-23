@@ -4,8 +4,8 @@ from pathlib import Path
 import tomllib
 
 
-DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent / "config.toml"
-
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config.toml"
 
 # 各區段必須提供的欄位。
 REQUIRED_FIELDS = {

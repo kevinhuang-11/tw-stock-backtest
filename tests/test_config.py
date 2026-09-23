@@ -3,7 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from config import apply_overrides, load_config
+from tw_stock_backtest.config import apply_overrides, load_config
 
 
 TEST_CONFIG = """

@@ -1,7 +1,7 @@
 import unittest
 from decimal import Decimal
 
-from strategies import moving_average_crossover
+from tw_stock_backtest.analysis.strategies import moving_average_crossover
 
 
 class TestMovingAverageCrossover(unittest.TestCase):

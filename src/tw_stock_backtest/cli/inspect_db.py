@@ -2,7 +2,7 @@ import argparse
 import sqlite3
 from contextlib import closing
 
-from config import DEFAULT_CONFIG_PATH, load_config
+from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config
 
 
 def parse_arguments():

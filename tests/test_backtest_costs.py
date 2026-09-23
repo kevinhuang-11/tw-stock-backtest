@@ -1,8 +1,8 @@
 import unittest
 from decimal import Decimal
 
-from backtest import run_backtest
-from costs import CostSettings
+from tw_stock_backtest.backtesting.backtest import run_backtest
+from tw_stock_backtest.backtesting.costs import CostSettings
 
 
 class TestBacktestCosts(unittest.TestCase):
