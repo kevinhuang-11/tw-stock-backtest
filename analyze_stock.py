@@ -3,6 +3,8 @@ import sqlite3
 
 from database import load_records
 from indicators import simple_moving_average
+from strategies import moving_average_crossover
+
 
 
 def parse_arguments():
@@ -73,6 +75,9 @@ def main():
         short_ma = simple_moving_average(closes, args.short)
         long_ma = simple_moving_average(closes, args.long)
 
+        # 根據兩條均線計算交叉訊號。
+        signals = moving_average_crossover(short_ma, long_ma)
+
     except (ValueError, sqlite3.Error, OSError) as error:
         print(f"分析失敗：{error}")
         return 1
@@ -89,18 +94,21 @@ def main():
         f"{'Close':>12}"
         f"{f'SMA{args.short}':>12}"
         f"{f'SMA{args.long}':>12}"
+        f"{'Signal':>10}"
     )
 
-    for record, short_value, long_value in zip(
+    for record, short_value, long_value, signal in zip(
         records,
         short_ma,
         long_ma,
+        signals,
     ):
         print(
             f"{record['date']:<12}"
             f"{format_price(record['close']):>12}"
             f"{format_price(short_value):>12}"
             f"{format_price(long_value):>12}"
+            f"{signal:>10}"
         )
 
     if len(records) < args.long:
