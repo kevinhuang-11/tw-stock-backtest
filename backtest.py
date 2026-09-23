@@ -1,9 +1,26 @@
 from datetime import date
 from decimal import Decimal
 
+from costs import CostSettings, calculate_transaction
 
-def run_backtest(records, signals, initial_cash, quantity):
-    """簡化回測：前日訊號、次筆開盤成交，暫不計交易成本。"""
+
+def run_backtest(
+    records,
+    signals,
+    initial_cash,
+    quantity,
+    cost_settings=None,
+):
+    """前日訊號、次筆開盤成交；可傳入交易成本設定。"""
+    # 沒有提供設定時，維持原本的零成本模式。
+    # 讓舊測試繼續驗證原本的交易邏輯。
+    if cost_settings is None:
+        cost_settings = CostSettings(
+            commission_rate=Decimal("0"),
+            minimum_commission=Decimal("0"),
+            sell_tax_rate=Decimal("0"),
+        )
+
     if len(records) != len(signals):
         raise ValueError("行情與訊號的長度必須相同")
 
@@ -21,7 +38,6 @@ def run_backtest(records, signals, initial_cash, quantity):
     ):
         raise ValueError("買入股數必須是正整數")
 
-    # 先檢查全部資料，避免使用不完整或排序錯誤的行情。
     previous_date = None
     stock_id = records[0]["stock_id"] if records else None
 
@@ -53,41 +69,65 @@ def run_backtest(records, signals, initial_cash, quantity):
     shares = 0
     trades = []
     equity_curve = []
+    total_commission = Decimal("0")
+    total_tax = Decimal("0")
 
     for index, record in enumerate(records):
-        # 第一天沒有區間內的前日訊號。
         signal = signals[index - 1] if index > 0 else "NONE"
-
         open_price = record["open"]
-        executed_quantity = 0
+
         action = None
+        executed_quantity = 0
+        transaction = None
 
         if signal == "BUY" and shares == 0:
-            cost = open_price * quantity
+            proposed = calculate_transaction(
+                open_price,
+                quantity,
+                "BUY",
+                cost_settings,
+            )
 
-            if cash >= cost:
-                cash -= cost
+            # 買入現金變動是負數，取負號得到所需資金。
+            required_cash = -proposed["cash_change"]
+
+            if cash >= required_cash:
+                transaction = proposed
                 shares = quantity
                 executed_quantity = quantity
                 action = "BUY"
 
         elif signal == "SELL" and shares > 0:
             executed_quantity = shares
-            cash += open_price * shares
+
+            transaction = calculate_transaction(
+                open_price,
+                executed_quantity,
+                "SELL",
+                cost_settings,
+            )
+
             shares = 0
             action = "SELL"
 
-        if action is not None:
+        if transaction is not None:
+            cash += transaction["cash_change"]
+            total_commission += transaction["commission"]
+            total_tax += transaction["tax"]
+
             trades.append({
                 "signal_date": records[index - 1]["date"],
                 "date": record["date"],
                 "action": action,
                 "price": open_price,
                 "quantity": executed_quantity,
+                "amount": transaction["amount"],
+                "commission": transaction["commission"],
+                "tax": transaction["tax"],
+                "cash_change": transaction["cash_change"],
                 "cash_after": cash,
             })
 
-        # 每天收盤時的總資產：現金＋持股市值。
         equity = cash + record["close"] * shares
 
         equity_curve.append({
@@ -109,6 +149,8 @@ def run_backtest(records, signals, initial_cash, quantity):
         "shares": shares,
         "final_equity": final_equity,
         "total_return": final_equity / initial_cash - Decimal("1"),
+        "total_commission": total_commission,
+        "total_tax": total_tax,
         "trades": trades,
         "equity_curve": equity_curve,
     }
