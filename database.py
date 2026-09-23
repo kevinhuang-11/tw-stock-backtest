@@ -1,6 +1,8 @@
 import sqlite3
 from contextlib import closing
 from pathlib import Path
+from decimal import Decimal
+from date_range import parse_date_range
 
 
 # 資料庫位置：專案資料夾/data/stocks.db
@@ -74,3 +76,45 @@ def save_records(records, db_path=DEFAULT_DB_PATH):
 
     # 本次處理筆數，包含新增與更新。
     return len(rows)
+
+
+def load_records(stock_id, start_text, end_text, db_path=DEFAULT_DB_PATH):
+    """讀取指定股票與日期區間的行情，依日期由舊到新排列。"""
+    start, end = parse_date_range(start_text, end_text)
+
+    db_path = Path(db_path).resolve()
+
+    # 唯讀模式，避免找不到檔案時建立空資料庫。
+    uri = db_path.as_uri() + "?mode=ro"
+
+    with closing(sqlite3.connect(uri, uri=True)) as connection:
+        # 讓查詢結果可以透過欄位名稱取值。
+        connection.row_factory = sqlite3.Row
+
+        rows = connection.execute("""
+            SELECT
+                stock_id, date, open, high, low, close,
+                volume, turnover, trade_count
+            FROM stock_prices
+            WHERE stock_id = ?
+              AND date >= ?
+              AND date <= ?
+            ORDER BY date ASC
+        """, (
+            stock_id,
+            start.isoformat(),
+            end.isoformat(),
+        )).fetchall()
+
+    records = []
+
+    for row in rows:
+        record = dict(row)
+
+        for key in ("open", "high", "low", "close"):
+            if record[key] is not None:
+                record[key] = Decimal(record[key])
+
+        records.append(record)
+
+    return records

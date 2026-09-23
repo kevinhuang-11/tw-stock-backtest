@@ -4,8 +4,7 @@ from contextlib import closing
 from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
-
-from database import save_records
+from database import save_records, load_records
 
 
 class TestSaveRecords(unittest.TestCase):
@@ -127,6 +126,68 @@ class TestSaveRecords(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0][1], "2025-01-02")
 
+    def test_load_filters_and_sorts_records(self):
+        first = self.record.copy()
+
+        second = self.record.copy()
+        second["date"] = "2025-01-03"
+
+        outside = self.record.copy()
+        outside["date"] = "2025-01-06"
+
+        other_stock = self.record.copy()
+        other_stock["stock_id"] = "2317"
+
+        # 刻意不依日期順序寫入。
+        save_records(
+            [second, outside, other_stock, first],
+            self.db_path,
+        )
+
+        result = load_records(
+            "2330",
+            "2025-01-02",
+            "2025-01-03",
+            self.db_path,
+        )
+
+        # 只取指定股票與區間，並按照日期排序。
+        self.assertEqual(result, [first, second])
+
+        # 價格確實恢復成 Decimal。
+        self.assertIsInstance(result[0]["close"], Decimal)
+
+    def test_load_empty_range(self):
+        save_records([self.record], self.db_path)
+
+        result = load_records(
+            "2330",
+            "2025-02-01",
+            "2025-02-28",
+            self.db_path,
+        )
+
+        self.assertEqual(result, [])
+
+    def test_load_preserves_missing_prices(self):
+        missing = self.record.copy()
+
+        for key in ("open", "high", "low", "close"):
+            missing[key] = None
+
+        for key in ("volume", "turnover", "trade_count"):
+            missing[key] = 0
+
+        save_records([missing], self.db_path)
+
+        result = load_records(
+            "2330",
+            "2025-01-02",
+            "2025-01-02",
+            self.db_path,
+        )
+
+        self.assertEqual(result, [missing])
 
 if __name__ == "__main__":
     unittest.main()
