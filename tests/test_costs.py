@@ -2,6 +2,7 @@ import unittest
 from decimal import Decimal, ROUND_HALF_UP
 
 from tw_stock_backtest.backtesting.costs import CostSettings, calculate_transaction
+from tw_stock_backtest.backtesting.costs import calculate_buy_quantity
 
 
 class TestTransactionCosts(unittest.TestCase):
@@ -140,6 +141,103 @@ class TestTransactionCosts(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     CostSettings(**values)
 
+class TestBuyQuantity(unittest.TestCase):
+    def setUp(self):
+        self.settings = CostSettings(
+            commission_rate=Decimal("0.001425"),
+            commission_discount=Decimal("1"),
+            minimum_commission=Decimal("20"),
+            sell_tax_rate=Decimal("0.003"),
+            commission_rounding="ROUND_DOWN",
+            tax_rounding="ROUND_DOWN",
+        )
+
+    def test_budget_includes_minimum_commission(self):
+        quantity = calculate_buy_quantity(
+            Decimal("100"),
+            Decimal("1000"),
+            self.settings,
+        )
+
+        # 9 股：900 + 20 = 920，可以買。
+        # 10 股：1000 + 20 = 1020，超出預算。
+        self.assertEqual(quantity, 9)
+
+    def test_exact_budget_is_enough(self):
+        quantity = calculate_buy_quantity(
+            Decimal("100"),
+            Decimal("1020"),
+            self.settings,
+        )
+
+        # 10 股：1000 + 20 = 1020，剛好足夠。
+        self.assertEqual(quantity, 10)
+
+    def test_percentage_commission(self):
+        quantity = calculate_buy_quantity(
+            Decimal("1000"),
+            Decimal("100000"),
+            self.settings,
+        )
+
+        # 99 股：
+        # 成交金額 99000，手續費 floor(141.075) = 141。
+        # 合計 99141，可以買。
+        #
+        # 100 股：
+        # 成交金額 100000，手續費 floor(142.5) = 142。
+        # 合計 100142，超出預算。
+        self.assertEqual(quantity, 99)
+
+    def test_insufficient_budget_returns_zero(self):
+        for budget in (Decimal("0"), Decimal("119")):
+            with self.subTest(budget=budget):
+                quantity = calculate_buy_quantity(
+                    Decimal("100"),
+                    budget,
+                    self.settings,
+                )
+
+                # 1 股至少需要 100 + 20 = 120 元。
+                self.assertEqual(quantity, 0)
+
+    def test_zero_commission(self):
+        settings = CostSettings(
+            commission_rate=Decimal("0"),
+            commission_discount=Decimal("1"),
+            minimum_commission=Decimal("0"),
+            sell_tax_rate=Decimal("0"),
+        )
+
+        quantity = calculate_buy_quantity(
+            Decimal("100"),
+            Decimal("1000"),
+            settings,
+        )
+
+        self.assertEqual(quantity, 10)
+
+    def test_invalid_inputs(self):
+        cases = [
+            (Decimal("0"), Decimal("1000")),
+            (Decimal("-1"), Decimal("1000")),
+            (Decimal("NaN"), Decimal("1000")),
+            (Decimal("Infinity"), Decimal("1000")),
+            (Decimal("100"), Decimal("-1")),
+            (Decimal("100"), Decimal("NaN")),
+            (Decimal("100"), Decimal("Infinity")),
+            (100, Decimal("1000")),
+            (Decimal("100"), 1000),
+        ]
+
+        for price, budget in cases:
+            with self.subTest(price=price, budget=budget):
+                with self.assertRaises(ValueError):
+                    calculate_buy_quantity(
+                        price,
+                        budget,
+                        self.settings,
+                    )
 
 if __name__ == "__main__":
     unittest.main()

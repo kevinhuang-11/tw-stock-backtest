@@ -98,3 +98,47 @@ def calculate_transaction(price, quantity, side, settings):
         "tax": tax,
         "cash_change": cash_change,
     }
+
+def calculate_buy_quantity(price, budget, settings):
+    """找出預算內可買的最大整數股數，預算包含手續費。"""
+    if (
+        not isinstance(price, Decimal)
+        or not price.is_finite()
+        or price <= 0
+    ):
+        raise ValueError("價格必須是大於零的有限 Decimal")
+
+    if (
+        not isinstance(budget, Decimal)
+        or not budget.is_finite()
+        or budget < 0
+    ):
+        raise ValueError("預算必須是非負的有限 Decimal")
+
+    if not isinstance(settings, CostSettings):
+        raise ValueError("settings 必須是 CostSettings")
+
+    # 完全不計手續費時，最多能買的股數。
+    low = 0
+    high = int(budget // price)
+
+    # 二分搜尋：找出含手續費後，仍在預算內的最大股數。
+    while low < high:
+        middle = (low + high + 1) // 2
+
+        transaction = calculate_transaction(
+            price,
+            middle,
+            "BUY",
+            settings,
+        )
+
+        required_cash = -transaction["cash_change"]
+
+        if required_cash <= budget:
+            low = middle
+        else:
+            high = middle - 1
+
+    return low
+

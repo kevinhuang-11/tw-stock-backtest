@@ -93,6 +93,12 @@ def parse_arguments():
         default="rules",
         help="排名方式：rules 為規則篩選，factors 為多因子評分",
     )
+    parser.add_argument(
+        "--sizing",
+        choices=("fixed_quantity", "fixed_budget"),
+        default=None,
+        help="股數配置模式；未指定時使用設定檔",
+    )
     return parser.parse_args()
 
 
@@ -126,6 +132,7 @@ def main():
                     "initial_cash": args.cash,
                     "quantity": args.quantity,
                     "max_positions": args.max_positions,
+                    "sizing_mode": args.sizing,
                 },
             },
         )
@@ -159,6 +166,7 @@ def main():
             cost_settings=cost_settings,
             ranking_method=args.ranking,
             factor_settings=settings["factors"],
+            sizing_mode=backtest_settings["sizing_mode"],
         )
         performance = summarize_performance(
             result["equity_curve"],
@@ -235,8 +243,17 @@ def main():
         print(f"保留候選數：{factor_settings['top_n']}")
         print("不設定最低分數門檻，依排名選取目標持股。")
     print(f"持股上限：{backtest_settings['max_positions']}")
-    print(f"每次買進股數：{backtest_settings['quantity']}")
-
+    if result["sizing_mode"] == "fixed_quantity":
+        print("配置模式：固定股數")
+        print(f"每次買進股數：{backtest_settings['quantity']}")
+    else:
+        print("配置模式：固定預算")
+        print(
+            f"單檔買進預算上限："
+            f"{result['budget_per_position']:.2f} 元（含手續費）"
+        )
+        print("預算按初始資金 / 持股上限計算，期間內維持不變")
+        print("現金不足時縮減買進股數；既有持股不每日調整股數")
     print(f"\n手續費率：{cost_settings.commission_rate:.4%}")
     print(f"折扣倍率：{cost_settings.commission_discount}")
     print(f"最低手續費：{cost_settings.minimum_commission} 元")

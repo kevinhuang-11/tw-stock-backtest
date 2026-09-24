@@ -57,8 +57,12 @@ REQUIRED_FIELDS = {
         "volatility_weight",
     },
 }
-
-
+# 選填欄位及其預設值。
+OPTIONAL_DEFAULTS = {
+    "backtest": {
+        "sizing_mode": "fixed_quantity",
+    },
+}
 DECIMAL_FIELDS = (
     ("screening", "min_volume_ratio"),
     ("backtest", "initial_cash"),
@@ -134,12 +138,26 @@ def validate_settings(settings):
                 f"{section} 缺少欄位：{', '.join(sorted(missing))}"
             )
 
-        unknown = set(values) - required
+        optional = OPTIONAL_DEFAULTS.get(section, {})
+        allowed = required | set(optional)
+
+        unknown = set(values) - allowed
         if unknown:
             raise ValueError(
                 f"{section} 有未知欄位：{', '.join(sorted(unknown))}"
             )
 
+        # 只在沒提供欄位時補預設值，不掩蓋無效值。
+        for key, default in optional.items():
+            values.setdefault(key, default)
+    sizing_mode = result["backtest"]["sizing_mode"]
+
+    if sizing_mode not in ("fixed_quantity", "fixed_budget"):
+        raise ValueError(
+            "backtest.sizing_mode 必須是 "
+            "fixed_quantity 或 fixed_budget"
+        )
+    
     stocks = result["universe"]["stocks"]
 
     if (
@@ -270,10 +288,14 @@ def apply_overrides(settings, overrides):
         if section not in REQUIRED_FIELDS:
             raise ValueError(f"未知設定區段：{section}")
 
-        for key, value in values.items():
-            if key not in REQUIRED_FIELDS[section]:
-                raise ValueError(f"未知設定欄位：{section}.{key}")
+        allowed = (
+            REQUIRED_FIELDS[section]
+            | set(OPTIONAL_DEFAULTS.get(section, {}))
+        )
 
+        for key, value in values.items():
+            if key not in allowed:
+                raise ValueError(f"未知設定欄位：{section}.{key}")
             if value is not None:
                 result[section][key] = value
 

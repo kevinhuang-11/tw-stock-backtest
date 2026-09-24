@@ -7,6 +7,7 @@ from tw_stock_backtest.analysis.screening_history import (
 from tw_stock_backtest.backtesting.costs import (
     CostSettings,
     calculate_transaction,
+    calculate_buy_quantity,
 )
 from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.analysis.factors import build_factor_history
@@ -117,7 +118,9 @@ def run_portfolio_backtest(
     ranking_method="rules",
     factor_settings=None,
     confirmed_halts=None,
+    sizing_mode="fixed_quantity",
 ):
+
     start, end = parse_date_range(start_text, end_text)
 
     if (
@@ -138,7 +141,14 @@ def run_portfolio_backtest(
         raise ValueError("必須提供 CostSettings")
 
     plan_rebalance({}, [], max_positions=max_positions)
+    if sizing_mode not in ("fixed_quantity", "fixed_budget"):
+        raise ValueError(
+            "股數配置模式必須是 fixed_quantity 或 fixed_budget"
+        )
 
+    # 整段回測使用相同的單檔買進預算上限。
+    # 此版本不隨資產變化調整預算，也不調整既有持股股數。
+    budget_per_position = initial_cash / Decimal(max_positions)
     if ranking_method == "rules":
         active_settings = screening_settings
         rule_parameters = {
@@ -219,25 +229,47 @@ def run_portfolio_backtest(
 
                     if not record["tradable"]:
                         reason = "已確認停牌，當日不成交"
+
                     elif (
                         action == "BUY"
                         and len(holdings) >= max_positions
                     ):
                         reason = "已達持股上限"
-                    else:
-                        transaction = calculate_transaction(
-                            record["open"],
-                            shares,
-                            action,
-                            cost_settings,
-                        )
 
+                    else:
                         if (
                             action == "BUY"
-                            and cash < -transaction["cash_change"]
+                            and sizing_mode == "fixed_budget"
                         ):
-                            reason = "資金不足，含手續費"
+                            available_budget = min(
+                                budget_per_position,
+                                cash,
+                            )
 
+                            shares = calculate_buy_quantity(
+                                record["open"],
+                                available_budget,
+                                cost_settings,
+                            )
+
+                            if shares == 0:
+                                reason = (
+                                    "預算或現金不足以買進一股，含手續費"
+                                )
+
+                        if reason is None:
+                            transaction = calculate_transaction(
+                                record["open"],
+                                shares,
+                                action,
+                                cost_settings,
+                            )
+
+                            if (
+                                action == "BUY"
+                                and cash < -transaction["cash_change"]
+                            ):
+                                reason = "資金不足，含手續費"
                     if reason is not None:
                         skipped_orders.append(
                             {
@@ -390,6 +422,12 @@ def run_portfolio_backtest(
 
     return {
         "ranking_method": ranking_method,
+        "sizing_mode": sizing_mode,
+        "budget_per_position": (
+            budget_per_position
+            if sizing_mode == "fixed_budget"
+            else None
+        ),
         "initial_cash": initial_cash,
         "cash": cash,
         "holdings": holdings.copy(),
@@ -403,3 +441,4 @@ def run_portfolio_backtest(
         "skipped_rebalances": skipped_rebalances,
         "market_events": market_events,
     }
+

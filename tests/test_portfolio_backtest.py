@@ -1,7 +1,7 @@
 import unittest
 from datetime import date, timedelta
 from decimal import Decimal
-
+from unittest.mock import patch
 from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.backtesting.portfolio import (
     run_portfolio_backtest,
@@ -189,6 +189,253 @@ class TestPortfolioBacktest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.run_engine(records)
 
+class TestPortfolioBudget(unittest.TestCase):
+    def setUp(self):
+        self.cost_settings = CostSettings(
+            commission_rate=Decimal("0"),
+            commission_discount=Decimal("1"),
+            minimum_commission=Decimal("0"),
+            sell_tax_rate=Decimal("0"),
+        )
+
+        self.screening_settings = {
+            "short_window": 1,
+            "long_window": 2,
+            "volume_window": 1,
+            "min_volume_ratio": Decimal("0"),
+            "momentum_window": 1,
+            "top_n": 2,
+        }
+
+    def make_records(self, stock_id, prices):
+        return [
+            {
+                "stock_id": stock_id,
+                "date": f"2024-01-{day:02d}",
+                "open": Decimal(price),
+                "high": Decimal(price),
+                "low": Decimal(price),
+                "close": Decimal(price),
+                "volume": 100,
+                "turnover": 1000,
+                "trade_count": 10,
+            }
+            for day, price in enumerate(prices, start=1)
+        ]
+
+    def run_case(
+        self,
+        records,
+        signals,
+        *,
+        initial_cash=Decimal("1000"),
+        max_positions=2,
+        sizing_mode="fixed_budget",
+        cost_settings=None,
+        confirmed_halts=None,
+    ):
+        def fake_evaluate(history, as_of, **kwargs):
+            stock_id = history[-1]["stock_id"]
+
+            return {
+                "stock_id": stock_id,
+                "selected": stock_id in signals.get(as_of, []),
+                "momentum": Decimal("1"),
+            }
+
+        with patch(
+            "tw_stock_backtest.backtesting.portfolio.evaluate_stock",
+            side_effect=fake_evaluate,
+        ):
+            return run_portfolio_backtest(
+                records,
+                "2024-01-01",
+                "2024-01-03",
+                screening_settings=self.screening_settings,
+                initial_cash=initial_cash,
+                quantity=10,
+                max_positions=max_positions,
+                cost_settings=(
+                    self.cost_settings
+                    if cost_settings is None
+                    else cost_settings
+                ),
+                sizing_mode=sizing_mode,
+                confirmed_halts=(
+                    {}
+                    if confirmed_halts is None
+                    else confirmed_halts
+                ),
+            )
+
+    def test_equal_budget_and_no_daily_resizing(self):
+        records = {
+            "AAA": self.make_records("AAA", ["10", "10", "20"]),
+            "BBB": self.make_records("BBB", ["20", "20", "20"]),
+        }
+        signals = {
+            "2024-01-01": ["AAA", "BBB"],
+            "2024-01-02": ["AAA", "BBB"],
+            "2024-01-03": ["AAA", "BBB"],
+        }
+
+        result = self.run_case(records, signals)
+
+        # 每檔預算 500 元：
+        # AAA 買 50 股，BBB 買 25 股。
+        self.assertEqual(
+            result["holdings"],
+            {"AAA": 50, "BBB": 25},
+        )
+        self.assertEqual(result["cash"], Decimal("0"))
+        self.assertEqual(result["budget_per_position"], Decimal("500"))
+        self.assertEqual(len(result["trades"]), 2)
+
+        # 第一日產生訊號，第二日成交。
+        self.assertTrue(
+            all(
+                trade["date"] == "2024-01-02"
+                for trade in result["trades"]
+            )
+        )
+
+        # 第三日 AAA 漲價，但不重新調整股數。
+        self.assertEqual(result["final_equity"], Decimal("1500"))
+
+    def test_budget_includes_commission(self):
+        settings = CostSettings(
+            commission_rate=Decimal("0"),
+            commission_discount=Decimal("1"),
+            minimum_commission=Decimal("20"),
+            sell_tax_rate=Decimal("0"),
+        )
+        records = {
+            "AAA": self.make_records("AAA", ["100", "100", "100"]),
+        }
+        signals = {
+            "2024-01-01": ["AAA"],
+            "2024-01-02": ["AAA"],
+        }
+
+        result = self.run_case(
+            records,
+            signals,
+            max_positions=1,
+            cost_settings=settings,
+        )
+
+        # 9 股 × 100 + 20 手續費 = 920。
+        self.assertEqual(result["holdings"], {"AAA": 9})
+        self.assertEqual(result["cash"], Decimal("80"))
+        self.assertEqual(result["total_commission"], Decimal("20"))
+
+    def test_replacement_uses_only_available_cash(self):
+        records = {
+            "AAA": self.make_records("AAA", ["10", "10", "5"]),
+            "BBB": self.make_records("BBB", ["20", "20", "20"]),
+        }
+        signals = {
+            "2024-01-01": ["AAA"],
+            "2024-01-02": ["BBB"],
+        }
+
+        result = self.run_case(
+            records,
+            signals,
+            max_positions=1,
+        )
+
+        # 第二日以 1000 元買進 AAA 100 股。
+        # 第三日先以 5 元賣出，現金只剩 500 元。
+        # BBB 只能買 25 股，不能使用原本 1000 元預算超支。
+        self.assertEqual(result["holdings"], {"BBB": 25})
+        self.assertEqual(result["cash"], Decimal("0"))
+        self.assertEqual(
+            [
+                (trade["stock_id"], trade["action"])
+                for trade in result["trades"]
+            ],
+            [
+                ("AAA", "BUY"),
+                ("AAA", "SELL"),
+                ("BBB", "BUY"),
+            ],
+        )
+
+    def test_unaffordable_stock_does_not_block_other_stock(self):
+        records = {
+            "AAA": self.make_records("AAA", ["600", "600", "600"]),
+            "BBB": self.make_records("BBB", ["20", "20", "20"]),
+        }
+
+        result = self.run_case(
+            records,
+            {"2024-01-01": ["AAA", "BBB"]},
+        )
+
+        # 單檔預算 500，AAA 連一股都買不起。
+        # BBB 仍正常買進；第三日依空候選名單賣出。
+        self.assertEqual(
+            [
+                (trade["stock_id"], trade["action"])
+                for trade in result["trades"]
+            ],
+            [("BBB", "BUY"), ("BBB", "SELL")],
+        )
+        self.assertEqual(result["skipped_orders"][0]["stock_id"], "AAA")
+        self.assertIn(
+            "不足以買進一股",
+            result["skipped_orders"][0]["reason"],
+        )
+        self.assertEqual(result["cash"], Decimal("1000"))
+
+    def test_halted_sell_does_not_release_slot_or_cash(self):
+        records = {
+            "AAA": self.make_records("AAA", ["10", "10", "10"]),
+            "BBB": self.make_records("BBB", ["20", "20", "20"]),
+        }
+
+        halt = records["AAA"][2]
+        for field in ("open", "high", "low", "close"):
+            halt[field] = None
+        for field in ("volume", "turnover", "trade_count"):
+            halt[field] = 0
+
+        result = self.run_case(
+            records,
+            {
+                "2024-01-01": ["AAA"],
+                "2024-01-02": ["BBB"],
+            },
+            max_positions=1,
+            confirmed_halts={
+                ("AAA", "2024-01-03"): {
+                    "reason": "人工停牌測試",
+                    "source": "unit test",
+                },
+            },
+        )
+
+        self.assertEqual(result["holdings"], {"AAA": 100})
+        self.assertEqual(result["cash"], Decimal("0"))
+        self.assertEqual(len(result["trades"]), 1)
+        self.assertEqual(len(result["skipped_orders"]), 2)
+        self.assertEqual(
+            result["skipped_orders"][1]["reason"],
+            "已達持股上限",
+        )
+
+    def test_invalid_sizing_mode(self):
+        records = {
+            "AAA": self.make_records("AAA", ["10", "10", "10"]),
+        }
+
+        with self.assertRaises(ValueError):
+            self.run_case(
+                records,
+                {},
+                sizing_mode="unknown",
+            )
 
 if __name__ == "__main__":
     unittest.main()

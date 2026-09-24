@@ -4,7 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from tw_stock_backtest.config import apply_overrides, load_config
-
+from tw_stock_backtest.config import validate_settings
 
 TEST_CONFIG = """
 [universe]
@@ -198,6 +198,88 @@ class TestConfig(unittest.TestCase):
 
         with self.assertRaises(FileNotFoundError):
             load_config(missing_path)
+
+    def test_legacy_config_defaults_to_fixed_quantity(self):
+        settings = load_config(self.config_path)
+
+        # 模擬沒有新欄位的舊設定。
+        settings["backtest"].pop("sizing_mode", None)
+
+        validated = validate_settings(settings)
+
+        self.assertEqual(
+            validated["backtest"]["sizing_mode"],
+            "fixed_quantity",
+        )
+
+        # 驗證過程不應修改傳入的設定。
+        self.assertNotIn("sizing_mode", settings["backtest"])
+
+    def test_load_fixed_budget_from_file(self):
+        text = self.config_path.read_text(encoding="utf-8")
+
+        # 在既有 backtest 區段插入新設定。
+        text = text.replace(
+            "[backtest]",
+            '[backtest]\nsizing_mode = "fixed_budget"',
+            1,
+        )
+        self.config_path.write_text(text, encoding="utf-8")
+
+        settings = load_config(self.config_path)
+
+        self.assertEqual(
+            settings["backtest"]["sizing_mode"],
+            "fixed_budget",
+        )
+
+    def test_sizing_override_and_none_preserve_settings(self):
+        settings = load_config(self.config_path)
+
+        fixed = apply_overrides(
+            settings,
+            {"backtest": {"sizing_mode": "fixed_quantity"}},
+        )
+        budget = apply_overrides(
+            fixed,
+            {"backtest": {"sizing_mode": "fixed_budget"}},
+        )
+        unchanged = apply_overrides(
+            budget,
+            {"backtest": {"sizing_mode": None}},
+        )
+
+        self.assertEqual(
+            fixed["backtest"]["sizing_mode"],
+            "fixed_quantity",
+        )
+        self.assertEqual(
+            budget["backtest"]["sizing_mode"],
+            "fixed_budget",
+        )
+        self.assertEqual(
+            unchanged["backtest"]["sizing_mode"],
+            "fixed_budget",
+        )
+
+    def test_invalid_sizing_modes_are_rejected(self):
+        settings = load_config(self.config_path)
+
+        for value in ("unknown", "", 1, True, None):
+            with self.subTest(value=value):
+                # 直接驗證設定中的 None，應拒絕。
+                # 命令列覆寫的 None 則代表「未指定」。
+                candidate = load_config(self.config_path)
+                candidate["backtest"]["sizing_mode"] = value
+
+                with self.assertRaises(ValueError):
+                    validate_settings(candidate)
+
+        with self.assertRaises(ValueError):
+            apply_overrides(
+                settings,
+                {"backtest": {"sizing_mode": "unknown"}},
+            )
 
 
 if __name__ == "__main__":
