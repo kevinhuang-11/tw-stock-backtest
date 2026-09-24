@@ -9,7 +9,7 @@ from tw_stock_backtest.backtesting.costs import (
     calculate_transaction,
 )
 from tw_stock_backtest.date_range import parse_date_range
-
+from tw_stock_backtest.analysis.factors import build_factor_history
 
 
 def plan_rebalance(
@@ -105,6 +105,8 @@ def run_portfolio_backtest(
     quantity,
     max_positions,
     cost_settings,
+    ranking_method="rules",
+    factor_settings=None,
 ):
     """每日選股，下一行情日開盤調整持股的簡化組合回測。"""
     start, end = parse_date_range(start_text, end_text)
@@ -132,12 +134,27 @@ def run_portfolio_backtest(
     # 沿用持股計畫函式，驗證持股上限。
     plan_rebalance({}, [], max_positions=max_positions)
 
-    screening_history = build_screening_history(
-        records_by_stock,
-        start.isoformat(),
-        end.isoformat(),
-        screening_settings=screening_settings,
-    )
+    if ranking_method == "rules":
+        screening_history = build_screening_history(
+            records_by_stock,
+            start.isoformat(),
+            end.isoformat(),
+            screening_settings=screening_settings,
+        )
+
+    elif ranking_method == "factors":
+        if factor_settings is None:
+            raise ValueError("因子排名模式必須提供 factor_settings")
+
+        screening_history = build_factor_history(
+            records_by_stock,
+            start.isoformat(),
+            end.isoformat(),
+            factor_settings=factor_settings,
+        )
+
+    else:
+        raise ValueError("ranking_method 只支援 rules 或 factors")
 
     if not screening_history:
         raise ValueError("指定期間沒有可回測的行情")
@@ -326,6 +343,7 @@ def run_portfolio_backtest(
     final_equity = equity_curve[-1]["equity"]
 
     return {
+        "ranking_method": ranking_method,
         "initial_cash": initial_cash,
         "cash": cash,
         "holdings": holdings.copy(),

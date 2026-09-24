@@ -1,5 +1,6 @@
 from decimal import Decimal
 from datetime import date
+from tw_stock_backtest.date_range import parse_date_range
 
 
 FACTOR_DIRECTIONS = {
@@ -308,3 +309,115 @@ def calculate_factor_row(records, as_of, *, factor_settings):
         "volatility": variance.sqrt(),
     }
 
+def build_factor_history(
+    records_by_stock,
+    start_text,
+    end_text,
+    *,
+    factor_settings,
+):
+    """逐日計算因子排名，輸出回測引擎使用的候選名單。"""
+    start, end = parse_date_range(start_text, end_text)
+    top_n = factor_settings["top_n"]
+
+    if (
+        isinstance(top_n, bool)
+        or not isinstance(top_n, int)
+        or top_n <= 0
+    ):
+        raise ValueError("top_n 必須是正整數")
+
+    weights = {
+        "momentum": factor_settings["momentum_weight"],
+        "trend": factor_settings["trend_weight"],
+        "volatility": factor_settings["volatility_weight"],
+    }
+
+    # 即使沒有行情，也先確認權重是否合法。
+    rank_factor_candidates([], weights=weights)
+
+    analysis_dates = set()
+
+    for stock_id, records in records_by_stock.items():
+        previous_date = None
+
+        for record in records:
+            current_date = date.fromisoformat(record["date"])
+
+            if record["stock_id"] != stock_id:
+                raise ValueError(f"{stock_id} 的行情混入其他股票")
+
+            if (
+                previous_date is not None
+                and current_date <= previous_date
+            ):
+                raise ValueError("行情日期必須遞增且不可重複")
+
+            previous_date = current_date
+
+            if start <= current_date <= end:
+                analysis_dates.add(current_date)
+
+    available = {
+        stock_id: []
+        for stock_id in records_by_stock
+    }
+    positions = {
+        stock_id: 0
+        for stock_id in records_by_stock
+    }
+
+    history = []
+
+    for analysis_date in sorted(analysis_dates):
+        as_of = analysis_date.isoformat()
+        factor_rows = []
+        errors = {}
+
+        for stock_id, records in records_by_stock.items():
+            position = positions[stock_id]
+
+            while (
+                position < len(records)
+                and date.fromisoformat(
+                    records[position]["date"]
+                ) <= analysis_date
+            ):
+                available[stock_id].append(records[position])
+                position += 1
+
+            positions[stock_id] = position
+
+            try:
+                factor_rows.append(
+                    calculate_factor_row(
+                        available[stock_id],
+                        as_of,
+                        factor_settings=factor_settings,
+                    )
+                )
+            except ValueError as error:
+                errors[stock_id] = str(error)
+
+        # 相對排名需要固定的比較母體。
+        # 有任何股票無法評估，該日不產生新目標。
+        ranked = (
+            []
+            if errors
+            else rank_factor_candidates(
+                factor_rows,
+                weights=weights,
+            )
+        )
+
+        history.append(
+            {
+                "date": as_of,
+                "evaluated_count": len(factor_rows),
+                "matched_count": len(ranked),
+                "candidates": ranked[:top_n],
+                "errors": errors,
+            }
+        )
+
+    return history

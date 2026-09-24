@@ -87,6 +87,12 @@ def parse_arguments():
         default=None,
         help="匯出目錄；搭配 --export，預設為專案的 reports",
     )
+    parser.add_argument(
+        "--ranking",
+        choices=("rules", "factors"),
+        default="rules",
+        help="排名方式：rules 為規則篩選，factors 為多因子評分",
+    )
     return parser.parse_args()
 
 
@@ -103,7 +109,18 @@ def main():
                     "stocks": args.stocks,
                 },
                 "screening": {
-                    "top_n": args.top,
+                    "top_n": (
+                        args.top
+                        if args.ranking == "rules"
+                        else None
+                    ),
+                },
+                "factors": {
+                    "top_n": (
+                        args.top
+                        if args.ranking == "factors"
+                        else None
+                    ),
                 },
                 "backtest": {
                     "initial_cash": args.cash,
@@ -140,6 +157,8 @@ def main():
             quantity=backtest_settings["quantity"],
             max_positions=backtest_settings["max_positions"],
             cost_settings=cost_settings,
+            ranking_method=args.ranking,
+            factor_settings=settings["factors"],
         )
         performance = summarize_performance(
             result["equity_curve"],
@@ -174,21 +193,41 @@ def main():
     print(f"實際期間：{first_date} ～ {last_date}")
     print(f"回測行情日數：{len(result['equity_curve'])}")
 
-    print(
-        f"\n趨勢條件：Close"
-        f" > SMA{screening_settings['short_window']}"
-        f" > SMA{screening_settings['long_window']}"
-    )
-    print(
-        f"量比條件：當日量 / 前"
-        f" {screening_settings['volume_window']} 筆均量"
-        f" > {screening_settings['min_volume_ratio']}"
-    )
-    print(
-        f"排名依據："
-        f"{screening_settings['momentum_window']} 期價格報酬率"
-    )
-    print(f"保留候選數：{screening_settings['top_n']}")
+    if args.ranking == "rules":
+        print("\n排名模式：規則篩選")
+        print(
+            f"趨勢條件：Close"
+            f" > SMA{screening_settings['short_window']}"
+            f" > SMA{screening_settings['long_window']}"
+        )
+        print(
+            f"量比條件：當日量 / 前"
+            f" {screening_settings['volume_window']} 筆均量"
+            f" > {screening_settings['min_volume_ratio']}"
+        )
+        print(
+            f"排名依據："
+            f"{screening_settings['momentum_window']} 期價格報酬率"
+        )
+        print(f"保留候選數：{screening_settings['top_n']}")
+
+    else:
+        factor_settings = settings["factors"]
+
+        print("\n排名模式：多因子評分")
+        print(
+            f"期間：動能 {factor_settings['momentum_window']}，"
+            f"均線 {factor_settings['short_window']}"
+            f"/{factor_settings['long_window']}，"
+            f"波動 {factor_settings['volatility_window']}"
+        )
+        print(
+            f"權重：動能 {factor_settings['momentum_weight']}，"
+            f"趨勢 {factor_settings['trend_weight']}，"
+            f"低波動 {factor_settings['volatility_weight']}"
+        )
+        print(f"保留候選數：{factor_settings['top_n']}")
+        print("不設定最低分數門檻，依排名選取目標持股。")
     print(f"持股上限：{backtest_settings['max_positions']}")
     print(f"每次買進股數：{backtest_settings['quantity']}")
 
