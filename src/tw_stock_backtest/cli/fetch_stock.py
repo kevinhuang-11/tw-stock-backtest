@@ -48,6 +48,61 @@ def fetch_month(stock_id, month, *, timeout_seconds):
 
     return result
 
+def fetch_month_with_retry(
+    stock_id,
+    month,
+    *,
+    timeout_seconds,
+    max_attempts,
+    retry_wait_seconds,
+):
+    """遇到指定的暫時性錯誤時，有限次數重試。"""
+    for name, value in (
+        ("max_attempts", max_attempts),
+        ("retry_wait_seconds", retry_wait_seconds),
+    ):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or value <= 0
+        ):
+            raise ValueError(f"{name} 必須是正整數")
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return fetch_month(
+                stock_id,
+                month,
+                timeout_seconds=timeout_seconds,
+            )
+
+        except HTTPError as error:
+            # HTTPError 是 URLError 的子類別，必須先處理。
+            if (
+                error.code not in (502, 503, 504)
+                or attempt == max_attempts
+            ):
+                raise
+
+            message = f"HTTP {error.code}"
+
+        except (URLError, TimeoutError, ConnectionError) as error:
+            if attempt == max_attempts:
+                raise
+
+            message = str(error)
+
+        wait_seconds = retry_wait_seconds * (2 ** (attempt - 1))
+
+        print(
+            f"查詢失敗：{message}。"
+            f"等待 {wait_seconds} 秒後進行第"
+            f" {attempt + 1}/{max_attempts} 次嘗試。",
+            flush=True,
+        )
+
+        time.sleep(wait_seconds)
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -116,10 +171,14 @@ def main():
                 flush=True,
             )
 
-            result = fetch_month(
+            result = fetch_month_with_retry(
                 stock_id,
                 month.strftime("%Y%m%d"),
                 timeout_seconds=timeout_seconds,
+                max_attempts=download_settings["max_attempts"],
+                retry_wait_seconds=download_settings[
+                    "retry_wait_seconds"
+                ],
             )
 
             monthly_records = [

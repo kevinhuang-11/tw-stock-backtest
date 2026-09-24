@@ -40,6 +40,8 @@ REQUIRED_FIELDS = {
     "download": {
         "timeout_seconds",
         "request_interval_seconds",
+        "max_attempts",
+        "retry_wait_seconds",
     },
     "storage": {
         "database_path",
@@ -67,6 +69,8 @@ POSITIVE_INTEGER_FIELDS = (
     ("strategy", "long_window"),
     ("backtest", "quantity"),
     ("backtest", "max_positions"),
+    ("download", "max_attempts"),
+    ("download", "retry_wait_seconds"),
 )
 
 

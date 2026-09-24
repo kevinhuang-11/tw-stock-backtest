@@ -29,6 +29,8 @@ tax_rounding = "ROUND_DOWN"
 [download]
 timeout_seconds = 30
 request_interval_seconds = 3
+max_attempts = 3
+retry_wait_seconds = 3
 
 [storage]
 database_path = "data/stocks.db"
