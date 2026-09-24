@@ -7,7 +7,9 @@ name = "tw-stock-backtest"
 version = "0.1.0"
 description = "Taiwan stock screening and backtesting tools"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "matplotlib>=3.8,<4",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
