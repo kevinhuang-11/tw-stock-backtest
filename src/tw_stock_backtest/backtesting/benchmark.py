@@ -6,6 +6,10 @@ from tw_stock_backtest.backtesting.costs import (
     calculate_transaction,
 )
 from tw_stock_backtest.date_range import parse_date_range
+from tw_stock_backtest.data.market_events import (
+    CONFIRMED_HALTS,
+    prepare_backtest_market,
+)
 
 
 def affordable_quantity(price, budget, cost_settings):
@@ -40,12 +44,9 @@ def run_buy_and_hold(
     *,
     initial_cash,
     cost_settings,
+    confirmed_halts=None,
 ):
-    """等預算買入股票池，持有到期末的簡化基準。"""
     start, end = parse_date_range(start_text, end_text)
-
-    if not records_by_stock:
-        raise ValueError("股票池不可為空")
 
     if (
         not isinstance(initial_cash, Decimal)
@@ -57,114 +58,73 @@ def run_buy_and_hold(
     if not isinstance(cost_settings, CostSettings):
         raise ValueError("必須提供 CostSettings")
 
-    prices_by_stock = {}
-    all_dates = set()
+    events = CONFIRMED_HALTS if confirmed_halts is None else confirmed_halts
 
-    for stock_id, records in records_by_stock.items():
-        selected = {}
-        previous_date = None
-
-        for record in records:
-            current_date = date.fromisoformat(record["date"])
-
-            if record["stock_id"] != stock_id:
-                raise ValueError(f"{stock_id} 的行情混入其他股票")
-
-            if (
-                previous_date is not None
-                and current_date <= previous_date
-            ):
-                raise ValueError("行情日期必須遞增且不可重複")
-
-            previous_date = current_date
-
-            if start <= current_date <= end:
-                for field in ("open", "close"):
-                    value = record[field]
-
-                    if (
-                        not isinstance(value, Decimal)
-                        or not value.is_finite()
-                        or value <= 0
-                    ):
-                        raise ValueError(
-                            f"{stock_id} / {record['date']} "
-                            f"的 {field} 必須是正值且有限的 Decimal"
-                        )
-
-                selected[record["date"]] = record
-                all_dates.add(record["date"])
-
-        prices_by_stock[stock_id] = selected
-
-    if not all_dates:
-        raise ValueError("指定期間沒有可回測的行情")
-
-    trading_dates = sorted(all_dates)
-
-    for stock_id, prices in prices_by_stock.items():
-        for trading_date in trading_dates:
-            if trading_date not in prices:
-                raise ValueError(
-                    f"{stock_id} 缺少 {trading_date} 行情"
-                )
-
-    # 每檔預算無條件捨去到分，避免分配總額超過初始資金。
-    stock_count = len(prices_by_stock)
-    budget = (
-        (initial_cash * 100 // stock_count) / Decimal("100")
+    market, trading_dates = prepare_backtest_market(
+        records_by_stock,
+        start,
+        end,
+        confirmed_halts=events,
     )
+
+    budget = (
+        initial_cash * 100 // len(market)
+    ) / Decimal("100")
 
     cash = initial_cash
     holdings = {}
     trades = []
-    unbought = []
-    total_commission = Decimal("0")
-
-    first_date = trading_dates[0]
-
-    for stock_id in sorted(prices_by_stock):
-        price = prices_by_stock[stock_id][first_date]["open"]
-
-        quantity = affordable_quantity(
-            price,
-            budget,
-            cost_settings,
-        )
-
-        if quantity == 0:
-            unbought.append(stock_id)
-            continue
-
-        transaction = calculate_transaction(
-            price,
-            quantity,
-            "BUY",
-            cost_settings,
-        )
-
-        cash += transaction["cash_change"]
-        holdings[stock_id] = quantity
-        total_commission += transaction["commission"]
-
-        trades.append(
-            {
-                "stock_id": stock_id,
-                "date": first_date,
-                "action": "BUY",
-                "price": price,
-                "quantity": quantity,
-                **transaction,
-                "cash_after": cash,
-            }
-        )
-
     equity_curve = []
+    total_commission = Decimal("0")
+    waiting = set(market)
+    unbought = []
 
     for trading_date in trading_dates:
+        # 每檔在期間內第一個可交易日，使用保留給它的預算買入。
+        for stock_id in sorted(waiting):
+            record = market[stock_id][trading_date]
+
+            if not record["tradable"]:
+                continue
+
+            quantity = affordable_quantity(
+                record["open"],
+                budget,
+                cost_settings,
+            )
+
+            waiting.remove(stock_id)
+
+            if quantity == 0:
+                unbought.append(stock_id)
+                continue
+
+            transaction = calculate_transaction(
+                record["open"],
+                quantity,
+                "BUY",
+                cost_settings,
+            )
+
+            cash += transaction["cash_change"]
+            holdings[stock_id] = quantity
+            total_commission += transaction["commission"]
+
+            trades.append(
+                {
+                    "stock_id": stock_id,
+                    "date": trading_date,
+                    "action": "BUY",
+                    "price": record["open"],
+                    "quantity": quantity,
+                    **transaction,
+                    "cash_after": cash,
+                }
+            )
+
         market_value = sum(
             (
-                prices_by_stock[stock_id][trading_date]["close"]
+                market[stock_id][trading_date]["valuation_close"]
                 * quantity
                 for stock_id, quantity in holdings.items()
             ),
@@ -178,6 +138,13 @@ def run_buy_and_hold(
                 "market_value": market_value,
                 "equity": cash + market_value,
                 "holdings": holdings.copy(),
+                "stale_prices": {
+                    stock_id: market[stock_id][trading_date][
+                        "valuation_price_date"
+                    ]
+                    for stock_id in holdings
+                    if not market[stock_id][trading_date]["tradable"]
+                },
             }
         )
 
@@ -186,12 +153,13 @@ def run_buy_and_hold(
     return {
         "initial_cash": initial_cash,
         "cash": cash,
-        "holdings": holdings,
+        "holdings": holdings.copy(),
         "final_equity": final_equity,
         "total_return": final_equity / initial_cash - Decimal("1"),
         "total_commission": total_commission,
         "total_tax": Decimal("0"),
         "trades": trades,
         "equity_curve": equity_curve,
-        "unbought": unbought,
-    }
+        "unbought": sorted(unbought),
+        "unavailable_entire_period": sorted(waiting),
+    }   

@@ -10,6 +10,15 @@ from tw_stock_backtest.backtesting.costs import (
 )
 from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.analysis.factors import build_factor_history
+from tw_stock_backtest.analysis.screening import evaluate_stock
+from tw_stock_backtest.analysis.factors import (
+    calculate_factor_row,
+    rank_factor_candidates,
+)
+from tw_stock_backtest.data.market_events import (
+    CONFIRMED_HALTS,
+    prepare_backtest_market,
+)
 
 
 def plan_rebalance(
@@ -107,12 +116,9 @@ def run_portfolio_backtest(
     cost_settings,
     ranking_method="rules",
     factor_settings=None,
+    confirmed_halts=None,
 ):
-    """每日選股，下一行情日開盤調整持股的簡化組合回測。"""
     start, end = parse_date_range(start_text, end_text)
-
-    if not records_by_stock:
-        raise ValueError("股票池不可為空")
 
     if (
         not isinstance(initial_cash, Decimal)
@@ -126,75 +132,59 @@ def run_portfolio_backtest(
         or not isinstance(quantity, int)
         or quantity <= 0
     ):
-        raise ValueError("每次買進股數必須是正整數")
+        raise ValueError("買進股數必須是正整數")
 
     if not isinstance(cost_settings, CostSettings):
         raise ValueError("必須提供 CostSettings")
 
-    # 沿用持股計畫函式，驗證持股上限。
     plan_rebalance({}, [], max_positions=max_positions)
 
     if ranking_method == "rules":
-        screening_history = build_screening_history(
-            records_by_stock,
-            start.isoformat(),
-            end.isoformat(),
-            screening_settings=screening_settings,
-        )
-
-    elif ranking_method == "factors":
-        if factor_settings is None:
-            raise ValueError("因子排名模式必須提供 factor_settings")
-
-        screening_history = build_factor_history(
-            records_by_stock,
-            start.isoformat(),
-            end.isoformat(),
-            factor_settings=factor_settings,
-        )
-
-    else:
-        raise ValueError("ranking_method 只支援 rules 或 factors")
-
-    if not screening_history:
-        raise ValueError("指定期間沒有可回測的行情")
-
-    trading_dates = [
-        day["date"]
-        for day in screening_history
-    ]
-
-    # 建立查詢索引，並驗證回測期間的價格。
-    prices_by_stock = {}
-
-    for stock_id, records in records_by_stock.items():
-        prices_by_stock[stock_id] = {
-            record["date"]: record
-            for record in records
-            if start <= date.fromisoformat(record["date"]) <= end
+        active_settings = screening_settings
+        rule_parameters = {
+            key: screening_settings[key]
+            for key in (
+                "short_window",
+                "long_window",
+                "volume_window",
+                "min_volume_ratio",
+                "momentum_window",
+            )
         }
+    elif ranking_method == "factors" and factor_settings is not None:
+        active_settings = factor_settings
+        weights = {
+            "momentum": factor_settings["momentum_weight"],
+            "trend": factor_settings["trend_weight"],
+            "volatility": factor_settings["volatility_weight"],
+        }
+        rank_factor_candidates([], weights=weights)
+    else:
+        raise ValueError("排名模式或因子設定無效")
 
-        for trading_date in trading_dates:
-            record = prices_by_stock[stock_id].get(trading_date)
+    top_n = active_settings["top_n"]
+    if isinstance(top_n, bool) or not isinstance(top_n, int) or top_n <= 0:
+        raise ValueError("top_n 必須是正整數")
 
-            if record is None:
-                raise ValueError(
-                    f"{stock_id} 缺少 {trading_date} 行情，"
-                    "本版不模擬缺行情或停牌時的成交與估值"
-                )
+    events = CONFIRMED_HALTS if confirmed_halts is None else confirmed_halts
 
-            for field in ("open", "close"):
-                value = record[field]
+    market, trading_dates = prepare_backtest_market(
+        records_by_stock,
+        start,
+        end,
+        confirmed_halts=events,
+    )
 
-                if (
-                    not isinstance(value, Decimal)
-                    or not value.is_finite()
-                    or value <= 0
-                ):
-                    raise ValueError(
-                        f"{stock_id} / {trading_date} "
-                        f"的 {field} 必須是正值且有限的 Decimal"
-                    )
+    # 暖機資料只收錄實際有行情的日期。
+    histories = {
+        stock_id: [
+            record
+            for record_date, record in prices.items()
+            if date.fromisoformat(record_date) < start
+            and record["tradable"]
+        ]
+        for stock_id, prices in market.items()
+    }
 
     cash = initial_cash
     holdings = {}
@@ -202,107 +192,102 @@ def run_portfolio_backtest(
     skipped_orders = []
     skipped_rebalances = []
     equity_curve = []
+    market_events = []
     total_commission = Decimal("0")
     total_tax = Decimal("0")
-
-    # 存放上一行情日收盤後產生的計畫。
     pending = None
 
-    for day in screening_history:
-        trading_date = day["date"]
-
+    for trading_date in trading_dates:
+        # 開盤：執行上一行情日收盤後產生的計畫。
         if pending is not None:
-            signal_date = pending["signal_date"]
-            plan = pending["plan"]
+            signal_date, plan = pending
 
-            # 先賣出，釋放資金與持股名額。
-            for stock_id in plan["sell"]:
-                shares = holdings[stock_id]
-                price = prices_by_stock[stock_id][trading_date]["open"]
+            for action, stock_ids in (
+                ("SELL", plan["sell"]),
+                ("BUY", plan["buy"]),
+            ):
+                for stock_id in stock_ids:
+                    record = market[stock_id][trading_date]
+                    reason = None
+                    transaction = None
 
-                transaction = calculate_transaction(
-                    price,
-                    shares,
-                    "SELL",
-                    cost_settings,
-                )
+                    shares = (
+                        holdings[stock_id]
+                        if action == "SELL"
+                        else quantity
+                    )
 
-                cash += transaction["cash_change"]
-                del holdings[stock_id]
+                    if not record["tradable"]:
+                        reason = "已確認停牌，當日不成交"
+                    elif (
+                        action == "BUY"
+                        and len(holdings) >= max_positions
+                    ):
+                        reason = "已達持股上限"
+                    else:
+                        transaction = calculate_transaction(
+                            record["open"],
+                            shares,
+                            action,
+                            cost_settings,
+                        )
 
-                total_commission += transaction["commission"]
-                total_tax += transaction["tax"]
+                        if (
+                            action == "BUY"
+                            and cash < -transaction["cash_change"]
+                        ):
+                            reason = "資金不足，含手續費"
 
-                trades.append(
-                    {
-                        "stock_id": stock_id,
-                        "signal_date": signal_date,
-                        "date": trading_date,
-                        "action": "SELL",
-                        "price": price,
-                        "quantity": shares,
-                        **transaction,
-                        "cash_after": cash,
-                    }
-                )
+                    if reason is not None:
+                        skipped_orders.append(
+                            {
+                                "stock_id": stock_id,
+                                "signal_date": signal_date,
+                                "date": trading_date,
+                                "action": action,
+                                "reason": reason,
+                            }
+                        )
+                        continue
 
-            # 再依候選排名買進。
-            for stock_id in plan["buy"]:
-                price = prices_by_stock[stock_id][trading_date]["open"]
+                    cash += transaction["cash_change"]
 
-                transaction = calculate_transaction(
-                    price,
-                    quantity,
-                    "BUY",
-                    cost_settings,
-                )
+                    if action == "SELL":
+                        del holdings[stock_id]
+                    else:
+                        holdings[stock_id] = shares
 
-                reason = None
+                    total_commission += transaction["commission"]
+                    total_tax += transaction["tax"]
 
-                if len(holdings) >= max_positions:
-                    reason = "已達持股上限"
-                elif cash < -transaction["cash_change"]:
-                    reason = "資金不足，含手續費"
-
-                if reason is not None:
-                    skipped_orders.append(
+                    trades.append(
                         {
                             "stock_id": stock_id,
                             "signal_date": signal_date,
                             "date": trading_date,
-                            "reason": reason,
+                            "action": action,
+                            "price": record["open"],
+                            "quantity": shares,
+                            **transaction,
+                            "cash_after": cash,
                         }
                     )
-                    continue
 
-                cash += transaction["cash_change"]
-                holdings[stock_id] = quantity
+        # 收盤：持有中的停牌股票使用最近有效收盤價估值。
+        market_value = Decimal("0")
+        stale_prices = {}
 
-                total_commission += transaction["commission"]
-                total_tax += transaction["tax"]
+        for stock_id, shares in holdings.items():
+            record = market[stock_id][trading_date]
+            valuation = record["valuation_close"]
 
-                trades.append(
-                    {
-                        "stock_id": stock_id,
-                        "signal_date": signal_date,
-                        "date": trading_date,
-                        "action": "BUY",
-                        "price": price,
-                        "quantity": quantity,
-                        **transaction,
-                        "cash_after": cash,
-                    }
-                )
+            if valuation is None:
+                raise ValueError(f"{stock_id} 沒有可用估值價格")
 
-        # 當日收盤估值。
-        market_value = sum(
-            (
-                prices_by_stock[stock_id][trading_date]["close"]
-                * shares
-                for stock_id, shares in holdings.items()
-            ),
-            Decimal("0"),
-        )
+            market_value += valuation * shares
+
+            if not record["tradable"]:
+                stale_prices[stock_id] = record["valuation_price_date"]
 
         equity_curve.append(
             {
@@ -311,34 +296,95 @@ def run_portfolio_backtest(
                 "market_value": market_value,
                 "equity": cash + market_value,
                 "holdings": holdings.copy(),
+                "stale_prices": stale_prices,
             }
         )
 
-        # 產生下一行情日的計畫。
-        # 如果今日無法完整評估股票池，就不建立新計畫。
-        pending = None
+        # 逐檔計算：一檔停牌，不阻止其他股票更新訊號。
+        evaluations = []
+        errors = {}
 
-        if day["errors"]:
+        for stock_id, prices in market.items():
+            record = prices[trading_date]
+
+            if not record["tradable"]:
+                errors[stock_id] = "已確認停牌，僅暫停本股票訊號更新"
+                market_events.append(
+                    {
+                        "stock_id": stock_id,
+                        "date": trading_date,
+                        **events[(stock_id, trading_date)],
+                    }
+                )
+                continue
+
+            histories[stock_id].append(record)
+
+            try:
+                if ranking_method == "rules":
+                    evaluation = evaluate_stock(
+                        histories[stock_id],
+                        trading_date,
+                        **rule_parameters,
+                    )
+                else:
+                    evaluation = calculate_factor_row(
+                        histories[stock_id],
+                        trading_date,
+                        factor_settings=factor_settings,
+                    )
+
+                evaluations.append(evaluation)
+
+            except ValueError as error:
+                errors[stock_id] = str(error)
+
+        if ranking_method == "rules":
+            candidates = [
+                row for row in evaluations if row["selected"]
+            ]
+            candidates.sort(
+                key=lambda row: (-row["momentum"], row["stock_id"])
+            )
+        else:
+            candidates = rank_factor_candidates(
+                evaluations,
+                weights=weights,
+            )
+
+        # 停牌或無法更新訊號的既有持股暫時保留，仍占名額。
+        frozen = sorted(
+            stock_id
+            for stock_id in holdings
+            if stock_id in errors
+        )
+
+        available_slots = max_positions - len(frozen)
+
+        ranked_ids = [
+            row["stock_id"]
+            for row in candidates[:top_n]
+            if row["stock_id"] not in frozen
+        ]
+
+        target_ids = frozen + ranked_ids[:available_slots]
+
+        pending = (
+            trading_date,
+            plan_rebalance(
+                holdings,
+                target_ids,
+                max_positions=max_positions,
+            ),
+        )
+
+        if errors:
             skipped_rebalances.append(
                 {
                     "date": trading_date,
-                    "errors": day["errors"].copy(),
+                    "errors": errors.copy(),
                 }
             )
-        else:
-            ranked_stock_ids = [
-                candidate["stock_id"]
-                for candidate in day["candidates"]
-            ]
-
-            pending = {
-                "signal_date": trading_date,
-                "plan": plan_rebalance(
-                    holdings,
-                    ranked_stock_ids,
-                    max_positions=max_positions,
-                ),
-            }
 
     final_equity = equity_curve[-1]["equity"]
 
@@ -355,4 +401,5 @@ def run_portfolio_backtest(
         "equity_curve": equity_curve,
         "skipped_orders": skipped_orders,
         "skipped_rebalances": skipped_rebalances,
+        "market_events": market_events,
     }

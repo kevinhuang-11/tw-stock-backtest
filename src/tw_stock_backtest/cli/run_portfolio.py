@@ -265,7 +265,7 @@ def main():
         f"{performance['invested_day_ratio']:.2%}"
     )
     print("\n買進持有基準比較：")
-    print("基準：第一個行情日開盤，等預算買進全部股票池")
+    print("基準：每檔在期間內第一個可交易日，以等預算買進")
     print("基準股數依預算計算，不使用策略的固定股數或持股上限")
     print(
         f"策略期末總資產：{result['final_equity']:.2f}"
@@ -305,6 +305,11 @@ def main():
             "基準因單檔預算不足而未買進："
             + ", ".join(benchmark["unbought"])
         )
+    if benchmark["unavailable_entire_period"]:
+        print(
+            "基準因整段期間皆無法交易而未買進："
+            + ", ".join(benchmark["unavailable_entire_period"])
+        )
     print("\n期末持股：")
 
     if not result["holdings"]:
@@ -330,17 +335,18 @@ def main():
                 f" | 剩餘現金 {trade['cash_after']:.2f}"
             )
 
-    print(f"\n未成交買進計畫：{len(result['skipped_orders'])} 筆")
+    print(f"\n未成交交易計畫：{len(result['skipped_orders'])} 筆")
 
     for order in result["skipped_orders"]:
         print(
             f"{order['date']} | {order['stock_id']}"
+            f" | {order['action']}"
             f" | 訊號日 {order['signal_date']}"
             f" | {order['reason']}"
         )
 
     print(
-        f"\n因評估不完整而跳過調整："
+        f"\n有個別股票未更新訊號的日期："
         f"{len(result['skipped_rebalances'])} 日"
     )
 
