@@ -46,6 +46,16 @@ REQUIRED_FIELDS = {
     "storage": {
         "database_path",
     },
+    "factors": {
+        "short_window",
+        "long_window",
+        "momentum_window",
+        "volatility_window",
+        "top_n",
+        "momentum_weight",
+        "trend_weight",
+        "volatility_weight",
+    },
 }
 
 
@@ -56,6 +66,9 @@ DECIMAL_FIELDS = (
     ("costs", "commission_discount"),
     ("costs", "minimum_commission"),
     ("costs", "sell_tax_rate"),
+    ("factors", "momentum_weight"),
+    ("factors", "trend_weight"),
+    ("factors", "volatility_weight"),
 )
 
 
@@ -71,6 +84,11 @@ POSITIVE_INTEGER_FIELDS = (
     ("backtest", "max_positions"),
     ("download", "max_attempts"),
     ("download", "retry_wait_seconds"),
+    ("factors", "short_window"),
+    ("factors", "long_window"),
+    ("factors", "momentum_window"),
+    ("factors", "volatility_window"),
+    ("factors", "top_n"),
 )
 
 
@@ -149,7 +167,7 @@ def validate_settings(settings):
         ):
             raise ValueError(f"{section}.{key} 必須是正整數")
 
-    for section in ("screening", "strategy"):
+    for section in ("screening", "strategy", "factors"):
         if (
             result[section]["short_window"]
             >= result[section]["long_window"]
@@ -163,6 +181,20 @@ def validate_settings(settings):
             result[section][key],
             f"{section}.{key}",
         )
+    factor_weights = [
+        result["factors"][key]
+        for key in (
+            "momentum_weight",
+            "trend_weight",
+            "volatility_weight",
+        )
+    ]
+
+    if any(weight < 0 for weight in factor_weights):
+        raise ValueError("因子權重不可為負數")
+
+    if sum(factor_weights, Decimal("0")) == 0:
+        raise ValueError("因子權重不可全部為 0")
 
     if result["screening"]["min_volume_ratio"] < 0:
         raise ValueError("screening.min_volume_ratio 不可為負數")

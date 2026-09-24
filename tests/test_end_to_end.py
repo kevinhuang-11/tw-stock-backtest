@@ -49,6 +49,16 @@ retry_wait_seconds = 3
 
 [storage]
 database_path = "data/stocks.db"
+
+[factors]
+short_window = 5
+long_window = 20
+momentum_window = 20
+volatility_window = 20
+top_n = 3
+momentum_weight = "1"
+trend_weight = "1"
+volatility_weight = "1"
 """
 
 
