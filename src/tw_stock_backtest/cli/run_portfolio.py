@@ -18,6 +18,8 @@ from tw_stock_backtest.backtesting.metrics import (
 from tw_stock_backtest.backtesting.benchmark import (
     run_buy_and_hold,
 )
+from pathlib import Path
+from tw_stock_backtest.reporting import export_portfolio_report
 
 
 
@@ -75,7 +77,16 @@ def parse_arguments():
         action="store_true",
         help="顯示每日現金、市值與總資產",
     )
-
+    parser.add_argument(
+        "--export",
+        action="store_true",
+        help="匯出設定、行情快照、成交紀錄與資產報表",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="匯出目錄；搭配 --export，預設為專案的 reports",
+    )
     return parser.parse_args()
 
 
@@ -320,6 +331,30 @@ def main():
                 f" | {point['equity']:.2f}"
                 f" | {holdings_text}"
             )
+    if args.export:
+        output_root = (
+            Path(args.output_dir)
+            if args.output_dir is not None
+            else DEFAULT_CONFIG_PATH.parent / "reports"
+        )
+
+        try:
+            report_dir = export_portfolio_report(
+                output_root,
+                settings=settings,
+                start_text=start.isoformat(),
+                end_text=end.isoformat(),
+                records_by_stock=records_by_stock,
+                result=result,
+                performance=performance,
+                benchmark=benchmark,
+                benchmark_performance=benchmark_performance,
+            )
+        except (ValueError, TypeError, OSError) as error:
+            print(f"\n回測已完成，但報表匯出失敗：{error}")
+            return 1
+
+        print(f"\n報表已匯出：{report_dir}")
 
     return 0
 
