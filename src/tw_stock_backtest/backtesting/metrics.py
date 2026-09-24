@@ -94,3 +94,45 @@ def summarize_performance(equity_curve, initial_cash):
             Decimal(invested_days) / Decimal(total_days)
         ),
     }
+
+def summarize_exposure(equity_curve):
+    """計算每日收盤持股市值占比，包含空手日。"""
+    if not equity_curve:
+        raise ValueError("資產曲線不可為空")
+
+    ratios = []
+
+    for point in equity_curve:
+        equity = point.get("equity")
+        market_value = point.get("market_value")
+
+        for name, value in (
+            ("總資產", equity),
+            ("持股市值", market_value),
+        ):
+            if (
+                not isinstance(value, Decimal)
+                or not value.is_finite()
+                or value < 0
+            ):
+                raise ValueError(
+                    f"{name}必須是非負的有限 Decimal"
+                )
+
+        if market_value > equity:
+            raise ValueError("持股市值不可超過總資產")
+
+        ratio = (
+            market_value / equity
+            if equity > 0
+            else Decimal("0")
+        )
+        ratios.append(ratio)
+
+    return {
+        "average_exposure": (
+            sum(ratios, Decimal("0")) / Decimal(len(ratios))
+        ),
+        "max_exposure": max(ratios),
+    }
+

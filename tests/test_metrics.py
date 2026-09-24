@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from tw_stock_backtest.backtesting.metrics import (
-    summarize_performance,
+    summarize_performance, summarize_exposure
 )
 
 
@@ -103,6 +103,141 @@ class TestPerformanceMetrics(unittest.TestCase):
                         self.make_curve([value]),
                         Decimal("100"),
                     )
+
+class TestExposure(unittest.TestCase):
+    def test_average_includes_cash_only_days(self):
+        curve = [
+            {
+                "equity": Decimal("1000"),
+                "market_value": Decimal("0"),
+            },
+            {
+                "equity": Decimal("1000"),
+                "market_value": Decimal("500"),
+            },
+            {
+                "equity": Decimal("2000"),
+                "market_value": Decimal("2000"),
+            },
+        ]
+
+        result = summarize_exposure(curve)
+
+        # 每日占比：0%、50%、100%。
+        # 平均：(0 + 0.5 + 1) / 3 = 0.5。
+        self.assertEqual(
+            result["average_exposure"],
+            Decimal("0.5"),
+        )
+        self.assertEqual(
+            result["max_exposure"],
+            Decimal("1"),
+        )
+
+    def test_all_cash(self):
+        curve = [
+            {
+                "equity": Decimal("1000"),
+                "market_value": Decimal("0"),
+            },
+        ]
+
+        result = summarize_exposure(curve)
+
+        self.assertEqual(
+            result["average_exposure"],
+            Decimal("0"),
+        )
+        self.assertEqual(
+            result["max_exposure"],
+            Decimal("0"),
+        )
+
+    def test_zero_equity(self):
+        curve = [
+            {
+                "equity": Decimal("0"),
+                "market_value": Decimal("0"),
+            },
+        ]
+
+        result = summarize_exposure(curve)
+
+        # 本程式約定：總資產與持股市值皆為零時，占比為零。
+        self.assertEqual(
+            result["average_exposure"],
+            Decimal("0"),
+        )
+        self.assertEqual(
+            result["max_exposure"],
+            Decimal("0"),
+        )
+
+    def test_invalid_input(self):
+        invalid_curves = [
+            # 沒有資料。
+            [],
+
+            # 缺少持股市值。
+            [
+                {
+                    "equity": Decimal("1000"),
+                },
+            ],
+
+            # 總資產不是有限數值。
+            [
+                {
+                    "equity": Decimal("NaN"),
+                    "market_value": Decimal("0"),
+                },
+            ],
+
+            # 持股市值不是有限數值。
+            [
+                {
+                    "equity": Decimal("1000"),
+                    "market_value": Decimal("Infinity"),
+                },
+            ],
+
+            # 總資產為負。
+            [
+                {
+                    "equity": Decimal("-1"),
+                    "market_value": Decimal("0"),
+                },
+            ],
+
+            # 持股市值為負。
+            [
+                {
+                    "equity": Decimal("1000"),
+                    "market_value": Decimal("-1"),
+                },
+            ],
+
+            # 本專案不融資，持股市值不可超過總資產。
+            [
+                {
+                    "equity": Decimal("1000"),
+                    "market_value": Decimal("1001"),
+                },
+            ],
+
+            # 型別錯誤：應使用 Decimal。
+            [
+                {
+                    "equity": 1000,
+                    "market_value": Decimal("0"),
+                },
+            ],
+        ]
+
+        for curve in invalid_curves:
+            with self.subTest(curve=curve):
+                with self.assertRaises(ValueError):
+                    summarize_exposure(curve)
 
 
 if __name__ == "__main__":

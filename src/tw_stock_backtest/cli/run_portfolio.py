@@ -13,7 +13,7 @@ from tw_stock_backtest.backtesting.portfolio import (
     run_portfolio_backtest,
 )
 from tw_stock_backtest.backtesting.metrics import (
-    summarize_performance,
+    summarize_performance, summarize_exposure,
 )
 from tw_stock_backtest.backtesting.benchmark import (
     run_buy_and_hold,
@@ -164,6 +164,9 @@ def main():
             result["equity_curve"],
             result["initial_cash"],
         )
+        performance.update(
+            summarize_exposure(result["equity_curve"])
+        )
         benchmark = run_buy_and_hold(
             records_by_stock,
             start.isoformat(),
@@ -175,7 +178,10 @@ def main():
         benchmark_performance = summarize_performance(
             benchmark["equity_curve"],
             benchmark["initial_cash"],
-        )       
+        )    
+        benchmark_performance.update(
+            summarize_exposure(benchmark["equity_curve"])
+        )   
 
     except (ValueError, sqlite3.Error, OSError) as error:
         print(f"多股票回測失敗：{error}")
@@ -263,6 +269,22 @@ def main():
     print(
         f"持股天數占比："
         f"{performance['invested_day_ratio']:.2%}"
+    )
+    print(
+        f"平均持股市值占比（含空手日）："
+        f"{performance['average_exposure']:.2%}"
+    )
+    print(
+        f"最高持股市值占比："
+        f"{performance['max_exposure']:.2%}"
+    )
+    print(
+        f"基準平均持股市值占比："
+        f"{benchmark_performance['average_exposure']:.2%}"
+    )
+    print(
+        f"基準最高持股市值占比："
+        f"{benchmark_performance['max_exposure']:.2%}"
     )
     print("\n買進持有基準比較：")
     print("基準：每檔在期間內第一個可交易日，以等預算買進")
