@@ -5,7 +5,8 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-
+import os
+from tempfile import NamedTemporaryFile
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config
 from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.data.universe import load_universe
@@ -24,6 +25,7 @@ def download_batch(
     *,
     config_path,
     interval_seconds=3,
+    on_result=None,
 ):
     """逐檔執行既有下載命令；個別失敗不終止整批。"""
     start, end = parse_date_range(start_text, end_text)
@@ -55,6 +57,10 @@ def download_batch(
                 reason="股票在指定期間結束後才上市",
             )
             results.append(item)
+
+            if on_result is not None:
+                on_result(item)
+
             print(item["reason"], flush=True)
             continue
 
@@ -102,6 +108,9 @@ def download_batch(
 
         results.append(item)
 
+        if on_result is not None:
+            on_result(item)
+
         if item["status"] == "failed":
             print(item["reason"], flush=True)
 
@@ -112,6 +121,106 @@ def download_batch(
 
     return results
 
+def save_progress(report, path):
+    """完整寫入暫存檔後，才替換既有進度檔。"""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    temporary_path = None
+
+    try:
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as file:
+            temporary_path = Path(file.name)
+
+            json.dump(
+                report,
+                file,
+                ensure_ascii=False,
+                indent=2,
+            )
+            file.write("\n")
+
+        os.replace(temporary_path, path)
+
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
+def load_progress(path, expected_job):
+    """確認進度檔屬於相同工作，並檢查已保存的結果。"""
+    with Path(path).open(encoding="utf-8") as file:
+        report = json.load(file)
+
+    if (
+        not isinstance(report, dict)
+        or type(report.get("schema_version")) is not int
+        or report["schema_version"] != 1
+    ):
+        raise ValueError("不支援的進度檔格式")
+
+    if report.get("job") != expected_job:
+        raise ValueError(
+            "進度檔的日期、股票範圍或設定與本次不同，"
+            "請使用原本參數接續"
+        )
+
+    results = report.get("results")
+
+    if not isinstance(results, list):
+        raise ValueError("進度檔缺少結果清單")
+
+    allowed_ids = {
+        stock["stock_id"]
+        for stock in expected_job["stocks"]
+    }
+    seen = set()
+
+    for item in results:
+        if not isinstance(item, dict):
+            raise ValueError("進度檔包含無效結果")
+
+        stock_id = item.get("stock_id")
+
+        if (
+            not isinstance(stock_id, str)
+            or stock_id not in allowed_ids
+            or stock_id in seen
+        ):
+            raise ValueError("進度檔包含未知或重複的股票")
+
+        if item.get("status") not in (
+            "completed",
+            "failed",
+            "skipped",
+        ):
+            raise ValueError("進度檔包含未知狀態")
+
+        seen.add(stock_id)
+
+    return report
+
+
+def select_pending_stocks(stocks, results):
+    """成功與確定略過的不再執行；失敗或未執行的繼續處理。"""
+    finished_ids = {
+        item["stock_id"]
+        for item in results
+        if item["status"] in ("completed", "skipped")
+    }
+
+    return [
+        stock
+        for stock in stocks
+        if stock["stock_id"] not in finished_ids
+    ]
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -151,6 +260,12 @@ def parse_arguments():
         default=DEFAULT_LOG_DIR,
         help="批次結果紀錄的儲存資料夾",
     )
+    parser.add_argument(
+        "--resume",
+        type=Path,
+        default=None,
+        help="從指定進度 JSON 接續，須搭配原本的下載參數",
+    )
 
     return parser.parse_args()
 
@@ -169,7 +284,6 @@ def main():
         settings = load_config(args.config)
         snapshot = load_universe(args.universe)
 
-        # 固定按代號排序，讓 offset 的意義清楚。
         all_stocks = sorted(
             snapshot["stocks"],
             key=lambda stock: stock["stock_id"],
@@ -182,76 +296,131 @@ def main():
         if not stocks:
             raise ValueError("指定範圍內沒有股票")
 
-        # 先確認紀錄資料夾可以建立。
-        args.log_dir.mkdir(parents=True, exist_ok=True)
+        # 把 Decimal、Path 等設定轉成可保存的 JSON 資料。
+        settings_snapshot = json.loads(
+            json.dumps(settings, default=str)
+        )
+
+        job = {
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "stocks": stocks,
+            "config_path": str(args.config.resolve()),
+            "settings": settings_snapshot,
+        }
+
+        now = datetime.now(timezone.utc)
+
+        if args.resume is not None:
+            log_path = args.resume.resolve()
+            report = load_progress(log_path, job)
+
+        else:
+            log_path = (
+                args.log_dir
+                / (now.strftime("%Y%m%dT%H%M%S_%fZ") + ".json")
+            ).resolve()
+
+            report = {
+                "schema_version": 1,
+                "started_at": now.isoformat(),
+                "universe_path": str(args.universe.resolve()),
+                "universe_downloaded_at": snapshot["downloaded_at"],
+                "job": job,
+                "results": [],
+            }
+
+        pending = select_pending_stocks(
+            stocks,
+            report["results"],
+        )
+
+        # 先保存工作資訊，即使第一檔就中斷，也有可接續的檔案。
+        report["status"] = "running"
+        report["updated_at"] = now.isoformat()
+        report.pop("finished_at", None)
+
+        save_progress(report, log_path)
 
     except (ValueError, OSError) as error:
         print(f"批次下載設定失敗：{error}")
         return 1
 
-    started_at = datetime.now(timezone.utc)
-
     print(f"名單股票總數：{len(all_stocks)}")
-    print(f"本次處理股票數：{len(stocks)}")
+    print(f"本次工作股票數：{len(stocks)}")
+    print(f"已完成或略過：{len(stocks) - len(pending)}")
+    print(f"待執行或重試：{len(pending)}")
     print(f"指定期間：{start} ～ {end}")
     print(f"資料庫位置：{settings['storage']['database_path']}")
-    print(
-        "本次股票："
-        + ", ".join(stock["stock_id"] for stock in stocks)
-    )
+    print(f"進度檔：{log_path}", flush=True)
 
-    results = download_batch(
-        stocks,
-        start.isoformat(),
-        end.isoformat(),
-        config_path=args.config,
-        interval_seconds=float(
-            settings["download"]["request_interval_seconds"]
-        ),
-    )
-
-    counts = {
-        status: sum(
-            item["status"] == status
-            for item in results
-        )
-        for status in ("completed", "failed", "skipped")
+    results_by_id = {
+        item["stock_id"]: item
+        for item in report["results"]
     }
 
-    report = {
-        "started_at": started_at.isoformat(),
-        "finished_at": datetime.now(timezone.utc).isoformat(),
-        "universe_path": str(args.universe.resolve()),
-        "universe_downloaded_at": snapshot["downloaded_at"],
-        "config_path": str(args.config.resolve()),
-        "database_path": str(settings["storage"]["database_path"]),
-        "requested_start": start.isoformat(),
-        "requested_end": end.isoformat(),
-        "counts": counts,
-        "results": results,
-    }
+    def record_result(item):
+        # 重試結果會替換該股票上一次的失敗結果。
+        results_by_id[item["stock_id"]] = item
 
-    log_path = args.log_dir / (
-        started_at.strftime("%Y%m%dT%H%M%S_%fZ") + ".json"
-    )
+        report["results"] = [
+            results_by_id[stock["stock_id"]]
+            for stock in stocks
+            if stock["stock_id"] in results_by_id
+        ]
+        report["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        save_progress(report, log_path)
 
     try:
-        log_path.write_text(
-            json.dumps(report, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
+        download_batch(
+            pending,
+            start.isoformat(),
+            end.isoformat(),
+            config_path=args.config,
+            interval_seconds=float(
+                settings["download"]["request_interval_seconds"]
+            ),
+            on_result=record_result,
         )
-    except OSError as error:
-        print(f"下載流程已結束，但無法保存批次紀錄：{error}")
+
+        counts = {
+            status: sum(
+                item["status"] == status
+                for item in report["results"]
+            )
+            for status in ("completed", "failed", "skipped")
+        }
+
+        report["counts"] = counts
+        report["status"] = (
+            "finished_with_errors"
+            if counts["failed"]
+            else "finished"
+        )
+        report["finished_at"] = datetime.now(timezone.utc).isoformat()
+        report["updated_at"] = report["finished_at"]
+
+        save_progress(report, log_path)
+
+    except KeyboardInterrupt:
+        print("\n下載已中斷；已保存的進度可用 --resume 接續。")
+        print(f"進度檔：{log_path}")
+        return 130
+
+    except (ValueError, OSError) as error:
+        print(f"\n批次處理停止：{error}")
+        print("接續時，以進度檔中最後成功保存的內容為準。")
+        print(f"進度檔：{log_path}")
         return 1
 
     print("\n批次執行摘要：")
     print(f"命令成功：{counts['completed']}")
     print(f"命令失敗：{counts['failed']}")
     print(f"略過：{counts['skipped']}")
-    print(f"紀錄位置：{log_path.resolve()}")
+    print(f"進度檔：{log_path}")
 
     return 1 if counts["failed"] else 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
