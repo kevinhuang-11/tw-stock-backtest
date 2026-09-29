@@ -1,8 +1,15 @@
 import unittest
 from datetime import date
 from html import escape
-
 from tw_stock_backtest.data.universe import parse_listed_stocks
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from tw_stock_backtest.data.universe import (
+    load_universe,
+    save_universe,
+)
 
 
 class TestListedStocks(unittest.TestCase):
@@ -129,6 +136,63 @@ class TestListedStocks(unittest.TestCase):
             [stock["stock_id"] for stock in result],
             ["1101", "2330"],
         )
+    def test_save_and_load_universe(self):
+        stocks = self.parse([self.row])
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "data" / "listed_stocks.json"
+
+            saved = save_universe(stocks, path)
+            loaded = load_universe(path)
+
+            self.assertEqual(loaded, saved)
+            self.assertEqual(loaded["stocks"], stocks)
+            self.assertEqual(loaded["count"], 1)
+
+            # 確認中文名稱直接保存，方便人工查看。
+            self.assertIn(
+                "台積電",
+                path.read_text(encoding="utf-8"),
+            )
+
+    def test_invalid_update_preserves_existing_file(self):
+        stocks = self.parse([self.row])
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "listed_stocks.json"
+
+            save_universe(stocks, path)
+            original = path.read_bytes()
+
+            with self.assertRaises(ValueError):
+                save_universe([], path)
+
+            self.assertEqual(path.read_bytes(), original)
+
+    def test_incorrect_count_is_rejected(self):
+        stocks = self.parse([self.row])
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "listed_stocks.json"
+
+            snapshot = save_universe(stocks, path)
+            snapshot["count"] = 999
+
+            path.write_text(
+                json.dumps(snapshot, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(ValueError):
+                load_universe(path)
+
+    def test_corrupted_json_is_rejected(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "listed_stocks.json"
+            path.write_text("{broken", encoding="utf-8")
+
+            with self.assertRaises(ValueError):
+                load_universe(path)
 
 
 if __name__ == "__main__":
