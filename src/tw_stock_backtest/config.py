@@ -61,11 +61,13 @@ REQUIRED_FIELDS = {
 OPTIONAL_DEFAULTS = {
     "backtest": {
         "sizing_mode": "fixed_quantity",
+        "slippage_rate": "0",
     },
 }
 DECIMAL_FIELDS = (
     ("screening", "min_volume_ratio"),
     ("backtest", "initial_cash"),
+    ("backtest", "slippage_rate"),
     ("costs", "commission_rate"),
     ("costs", "commission_discount"),
     ("costs", "minimum_commission"),
@@ -198,6 +200,12 @@ def validate_settings(settings):
         result[section][key] = _to_decimal(
             result[section][key],
             f"{section}.{key}",
+        )
+    slippage_rate = result["backtest"]["slippage_rate"]
+
+    if not Decimal("0") <= slippage_rate < Decimal("1"):
+        raise ValueError(
+            "backtest.slippage_rate 必須介於 0（含）與 1（不含）"
         )
     factor_weights = [
         result["factors"][key]

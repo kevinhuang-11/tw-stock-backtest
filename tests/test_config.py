@@ -280,7 +280,78 @@ class TestConfig(unittest.TestCase):
                 settings,
                 {"backtest": {"sizing_mode": "unknown"}},
             )
+    def test_legacy_config_defaults_to_zero_slippage(self):
+        settings = load_config(self.config_path)
+        settings["backtest"].pop("slippage_rate", None)
 
+        result = validate_settings(settings)
+
+        self.assertEqual(
+            result["backtest"]["slippage_rate"],
+            Decimal("0"),
+        )
+        self.assertNotIn("slippage_rate", settings["backtest"])
+
+    def test_load_slippage_from_file(self):
+        text = self.config_path.read_text(encoding="utf-8")
+        text = text.replace(
+            "[backtest]",
+            '[backtest]\nslippage_rate = "0.001"',
+            1,
+        )
+        self.config_path.write_text(text, encoding="utf-8")
+
+        settings = load_config(self.config_path)
+
+        self.assertEqual(
+            settings["backtest"]["slippage_rate"],
+            Decimal("0.001"),
+        )
+
+    def test_slippage_override_preserves_zero_and_original(self):
+        original = load_config(self.config_path)
+        original_rate = original["backtest"]["slippage_rate"]
+
+        changed = apply_overrides(
+            original,
+            {"backtest": {"slippage_rate": "0.001"}},
+        )
+        unchanged = apply_overrides(
+            changed,
+            {"backtest": {"slippage_rate": None}},
+        )
+        zero = apply_overrides(
+            changed,
+            {"backtest": {"slippage_rate": "0"}},
+        )
+
+        self.assertEqual(
+            changed["backtest"]["slippage_rate"],
+            Decimal("0.001"),
+        )
+        self.assertEqual(
+            unchanged["backtest"]["slippage_rate"],
+            Decimal("0.001"),
+        )
+        self.assertEqual(
+            zero["backtest"]["slippage_rate"],
+            Decimal("0"),
+        )
+        self.assertEqual(
+            original["backtest"]["slippage_rate"],
+            original_rate,
+        )
+
+    def test_invalid_slippage_settings(self):
+        settings = load_config(self.config_path)
+
+        for value in ("-0.001", "1", "NaN", "Infinity", 0.001, True):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    apply_overrides(
+                        settings,
+                        {"backtest": {"slippage_rate": value}},
+                    )
 
 if __name__ == "__main__":
     unittest.main()

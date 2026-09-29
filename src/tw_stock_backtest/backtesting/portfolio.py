@@ -8,6 +8,7 @@ from tw_stock_backtest.backtesting.costs import (
     CostSettings,
     calculate_transaction,
     calculate_buy_quantity,
+    apply_slippage,
 )
 from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.analysis.factors import build_factor_history
@@ -119,6 +120,7 @@ def run_portfolio_backtest(
     factor_settings=None,
     confirmed_halts=None,
     sizing_mode="fixed_quantity",
+    slippage_rate=Decimal("0"),
 ):
 
     start, end = parse_date_range(start_text, end_text)
@@ -139,6 +141,8 @@ def run_portfolio_backtest(
 
     if not isinstance(cost_settings, CostSettings):
         raise ValueError("必須提供 CostSettings")
+    # 提前驗證滑價率，即使本區間沒有成交也要檢查。
+    apply_slippage(Decimal("1"), "BUY", slippage_rate)
 
     plan_rebalance({}, [], max_positions=max_positions)
     if sizing_mode not in ("fixed_quantity", "fixed_budget"):
@@ -237,6 +241,13 @@ def run_portfolio_backtest(
                         reason = "已達持股上限"
 
                     else:
+                        execution_price = apply_slippage(
+                            record["open"],
+                            action,
+                            slippage_rate,
+                        )
+
+                        # 只有固定預算買進，需要重新計算股數。
                         if (
                             action == "BUY"
                             and sizing_mode == "fixed_budget"
@@ -247,7 +258,7 @@ def run_portfolio_backtest(
                             )
 
                             shares = calculate_buy_quantity(
-                                record["open"],
+                                execution_price,
                                 available_budget,
                                 cost_settings,
                             )
@@ -257,9 +268,11 @@ def run_portfolio_backtest(
                                     "預算或現金不足以買進一股，含手續費"
                                 )
 
+                        # 所有可成交的買進與賣出，都要計算交易金額。
+                        # 這個 if 與上方配置模式的 if 同一層。
                         if reason is None:
                             transaction = calculate_transaction(
-                                record["open"],
+                                execution_price,
                                 shares,
                                 action,
                                 cost_settings,
@@ -270,6 +283,7 @@ def run_portfolio_backtest(
                                 and cash < -transaction["cash_change"]
                             ):
                                 reason = "資金不足，含手續費"
+
                     if reason is not None:
                         skipped_orders.append(
                             {
@@ -298,7 +312,8 @@ def run_portfolio_backtest(
                             "signal_date": signal_date,
                             "date": trading_date,
                             "action": action,
-                            "price": record["open"],
+                            "raw_price": record["open"],
+                            "price": execution_price,
                             "quantity": shares,
                             **transaction,
                             "cash_after": cash,
@@ -440,5 +455,6 @@ def run_portfolio_backtest(
         "skipped_orders": skipped_orders,
         "skipped_rebalances": skipped_rebalances,
         "market_events": market_events,
+        "slippage_rate": slippage_rate,
     }
 

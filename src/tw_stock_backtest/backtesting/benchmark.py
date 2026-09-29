@@ -4,6 +4,7 @@ from decimal import Decimal
 from tw_stock_backtest.backtesting.costs import (
     CostSettings,
     calculate_transaction,
+    apply_slippage,
 )
 from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.data.market_events import (
@@ -45,6 +46,7 @@ def run_buy_and_hold(
     initial_cash,
     cost_settings,
     confirmed_halts=None,
+    slippage_rate=Decimal("0"),
 ):
     start, end = parse_date_range(start_text, end_text)
 
@@ -57,6 +59,9 @@ def run_buy_and_hold(
 
     if not isinstance(cost_settings, CostSettings):
         raise ValueError("必須提供 CostSettings")
+    
+    # 即使沒有成交，也先驗證滑價率。
+    apply_slippage(Decimal("1"), "BUY", slippage_rate)
 
     events = CONFIRMED_HALTS if confirmed_halts is None else confirmed_halts
 
@@ -87,8 +92,14 @@ def run_buy_and_hold(
             if not record["tradable"]:
                 continue
 
-            quantity = affordable_quantity(
+            execution_price = apply_slippage(
                 record["open"],
+                "BUY",
+                slippage_rate,
+            )
+
+            quantity = affordable_quantity(
+                execution_price,
                 budget,
                 cost_settings,
             )
@@ -100,7 +111,7 @@ def run_buy_and_hold(
                 continue
 
             transaction = calculate_transaction(
-                record["open"],
+                execution_price,
                 quantity,
                 "BUY",
                 cost_settings,
@@ -115,7 +126,8 @@ def run_buy_and_hold(
                     "stock_id": stock_id,
                     "date": trading_date,
                     "action": "BUY",
-                    "price": record["open"],
+                    "raw_price": record["open"],
+                    "price": execution_price,
                     "quantity": quantity,
                     **transaction,
                     "cash_after": cash,
@@ -162,4 +174,5 @@ def run_buy_and_hold(
         "equity_curve": equity_curve,
         "unbought": sorted(unbought),
         "unavailable_entire_period": sorted(waiting),
+        "slippage_rate": slippage_rate,
     }   

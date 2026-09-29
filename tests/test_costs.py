@@ -3,6 +3,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from tw_stock_backtest.backtesting.costs import CostSettings, calculate_transaction
 from tw_stock_backtest.backtesting.costs import calculate_buy_quantity
+from tw_stock_backtest.backtesting.costs import apply_slippage
 
 
 class TestTransactionCosts(unittest.TestCase):
@@ -238,6 +239,69 @@ class TestBuyQuantity(unittest.TestCase):
                         budget,
                         self.settings,
                     )
+class TestSlippage(unittest.TestCase):
+    def test_buy_price_increases(self):
+        result = apply_slippage(
+            Decimal("100"),
+            "BUY",
+            Decimal("0.001"),
+        )
 
+        self.assertEqual(result, Decimal("100.1"))
+
+    def test_sell_price_decreases(self):
+        result = apply_slippage(
+            Decimal("100"),
+            "SELL",
+            Decimal("0.001"),
+        )
+
+        self.assertEqual(result, Decimal("99.9"))
+
+    def test_zero_slippage_preserves_price(self):
+        for action in ("BUY", "SELL"):
+            with self.subTest(action=action):
+                result = apply_slippage(
+                    Decimal("123.45"),
+                    action,
+                )
+
+                self.assertEqual(result, Decimal("123.45"))
+
+    def test_precision_is_preserved(self):
+        result = apply_slippage(
+            Decimal("123.45"),
+            "BUY",
+            Decimal("0.001"),
+        )
+
+        # 不先取成 123.57，避免過早捨入。
+        self.assertEqual(result, Decimal("123.57345"))
+
+    def test_invalid_inputs(self):
+        cases = [
+            (Decimal("0"), "BUY", Decimal("0")),
+            (Decimal("-1"), "BUY", Decimal("0")),
+            (Decimal("NaN"), "BUY", Decimal("0")),
+            (Decimal("Infinity"), "BUY", Decimal("0")),
+            (100, "BUY", Decimal("0")),
+            (Decimal("100"), "HOLD", Decimal("0")),
+            (Decimal("100"), "BUY", Decimal("-0.001")),
+            (Decimal("100"), "BUY", Decimal("1")),
+            (Decimal("100"), "BUY", Decimal("NaN")),
+            (Decimal("100"), "BUY", Decimal("Infinity")),
+            (Decimal("100"), "BUY", 0.001),
+        ]
+
+        for price, action, rate in cases:
+            with self.subTest(
+                price=price,
+                action=action,
+                rate=rate,
+            ):
+                with self.assertRaises(ValueError):
+                    apply_slippage(price, action, rate)
+
+                    
 if __name__ == "__main__":
     unittest.main()

@@ -142,3 +142,35 @@ def calculate_buy_quantity(price, budget, settings):
 
     return low
 
+def apply_slippage(price, action, slippage_rate=Decimal("0")):
+    """
+    依固定比例模擬不利滑價。
+
+    BUY：成交價提高。
+    SELL：成交價降低。
+    保留 Decimal 精度，不在此處取整或對齊價格跳動單位。
+    """
+    if (
+        not isinstance(price, Decimal)
+        or not price.is_finite()
+        or price <= 0
+    ):
+        raise ValueError("價格必須是大於零的有限 Decimal")
+
+    if action not in ("BUY", "SELL"):
+        raise ValueError("交易方向必須是 BUY 或 SELL")
+
+    if (
+        not isinstance(slippage_rate, Decimal)
+        or not slippage_rate.is_finite()
+        or not Decimal("0") <= slippage_rate < Decimal("1")
+    ):
+        raise ValueError(
+            "滑價率必須是介於 0（含）與 1（不含）的有限 Decimal"
+        )
+
+    if action == "BUY":
+        return price * (Decimal("1") + slippage_rate)
+
+    return price * (Decimal("1") - slippage_rate)
+

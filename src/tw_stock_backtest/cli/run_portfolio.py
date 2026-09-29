@@ -99,6 +99,11 @@ def parse_arguments():
         default=None,
         help="股數配置模式；未指定時使用設定檔",
     )
+    parser.add_argument(
+        "--slippage",
+        default=None,
+        help="單邊不利滑價率，例如 0.001 代表 0.1%；未指定時使用設定檔",
+    )
     return parser.parse_args()
 
 
@@ -133,6 +138,7 @@ def main():
                     "quantity": args.quantity,
                     "max_positions": args.max_positions,
                     "sizing_mode": args.sizing,
+                    "slippage_rate": args.slippage,
                 },
             },
         )
@@ -167,6 +173,7 @@ def main():
             ranking_method=args.ranking,
             factor_settings=settings["factors"],
             sizing_mode=backtest_settings["sizing_mode"],
+            slippage_rate=backtest_settings["slippage_rate"],
         )
         performance = summarize_performance(
             result["equity_curve"],
@@ -181,6 +188,7 @@ def main():
             end.isoformat(),
             initial_cash=backtest_settings["initial_cash"],
             cost_settings=cost_settings,
+            slippage_rate=backtest_settings["slippage_rate"],
         )
 
         benchmark_performance = summarize_performance(
@@ -199,7 +207,7 @@ def main():
     last_date = result["equity_curve"][-1]["date"]
 
     print("多股票回測：每日排名，下一行情日開盤調整持股")
-    print("含設定費稅；未計滑價、股利、拆股與精確零股成交")
+    print("含設定費稅與固定比例滑價；未計股利、拆股與精確零股成交")
     print("期末持股按收盤價估值，不強制賣出")
     print(f"\n股票池：{', '.join(stocks)}")
     print(f"資料庫位置：{db_path}")
@@ -260,7 +268,11 @@ def main():
     print(f"賣出交易稅率：{cost_settings.sell_tax_rate:.2%}")
     print(f"手續費取整：{cost_settings.commission_rounding}")
     print(f"交易稅取整：{cost_settings.tax_rounding}")
-
+    print(
+        f"單邊不利滑價率："
+        f"{backtest_settings['slippage_rate']:.4%}"
+    )
+    print("策略與基準採相同滑價率；持股估值仍使用原始收盤價")
     print(f"\n初始資金：{result['initial_cash']:.2f}")
     print(f"期末現金：{result['cash']:.2f}")
     print(f"期末總資產：{result['final_equity']:.2f}")

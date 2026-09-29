@@ -233,6 +233,7 @@ class TestPortfolioBudget(unittest.TestCase):
         sizing_mode="fixed_budget",
         cost_settings=None,
         confirmed_halts=None,
+        slippage_rate=Decimal("0"),
     ):
         def fake_evaluate(history, as_of, **kwargs):
             stock_id = history[-1]["stock_id"]
@@ -261,6 +262,7 @@ class TestPortfolioBudget(unittest.TestCase):
                     else cost_settings
                 ),
                 sizing_mode=sizing_mode,
+                slippage_rate=slippage_rate,
                 confirmed_halts=(
                     {}
                     if confirmed_halts is None
@@ -435,6 +437,79 @@ class TestPortfolioBudget(unittest.TestCase):
                 records,
                 {},
                 sizing_mode="unknown",
+            )
+
+    def test_slippage_reduces_affordable_quantity(self):
+        records = {
+            "AAA": self.make_records("AAA", ["10", "10", "10"]),
+        }
+
+        result = self.run_case(
+            records,
+            {
+                "2024-01-01": ["AAA"],
+                "2024-01-02": ["AAA"],
+            },
+            max_positions=1,
+            slippage_rate=Decimal("0.01"),
+        )
+
+        # 人工案例使用 1% 滑價，方便手算。
+        # 買進價：10 × 1.01 = 10.1。
+        # 1000 元只能買 99 股，花費 999.9，剩下 0.1。
+        self.assertEqual(result["holdings"], {"AAA": 99})
+        self.assertEqual(result["cash"], Decimal("0.1"))
+        self.assertEqual(
+            result["trades"][0]["raw_price"],
+            Decimal("10"),
+        )
+        self.assertEqual(
+            result["trades"][0]["price"],
+            Decimal("10.1"),
+        )
+
+        # 收盤仍用原始 10 元估值，不使用滑價後價格。
+        self.assertEqual(
+            result["final_equity"],
+            Decimal("990.1"),
+        )
+
+    def test_slippage_applies_to_both_buy_and_sell(self):
+        records = {
+            "AAA": self.make_records("AAA", ["10", "10", "10"]),
+        }
+
+        result = self.run_case(
+            records,
+            {
+                "2024-01-01": ["AAA"],
+                "2024-01-02": [],
+            },
+            max_positions=1,
+            slippage_rate=Decimal("0.01"),
+        )
+
+        # 第二日買進：99 × 10.1 = 999.9。
+        # 第三日賣出：99 × 9.9 = 980.1。
+        # 期末現金：0.1 + 980.1 = 980.2。
+        self.assertEqual(len(result["trades"]), 2)
+        self.assertEqual(
+            result["trades"][1]["price"],
+            Decimal("9.9"),
+        )
+        self.assertEqual(result["holdings"], {})
+        self.assertEqual(result["cash"], Decimal("980.2"))
+
+    def test_invalid_slippage_is_rejected_without_trades(self):
+        records = {
+            "AAA": self.make_records("AAA", ["10", "10", "10"]),
+        }
+
+        with self.assertRaises(ValueError):
+            self.run_case(
+                records,
+                {},
+                slippage_rate=Decimal("-0.01"),
             )
 
 if __name__ == "__main__":
