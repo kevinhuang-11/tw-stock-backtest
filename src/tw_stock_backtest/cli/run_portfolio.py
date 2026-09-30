@@ -102,7 +102,7 @@ def parse_arguments():
     parser.add_argument(
         "--slippage",
         default=None,
-        help="單邊不利滑價率，例如 0.001 代表 0.1%；未指定時使用設定檔",
+        help="單邊不利滑價率，例如 0.001 代表 0.1%%；未指定時使用設定檔",
     )
     return parser.parse_args()
 

@@ -79,6 +79,14 @@ class TestFactorHistory(unittest.TestCase):
 
         self.assertEqual(self.build(), original)
 
+    def test_ranking_recovers_when_missing_close_leaves_window(self):
+        expected = self.build()[-1]
+        self.records["AAA"][0]["close"] = None
+        history = self.build()
+        self.assertIn("收盤價", history[0]["errors"]["AAA"])
+        self.assertEqual(history[0]["candidates"], [])
+        self.assertEqual(history[-1], expected)
+
     def test_missing_date_prevents_partial_ranking(self):
         self.records["BBB"].pop()
 

@@ -239,6 +239,65 @@ class TestCalculateFactorRow(unittest.TestCase):
 
         self.assertEqual(self.calculate(), original)
 
+    def test_old_missing_close_outside_window_is_ignored(self):
+        records = [
+            {"stock_id": "AAA", "date": "2025-12-31", "close": None},
+            *self.records,
+        ]
+        original = deepcopy(records)
+        self.assertEqual(self.calculate(records=records), self.calculate())
+        self.assertEqual(records, original)
+
+    def test_missing_close_at_each_window_position_is_rejected(self):
+        for index in range(len(self.records)):
+            with self.subTest(index=index):
+                records = deepcopy(self.records)
+                records[index]["close"] = None
+                # 不可刪除缺失列，再用更舊的有效價格湊窗口。
+                records.insert(0, {
+                    "stock_id": "AAA", "date": "2025-12-31",
+                    "close": Decimal("5"),
+                })
+                with self.assertRaisesRegex(ValueError, "收盤價"):
+                    self.calculate(records=records)
+
+    def test_each_factor_controls_required_history(self):
+        for setting, periods in (
+            ("long_window", 4),
+            ("momentum_window", 3),
+            ("volatility_window", 3),
+        ):
+            with self.subTest(setting=setting):
+                settings = {**self.settings, setting: periods}
+                records = [
+                    {"stock_id": "AAA", "date": "2025-12-31",
+                     "close": Decimal("5")},
+                    *self.records,
+                ]
+                result = calculate_factor_row(
+                    records, "2026-01-03", factor_settings=settings,
+                )
+                self.assertTrue(all(
+                    result[name].is_finite()
+                    for name in ("momentum", "trend", "volatility")
+                ))
+                with self.assertRaisesRegex(
+                    ValueError, "至少需要 4 筆行情，目前只有 3 筆",
+                ):
+                    calculate_factor_row(
+                        records[1:], "2026-01-03", factor_settings=settings,
+                    )
+
+    def test_future_missing_close_is_ignored(self):
+        records = [*self.records, {
+            "stock_id": "AAA", "date": "2026-01-04", "close": None,
+        }]
+        self.assertEqual(self.calculate(records=records), self.calculate())
+
+    def test_future_prices_cannot_complete_insufficient_history(self):
+        with self.assertRaisesRegex(ValueError, "目前只有 2 筆"):
+            self.calculate(as_of="2026-01-02")
+
     def test_insufficient_history(self):
         with self.assertRaises(ValueError):
             self.calculate(records=self.records[1:])

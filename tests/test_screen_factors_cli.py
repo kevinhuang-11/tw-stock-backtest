@@ -1,5 +1,6 @@
 import sqlite3
 import unittest
+from decimal import Decimal
 from unittest.mock import patch
 
 from tw_stock_backtest.cli.screen_factors import collect_factor_rows
@@ -90,6 +91,24 @@ class TestCollectFactorRows(unittest.TestCase):
 
         self.assertEqual(rows, [{"stock_id": "1102"}])
         self.assertEqual(errors[0]["reason"], "資料不足")
+
+    @patch(f"{MODULE}.load_records")
+    def test_real_factor_calculation_ignores_old_missing_close(self, mock_load):
+        mock_load.return_value = [
+            {"stock_id": "1101", "date": "2026-08-27", "close": None},
+            {"stock_id": "1101", "date": "2026-08-28", "close": Decimal("10")},
+            {"stock_id": "1101", "date": "2026-08-31", "close": Decimal("12")},
+        ]
+        rows, errors = collect_factor_rows(
+            self.stocks[:1], "2026-08-31", db_path="unused.db",
+            factor_settings={
+                "short_window": 1, "long_window": 2,
+                "momentum_window": 1, "volatility_window": 1,
+            },
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["momentum"], Decimal("0.2"))
 
     @patch(f"{MODULE}.load_records")
     def test_database_error_is_not_hidden(self, mock_load):
