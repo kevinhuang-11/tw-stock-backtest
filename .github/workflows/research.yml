@@ -1,0 +1,142 @@
+name: Research
+on:
+  workflow_dispatch:
+    inputs:
+      as_of:
+        description: '分析與下載截止日 YYYY-MM-DD；空白採股票池最新可用日期'
+        type: string
+        default: ''
+      stocks:
+        description: '股票代號，以空白分隔；空白使用 config.toml 小型股票池'
+        type: string
+        default: ''
+      allow_partial:
+        description: '允許排除無法評估的股票'
+        type: boolean
+        default: false
+  schedule:
+    - cron: '23 8 * * 1-5' # UTC 08:23 = 台北平日 16:23
+permissions:
+  contents: read
+concurrency:
+  group: research-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  research:
+    if: github.event_name == 'workflow_dispatch' || vars.RESEARCH_SCHEDULE_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      MPLBACKEND: Agg
+      AS_OF: ${{ inputs.as_of }}
+      STOCKS: ${{ inputs.stocks }}
+      ALLOW_PARTIAL: ${{ inputs.allow_partial }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install .
+      - name: Validate inputs and derive cache scope
+        id: scope
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, os, re, tomllib
+          from datetime import date
+          stocks = os.environ.get('STOCKS', '').split()
+          if stocks and (len(stocks) > 10 or any(not re.fullmatch(r'[0-9]{4}', s) for s in stocks)):
+              raise SystemExit('手動股票池最多 10 檔四位數代號')
+          if os.environ.get('AS_OF'):
+              date.fromisoformat(os.environ['AS_OF'])
+          with open('config.toml', 'rb') as f:
+              config = tomllib.load(f)
+          selected = stocks or config['universe']['stocks']
+          if len(selected) > 10 or config['download']['request_interval_seconds'] < 3:
+              raise SystemExit('雲端最多 10 檔，請求間隔至少 3 秒')
+          scope = hashlib.sha256((' '.join(sorted(set(stocks))) or 'config').encode()).hexdigest()[:16]
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'scope={scope}\n')
+          PY
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        id: market-cache
+        with:
+          path: data/research-cache.db
+          key: research-v1-${{ runner.os }}-${{ hashFiles('config.toml') }}-${{ steps.scope.outputs.scope }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            research-v1-${{ runner.os }}-${{ hashFiles('config.toml') }}-${{ steps.scope.outputs.scope }}-
+      - name: Update and rank
+        id: research
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os, subprocess, sys
+          from pathlib import Path
+          args = [sys.executable, '-m', 'tw_stock_backtest.cli.run_research',
+                  '--config', 'config.toml', '--database', 'data/research-cache.db',
+                  '--initial-days', '90', '--output-dir', 'reports/research']
+          if os.environ.get('AS_OF'):
+              args += ['--as-of', os.environ['AS_OF']]
+          if os.environ.get('STOCKS', '').strip():
+              args += ['--stocks', *os.environ['STOCKS'].split()]
+          if os.environ.get('ALLOW_PARTIAL') == 'true':
+              args += ['--allow-partial']
+          completed = subprocess.run(args, check=False, capture_output=True, text=True)
+          code = completed.returncode
+          diagnostics = completed.stdout + completed.stderr
+          Path('reports/research').mkdir(parents=True, exist_ok=True)
+          Path('reports/research/runner-diagnostic.txt').write_text(diagnostics, encoding='utf-8')
+          print(diagnostics)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'exit_code={code}\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write(f'Research exit code: {code} (0 complete, 2 partial, 1 failed). See artifacts.\n')
+          # 最後一個步驟才判定 job 結果，先保存診斷與 cache。
+          PY
+      - name: Audit saved database without exporting it
+        if: always() && steps.research.outputs.exit_code != ''
+        run: |
+          python - <<'PYCODE'
+          import json, sqlite3
+          from pathlib import Path
+          db = Path('data/research-cache.db').resolve()
+          result = {'database_exists': db.is_file()}
+          if db.is_file():
+              with sqlite3.connect(db.as_uri() + '?mode=ro', uri=True) as connection:
+                  result['integrity_check'] = connection.execute('PRAGMA integrity_check').fetchone()[0]
+                  result['duplicate_keys'] = connection.execute(
+                      'SELECT COUNT(*) FROM (SELECT stock_id, date FROM stock_prices GROUP BY stock_id, date HAVING COUNT(*) > 1)'
+                  ).fetchone()[0]
+                  result['stocks'] = [dict(zip(('stock_id', 'rows', 'first_date', 'latest_date'), row))
+                      for row in connection.execute(
+                          'SELECT stock_id, COUNT(*), MIN(date), MAX(date) FROM stock_prices GROUP BY stock_id ORDER BY stock_id')]
+          output = Path('reports/research/database-check.json')
+          output.parent.mkdir(parents=True, exist_ok=True)
+          output.write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
+          if db.is_file() and (result['integrity_check'] != 'ok' or result['duplicate_keys'] != 0):
+              raise SystemExit('Database integrity or duplicate check failed')
+          PYCODE
+      - uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+        if: always() && steps.research.outputs.exit_code != '' && hashFiles('data/research-cache.db') != ''
+        with:
+          path: data/research-cache.db
+          key: ${{ steps.market-cache.outputs.cache-primary-key }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: research-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/research/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Check research result
+        if: always() && steps.research.outputs.exit_code != ''
+        env:
+          EXIT_CODE: ${{ steps.research.outputs.exit_code }}
+        run: |
+          if [ "$EXIT_CODE" = 2 ]; then
+            echo '::warning::Research partially completed; inspect summary and exclusions.'
+          elif [ "$EXIT_CODE" != 0 ]; then
+            exit 1
+          fi

@@ -16,6 +16,10 @@ from tw_stock_backtest.date_range import (
 from tw_stock_backtest.data.stock_data import normalize_row
 
 
+class NoMarketData(ValueError):
+    """來源明確表示無資料；仍相容既有 ValueError 處理。"""
+
+
 def fetch_month(stock_id, month, *, timeout_seconds):
     """下載指定股票、指定月份的原始行情。"""
     params = {
@@ -37,6 +41,9 @@ def fetch_month(stock_id, month, *, timeout_seconds):
 
     if not isinstance(result, dict):
         raise ValueError("行情回應格式錯誤，預期為 JSON 物件")
+
+    if result.get("stat") in ("查無資料", "很抱歉，沒有符合條件的資料!"):
+        raise NoMarketData("行情查詢未成功：來源明確回覆無資料")
 
     if result.get("stat") != "OK":
         raise ValueError(

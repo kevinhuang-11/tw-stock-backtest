@@ -184,3 +184,35 @@ def export_portfolio_report(
             )
 
     return report_dir
+
+class ResearchReport:
+    """執行中目錄保留 .incomplete；全部檔案完成後才原子改名。"""
+    def __init__(self, output_root):
+        root = Path(output_root).expanduser().resolve()
+        root.mkdir(parents=True, exist_ok=True)
+        name = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ") + "_" + uuid4().hex[:8]
+        self.run_id = name
+        self.path = root / (name + ".incomplete")
+        self.final_path = root / name
+        self.path.mkdir()
+
+    def write_json(self, name, document):
+        from tw_stock_backtest.cli.download_universe import save_progress
+        # 重用既有原子 JSON 寫入；先套用 Decimal/date/Path 序列化。
+        safe = json.loads(json.dumps(document, default=_json_default,
+                                     ensure_ascii=False, allow_nan=False))
+        save_progress(safe, self.path / name)
+
+    def finish(self, summary):
+        summary = dict(summary)
+        rankings = summary.pop("rankings", [])
+        self.write_json("rankings.json", rankings)
+        with (self.path / "rankings.csv").open("w", encoding="utf-8-sig", newline="") as file:
+            fields = ["rank", "stock_id", "date", "score", "momentum", "trend", "volatility"]
+            writer = csv.DictWriter(file, fieldnames=fields)
+            writer.writeheader()
+            for row in rankings:
+                writer.writerow({**{k: row[k] for k in fields[:4]}, **row["factors"]})
+        self.write_json("summary.json", {**summary, "report_complete": True})
+        self.path.rename(self.final_path)
+        return self.final_path

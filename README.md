@@ -84,13 +84,31 @@ editable 安裝讓原始碼修改直接生效，依賴由 pyproject.toml 安裝�
 設定集中在 config.toml；CLI 支援的覆寫參數優先，不修改原設定。
 資料庫相對路徑以設定檔所在目錄為基準。完整操作見 [DEMO](docs/DEMO.md)。
 
+## 自動化研究流程
+
+`run_research` 串接增量行情更新、同日因子排名與 JSON／CSV 保存。每次執行產生獨立報表，失敗或排除原因也會記錄。
+
+```bash
+# 使用既有行情，不下載；本機可直接驗證
+.venv/bin/python -m tw_stock_backtest.cli.run_research --skip-download --as-of 2026-09-29 --output-dir /tmp/tw-stock-research
+
+# 依設定檔小型股票池增量更新，再選最新可用日期排名
+.venv/bin/python -m tw_stock_backtest.cli.run_research
+```
+
+- **測試 CI**：push／PR／手動觸發，在 Python 3.12 乾淨環境跑離線測試。
+- **研究 workflow**：手動或定時連線更新行情，保存報表 artifacts；定時執行預設關閉。
+- 行情 cache 遺失時，僅初始化最近 90 個日曆日，不重新下載全部歷史。
+
+參數、resume、退出碼及 Actions 設定見 [自動化研究操作](docs/DEMO.md#自動化研究流程)。
+
 ## 測試與驗證
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-2026-09-30 完整驗證為 **252 個測試通過**；實際結果以執行為準。
+2026-10-01 完整驗證為 **287 個測試通過**；實際結果以執行為準。
 測試使用暫存資料與模擬輸入，不需要先下載全市場行情。
 
 可從這些測試了解設計：
