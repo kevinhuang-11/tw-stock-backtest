@@ -108,7 +108,8 @@ editable 安裝讓原始碼修改直接生效，依賴由 pyproject.toml 安裝�
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-2026-10-01 完整驗證為 **287 個測試通過**；實際結果以執行為準。
+2026-10-01 [GitHub 乾淨 runner 驗證](https://github.com/kevinhuang-11/tw-stock-backtest/actions/runs/36880915103)：**287 個測試通過**。
+三檔研究流程亦完成無 cache 初始化及 cache 還原後的增量更新；[驗收紀錄](docs/DEMO.md#github-遠端驗收2026-10-01)。
 測試使用暫存資料與模擬輸入，不需要先下載全市場行情。
 
 可從這些測試了解設計：

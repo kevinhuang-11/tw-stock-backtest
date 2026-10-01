@@ -178,7 +178,7 @@ README 圖表採三檔等權因子排名、初始資金 100 萬、持股上限 2
 Matplotlib 使用 Agg backend。CI 只有 contents: read 權限、10 分鐘 timeout。
 
 `.github/workflows/research.yml` 才會連線下載行情；採 20 分鐘 timeout，預設使用 config.toml 的三檔股票池。
-本次只建立本機檔案，沒有 push、觸發 Actions 或啟用定時變數。
+已完成兩次手動遠端驗收，結果見文末；定時變數仍未啟用。
 
 ### CLI 範例
 
@@ -302,9 +302,45 @@ Python 使用 3.12，依賴沿用 pyproject.toml 的 `matplotlib>=3.8,<4` 與 `s
 ### 本階段本機驗收（2026-10-01）
 
 - 新研究流程 35 項、既有下載／重試 15 項、既有批次 resume 8 項相關測試通過。
-- 建置 wheel 並安裝至 /tmp，使用專案 `.venv/bin/python` 從無 data/、reports/ 的乾淨目錄執行完整測試：287 項通過。此驗證仍使用本機虛擬環境的依賴；GitHub 全新 runner 安裝須 push 後再驗證。
+- 建置 wheel 並安裝至 /tmp，使用專案 `.venv/bin/python` 從無 data/、reports/ 的乾淨目錄執行完整測試：287 項通過。此項使用本機虛擬環境的依賴；後續 GitHub 全新 runner 驗收另列於下方。
 - 兩份 workflow 已通過 actionlint 1.7.12 靜態檢查（未使用 shellcheck）。
 - 既有本機資料的 skip-download：9/29 全名單 1,054 檔，成功排名 1,026、排除 28，退出碼 2；JSON／CSV 均保存 1,026 筆。
 - 三檔自動日期採 9/29，顯示距台北今日 10/1 為 2 天；三檔皆通過該日檢查，退出碼 0。
 - 資料庫 SHA-256 驗證前後一致，實際報表只寫入新的 /tmp 目錄。未下載真實行情、未改動既有研究結果。
-- 尚未驗證 GitHub runner、遠端 cache 保存／還原、artifact 下載與排程觸發；未 commit、push 或啟用任何 repository variable。
+- 本機驗收後另完成下方 GitHub 手動驗收；定時觸發仍未啟用或驗證。
+
+## GitHub 遠端驗收（2026-10-01）
+
+研究程式版本：`a9db36767d50dfdef4de9c08786eefa0ecad1dc3`，推送至遠端 main，保留完整開發歷史。
+兩次研究均手動指定 `stocks=2330 2317 2454`、`allow_partial=false`，as_of 留空自動選日。
+沒有更新全上市名單或下載多年歷史，沒有啟用 `RESEARCH_SCHEDULE_ENABLED`。
+
+| 執行 | 實際結果 |
+|---|---|
+| [手動 CI](https://github.com/kevinhuang-11/tw-stock-backtest/actions/runs/36880915103) | Ubuntu runner 安裝 Python 3.12 與專案依賴，從暫存目錄測試安裝後套件；287 項通過 |
+| [第一次研究](https://github.com/kevinhuang-11/tw-stock-backtest/actions/runs/36880920030) | cache miss；有限初始化 2026-07-04～10-01，每檔請求 7、8、9、10 月，共 12 個月份請求 |
+| [第二次研究](https://github.com/kevinhuang-11/tw-stock-backtest/actions/runs/36881332682) | 還原第一次 cache；每檔 previous_latest=2026-10-01，只重抓 10 月，共 3 個月份請求 |
+
+兩次均以 2026-10-01 分析，距台北當日 0 天；三檔全部評估成功、排除 0，狀態 success／退出碼 0。
+第一次每檔寫入 61 筆；第二次每檔 upsert 1 筆後，資料庫仍各有 61 筆。
+`database-check.json` 兩次均記錄 `integrity_check=ok`、`duplicate_keys=0`，實際行情日期為 7/6～10/1。
+此診斷只保存計數、日期與完整性檢查，不包含 SQLite 副本。
+
+cache 日誌顯示第二次從以 `36880920030-1` 結尾的 key 還原，再保存以 `36881332682-1` 結尾的新 key。
+驗收後共有兩份 cache，證明沒有覆寫不可變 key，也沒有每次重新建立初始化資料。
+
+兩份 artifact 均已下載檢查：
+
+- 各 8 個 JSON／CSV／TXT 檔案皆可讀；沒有資料庫、環境檔或私人筆記。
+- 設定、股票池與 commit 符合實際執行，dirty=false，initial_days=90。
+- JSON／CSV 都保存完整 3 檔排名，日期一致，excluded 為空。
+- summary.report_complete=true，run 目錄沒有 .incomplete 後綴。
+- 檢查輸出欄位及常見 Token／私鑰格式，未發現憑證；未匯出環境變數全集。
+
+### 驗收界線
+
+- 兩次真實研究均退出碼 0；此次沒有刻意製造真實 API 失敗來跑遠端 1／2 分支。
+- 1／2 的研究結果由遠端 CI 的離線測試涵蓋，workflow 最後判定腳本另在本機以 0／2／1 執行，分別為成功／成功附 warning／失敗；非零狀態的完整雲端故障流程尚未實測。
+- 寫入中斷的 .incomplete 行為由自動測試驗證，沒有故意中斷遠端 runner。
+- 自動排程維持停用，沒有驗證定時觸發或長期每日穩定性。
+- artifacts 保存 14 天、cache 可能被清理；本表為當次實際紀錄，不能替代永久資料備份。
