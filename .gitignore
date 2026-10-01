@@ -3,8 +3,12 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .env
-data/
+/data/
 reports/
 *.egg-info/
 build/
 dist/
+.env.*
+/docs/REHEARSAL.md
+/docs/demo-assets/ranking.txt
+/docs/demo-assets/factors.txt

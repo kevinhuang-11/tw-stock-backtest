@@ -44,7 +44,7 @@ done
 ```
 
 指出原始因子值、各因子分數與總分；分數是這三檔之間的相對排名，不是獲利機率。
-若使用已有全名單，可改跑 README 的 `--universe ... --allow-partial` 命令，說明成功與失敗數量。
+若使用已有全名單，可改跑下方「其他 CLI 操作」的 `--universe ... --allow-partial` 命令，說明成功與失敗數量。
 新環境只準備三檔時不要使用全名單模式。
 
 ### 1:20～2:40：回測與基準比較
@@ -100,3 +100,71 @@ WSL 不必啟動 GUI 視窗，直接用 IDE 檢視 PNG 即可。
 ```
 
 已修正 argparse help 字串的百分比跳脫，命令可正常執行，滑價說明顯示 `0.1%`。
+
+## 其他 CLI 操作
+
+以下為主展示流程以外的操作。下載命令會連線並寫入資料，已有資料時不需重跑。
+`download_universe` 的範例只取名單前 5 檔；`--resume` 路徑請換成原工作輸出的進度檔，並保持原日期、股票範圍及設定。
+全名單排名需要先有名單及對應行情，三檔資料不足以執行全名單展示。
+
+```bash
+.venv/bin/python -m tw_stock_backtest.cli.fetch_stock --stock 2330 --start 2026-07-01 --end 2026-09-29
+.venv/bin/python -m tw_stock_backtest.cli.update_universe --output data/listed_stocks.json
+.venv/bin/python -m tw_stock_backtest.cli.download_universe --universe data/listed_stocks.json --start 2026-07-01 --end 2026-09-29 --limit 5
+.venv/bin/python -m tw_stock_backtest.cli.download_universe --universe data/listed_stocks.json --start 2026-07-01 --end 2026-09-29 --limit 5 --resume data/download_logs/實際進度檔.json
+.venv/bin/python -m tw_stock_backtest.cli.analyze_stock --stock 2330 --start 2026-08-01 --end 2026-09-29
+.venv/bin/python -m tw_stock_backtest.cli.screen_stocks --as-of 2026-09-29 --stocks 2330 2317 2454
+.venv/bin/python -m tw_stock_backtest.cli.screen_history --start 2026-09-21 --end 2026-09-29 --stocks 2330 2317 2454 --top 3
+.venv/bin/python -m tw_stock_backtest.cli.screen_factors --as-of 2026-09-29 --universe data/listed_stocks.json --top 20 --allow-partial
+.venv/bin/python -m tw_stock_backtest.cli.run_backtest --stock 2330 --start 2026-08-01 --end 2026-09-29
+.venv/bin/python -m tw_stock_backtest.cli.run_portfolio --stocks 2330 2317 2454 --start 2026-08-01 --end 2026-09-29 --ranking rules
+```
+
+`--resume` 跳過成功與確定略過的股票，重試失敗及尚未完成者。
+下載命令成功不保證每日行情完整，仍需檢查日期及缺失資料。
+`--config` 可指定 TOML，CLI 支援的覆寫參數優先；資料庫相對路徑以設定檔所在目錄為基準。
+
+## 計算與回測假設
+
+因子只驗證本次所需窗口：20 期動能與波動需要 21 個價格。
+窗口外舊缺價不影響結果；窗口內不補零、不以前值填補，也不刪列湊窗口。
+
+兩種排名共用交易引擎：當日收盤產生名單，下一行情日開盤先賣後買。
+固定預算按「初始資金／持股上限」設定單檔上限，含買進手續費；既有持股不每天重新配置。
+基準將初始資金等分給所有股票，在各檔第一個可交易日買進。
+策略與基準使用相同費稅及滑價設定，但持股數、投入資金及持有時間不同，需同看資金投入比例。
+本文件規則版命令使用預設配置，因子版覆寫配置與滑價，兩者僅供展示功能，不能直接當成控制變因的比較。
+
+後續報酬評估從下一行情日開盤計至第 N 個行情日收盤，進場日算第 1 日。
+未計費稅、滑價、股利與拆股；平均價格報酬不能當作累積帳戶報酬。
+
+## 報表檔案
+
+`--export` 在 reports/ 建立獨立目錄，也可用 `--output-dir /tmp/tw-stock-demo` 指定輸出根目錄。
+
+| 檔案 | 內容 |
+|---|---|
+| `settings.json` | 實際設定與指定日期 |
+| `input_data.json` | 本次輸入行情快照 |
+| `results.json` | 策略、基準與績效結果 |
+| `trades.csv` | 策略與基準成交紀錄 |
+| `equity.csv` | 每日資產比較 |
+| `performance.png` | 執行繪圖命令後產生的比較圖 |
+
+## 展示數據與限制
+
+2026-09-29 全名單評分：1,054 檔中 1,026 檔成功、28 檔無法評估。
+失敗原因為 24 檔窗口內缺收盤價、2 檔行情未更新、1 檔筆數不足、1 檔沒有分析日以前行情。
+資料庫九月行情截至 9/29，不能當作完整九月。
+
+README 圖表採三檔等權因子排名、初始資金 100 萬、持股上限 2、固定預算與單邊 0.1% 滑價。
+指定區間 2026-08-01～9/29，實際行情區間 8/3～9/29。
+策略報酬／最大回撤為 10.7629%／9.2774%，基準為 10.2557%／7.0224%。
+報酬較高的同時回撤也較大，單次結果不能證明策略有效。
+
+目前上市名單不是歷史完整股票池，存在存活者偏差；三檔回測不能推廣至全市場。
+尚無獨立交易日曆，所有股票共同缺少的日期可能無法發現。
+回測另做行情完整性檢查，單日排名成功不保證整段歷史能回測。
+已確認停牌可沿用舊收盤價估值，但不回填原始價格或因子輸入。
+尚未處理股利、除權息／拆股調整、精確零股成交及委託簿／成交量限制。
+期末持股按收盤價估值，不強制賣出；最大回撤以每日收盤資產衡量。
