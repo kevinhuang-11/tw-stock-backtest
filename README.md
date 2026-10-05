@@ -3,7 +3,7 @@
 以台股公開資料為案例，實作從 API 資料擷取、SQLite 儲存、規則排名到歷史模擬與報表輸出的 Python 工具。
 支援批次下載與斷點接續，透過資料品質檢查、自動化測試及輸入快照保存，提升處理流程的可靠性與結果可追查性。
 
-**技術：Python 3.12 · SQLite · HTTP API 串接 · Git · Matplotlib**
+**技術：Python 3.12 · SQLite · HTTP API 串接 · Git · Matplotlib · Flask**
 
 [操作展示](docs/DEMO.md) · [測試程式](tests/) · [設定檔](config.toml)
 
@@ -102,6 +102,18 @@ editable 安裝讓原始碼修改直接生效，依賴由 pyproject.toml 安裝�
 
 參數、resume、退出碼及 Actions 設定見 [自動化研究操作](docs/DEMO.md#自動化研究流程)。
 
+## 本機研究工作台
+
+```bash
+.venv/bin/python -m pip install -e .
+.venv/bin/python -m tw_stock_backtest.cli.serve_workbench
+```
+
+開啟 `http://127.0.0.1:8765`，瀏覽既有報表、排入研究／回測工作、比較排名與查看基準圖表。
+預設只讀本機行情。研究報告包含候選股、因子加權貢獻、可比較前期的排名變化及資料限制；網頁與 Gmail 共用摘要。
+每次工作產生 HTML／純文字郵件預覽與排名 CSV；只有 CLI 明確 `--send` 才寄信。
+[操作、輸出位置與自行寄信設定](docs/DEMO.md#本機網頁工作台與-gmail)。
+
 ## 測試與驗證
 
 ```bash
@@ -121,7 +133,7 @@ editable 安裝讓原始碼修改直接生效，依賴由 pyproject.toml 安裝�
 
 ## 範圍與限制
 
-v1 聚焦資料處理與交易模擬，不包含 ML、券商下單或完整網頁系統。
+v1 聚焦資料處理與交易模擬，提供單人本機工作台，不包含 ML、券商下單或公開網頁服務。
 目前使用上市名單及簡化成交模型，尚未處理股利、拆股與獨立交易日曆。
 測試驗證程式行為，策略有效性仍需跨期間與樣本外驗證。
 

@@ -344,3 +344,174 @@ cache 日誌顯示第二次從以 `36880920030-1` 結尾的 key 還原，再保�
 - 寫入中斷的 .incomplete 行為由自動測試驗證，沒有故意中斷遠端 runner。
 - 自動排程維持停用，沒有驗證定時觸發或長期每日穩定性。
 - artifacts 保存 14 天、cache 可能被清理；本表為當次實際紀錄，不能替代永久資料備份。
+
+## 本機網頁工作台與 Gmail
+
+### 開啟與操作
+
+```bash
+.venv/bin/python -m pip install -e .
+.venv/bin/python -m tw_stock_backtest.cli.serve_workbench
+```
+
+瀏覽 `http://127.0.0.1:8765`。WSL 可從 Windows 瀏覽器開啟同一網址。
+依序操作：
+
+1. **既有報表**：讀取 `reports/` 的研究摘要與回測結果；未完成或無法解析的報表另外標示。
+2. **新增研究**：輸入股票代號與分析日期。預設只用本機行情；明確勾選才連線更新，最多 10 檔、初始化 90 天。沿用原研究 CLI 的同日評分、增量、嚴格／部分成功規則。
+3. **執行狀態**：重新整理查看 queued → running → success／partial／failed，以及日誌與摘要。
+4. **排名比較**：選擇兩份完成的研究報表，查看新增、退出與名次變動；母體或設定不同會提示，不把相對名次變化解讀為策略改善。
+5. **回測**：指定起迄日期及規則／多因子排名，沿用設定檔資金與費稅，結果包含策略、買進持有基準及圖表。使用自己已準備且獲准研究的期間。
+6. **郵件預覽**：每個工作完成（包括失敗）後產生 `notification.eml`。點開可查看；這個網頁版本不寄出真實郵件。
+
+可改變讀取與輸出位置：
+
+```bash
+.venv/bin/python -m tw_stock_backtest.cli.serve_workbench \
+  --config config.toml --reports-dir reports \
+  --state-dir /tmp/tw-stock-workbench --port 8765
+```
+
+`--reports-dir` 只供讀取；新工作存在 `--state-dir/<工作ID>/`，包含 `job.json`、`output.log`、`notification.eml` 與 `reports/`。
+預設 state 在 `reports/workbench`，已被 Git 忽略。不修改既有報表，也不修改原 CLI 的輸出格式。
+
+工作以一個背景 worker 依序執行，最多四個執行中／等待工作。研究／回測有 20 分鐘上限，繪圖另有 2 分鐘上限。
+程式重啟時將殘留 queued／running 標為 interrupted，不自動重跑下載或寄信。
+Ctrl+C 關閉會等待已排入的工作結束；強制終止後請檢查日誌與研究 `.incomplete`，必要時使用原 CLI 的 resume。
+同一 state 目錄不可啟動兩個工作台；不同目錄與其他 CLI 不共用此鎖，請勿同時更新同一資料庫。
+
+這是單人本機工具：綁定 loopback、關閉 debug、檢查 Host 與表單驗證碼。不要公開代理或部署。
+[Flask 官方說明](https://flask.palletsprojects.com/en/stable/quickstart/)亦將內建伺服器定位為開發用途。
+目前需手動重新整理，無多使用者帳號、排程、任務取消或自動重試。
+
+### Gmail：先預覽，再自行手動寄送
+
+不需要憑證即可預覽，預設使用 `preview@example.invalid` 作為收寄件人：
+
+```bash
+# 將路徑替換成工作台 job.json 或研究 summary.json；輸出檔須尚不存在
+.venv/bin/python -m tw_stock_backtest.cli.notify_report \
+  --summary reports/workbench/工作ID/job.json \
+  --dry-run --output /tmp/research-preview.eml
+```
+
+預覽使用與真實寄送相同的郵件建立函式。只有下列明確 `--send` 指令會連線 Gmail；工作台不讀取 Gmail 憑證、不寄信。
+
+自行測試時：
+
+1. 在自己的 Google 帳號啟用兩步驟驗證，再建立應用程式密碼。
+   [Google 官方說明](https://support.google.com/accounts/answer/185833)列出可用條件；某些組織帳號或安全設定不支援。使用應用程式密碼，不是一般登入密碼。
+2. 只在本機終端設定環境變數，不寫入 TOML、Git 或網頁表單。以下 Bash `read -s` 避免密碼出現在命令歷史／螢幕：
+
+```bash
+read -r -p '自己的 Gmail 地址: ' GMAIL_ADDRESS
+export GMAIL_ADDRESS
+read -r -s -p 'Gmail 應用程式密碼: ' GMAIL_APP_PASSWORD
+export GMAIL_APP_PASSWORD
+printf '\n'
+.venv/bin/python -m tw_stock_backtest.cli.notify_report \
+  --summary reports/workbench/工作ID/job.json --send
+unset GMAIL_ADDRESS GMAIL_APP_PASSWORD
+```
+
+使用 `smtp.gmail.com:465` 的 SSL 連線，寄件人與收件人固定相同。只支援個人 `@gmail.com` 地址，不使用 Gmail API 或 OAuth。
+失敗回傳 1，只顯示錯誤類型；成功／預覽回傳 0。不自動重試寄送，因為連線中斷時郵件可能已被接受，重試可能重複寄信。
+通知只挑選摘要欄位，不附完整資料庫、設定檔、日誌或環境變數。報表仍可能包含個人研究資訊，請自行保管。
+
+### 本機驗證範圍
+
+測試包含 Flask 表單與路徑限制、背景工作退出碼、重啟狀態、排名比較、離線研究／回測／圖表串接，以及模擬 SMTP 與 dry-run 不連線。
+使用者已確認 Gmail 真實寄送與收件成功；後續內容變更僅以模擬與預覽驗證，不自動寄信。WSL Windows 瀏覽器連線仍需在自己的環境確認，不修改 GitHub 排程。
+
+本階段於 2026-10-05 完成本機驗證：完整 **296 項測試通過**。使用既有三檔資料完成 9/24、9/29 排名比較與 9/1～9/29 回測，產生基準圖表及三份郵件預覽；本機 HTTP 回應 200，資料庫雜湊前後一致。
+另確認指定 9/28 時會因最後行情為 9/24 而失敗，未偷偷改用其他日期。沒有下載行情、寄送郵件或執行遠端 workflow。
+
+## 每日選股研究報告
+
+### 網頁查看
+
+重新啟動本機工作台後，在「既有報表」點選研究報表，即可查看：
+
+- 分析日期、完整／部分結果、指定及實際評估範圍。
+- 前 N 名候選股（預設 10，上限 50）、訊號收盤價與個股因子說明。
+- 可比較的前期排名、新進／退出前 N、研究提示與排除原因。
+- HTML／純文字郵件預覽、完整排名 CSV。完整排名表另提供股票代號搜尋及名次／代號／總分排序。
+
+工作台以啟動時的 `--reports-dir` 與 `--state-dir` 搜尋歷史。網頁只預覽，不新增自動寄信功能。
+舊工作已保存的 `notification.eml` 保留原內容；如需新版內容，使用報表明細的預覽連結或以下 CLI 產生新預覽。
+
+### 使用你已完成的工作預覽
+
+以下是目前存在的工作 ID。從專案根目錄執行，不需要 Gmail 憑證：
+
+```bash
+.venv/bin/python -m tw_stock_backtest.cli.notify_report \
+  --summary reports/workbench/4412a63a1df14eee855f2a58c21039be/job.json \
+  --top 10 --history-dir reports \
+  --dry-run --output /tmp/my-daily-research.eml
+```
+
+輸出必須尚不存在；再次產生請換一個檔名。產物為：
+
+```text
+/tmp/my-daily-research.eml
+/tmp/my-daily-research.eml.preview/
+    report.html             可用瀏覽器開啟的 HTML
+    report.txt              純文字
+    research-summary.json   共用摘要、數值、說明規則、前期來源與版本
+    rankings.csv            原報表完整 CSV（來源缺少時不偽造附件）
+    message.eml             HTML + 純文字替代內容 + CSV 附件
+```
+
+先寫入 `.preview.incomplete`，全部完成才改名；不覆寫原研究報表或舊預覽。
+`--summary` 同時接受原研究 `summary.json`。若 `job.json` 沒有唯一完成的研究報表，維持執行狀態摘要，不猜測對應結果。
+`--history-dir` 可重複指定；預設只搜尋目前目錄的 `reports/`，不掃描整個硬碟。
+
+### 使用者明確手動寄送
+
+依前節設定 Gmail 環境變數後，以下指令會**實際寄信**：
+
+```bash
+.venv/bin/python -m tw_stock_backtest.cli.notify_report \
+  --summary reports/workbench/4412a63a1df14eee855f2a58c21039be/job.json \
+  --top 10 --history-dir reports --send
+```
+
+若希望寄送的內容與已看過的預覽完全一致，直接使用保存的衍生摘要：
+
+```bash
+.venv/bin/python -m tw_stock_backtest.cli.notify_report \
+  --summary /tmp/my-daily-research.eml.preview/research-summary.json --send
+```
+
+此模式保留預覽當時的日期、候選數與前期選取，不再重新搜尋歷史；要更新內容請從原研究報表重新 dry-run。
+預覽與寄送共用同一 `build_message`；不加 localhost 連結。保持原本「一次明確呼叫寄一次、不自動重試」的行為，沒有新增寄送去重資料庫，重複手動 `--send` 仍會重複寄送。
+
+### 說明依據與比較界線
+
+- **不重新計算因子或排名**：讀取既有 `rankings.json` 的原始值、因子分數與總分；附件是原 `rankings.csv`。
+- **加權貢獻**＝保存的因子分數 × 有效權重 ÷ 權重總和。零權重不列入主因；有效貢獻差距不超過 1 分時不誇大差異。
+- **原始值**：動能是 N 期價格報酬；趨勢是短均線／長均線－1；波動是 N 個每日報酬的母體標準差。報告百分比僅為顯示單位，保存值不變。
+- **集中門檻**：因子分數 ≥ 75 稱相對較前；低波動分數 ≤ 25 提醒相對起伏較大；至少兩檔候選股中，同一已知產業占比 ≥ 50% 才提示集中。未知產業單獨列出，不當成同一類。門檻集中於 `research_digest.POLICY`，不是新增選股因子。
+- **前期選擇**：只選分析日期更早、已完成且成功／部分成功的報表。排名模式、因子期間與權重、指定股票池、實際排名母體都要相同；從相符者選最近分析日，同日多次以結束時間與 run_id 穩定選取。`top_n` 只是顯示限制，不影響完整排名比較。
+- **不相符時**：標明設定／母體差異，不計算名次升降；前次或本次未排名的股票另列，不稱為新進前 N 或排名下跌。同日重跑不當成跨日變化。
+- **資料缺漏**：新研究從當次使用的行情保存 `evaluations[].signal`（日期及收盤價）。舊報表缺少排名模式、收盤價、名稱或產業時顯示「未提供」，不查最新資料庫補值。僅指定代號的股票池通常沒有名稱／產業；使用名單檔的原報表才有該快照。
+- **歷史行情**：標題前加註，顯示與預覽當日的日曆日差距；沒有交易日曆，不推定缺少幾個交易日。分數不是上漲機率，說明不提供目標價或交易建議。
+
+### 本階段驗證（2026-10-05）
+
+使用既有小型三檔與全名單報表（1,054 檔，成功 1,026、排除 28）產生 HTML、純文字與 CSV 附件預覽。指定歷史目錄沒有更早且可比較的結果，因此真實示例顯示「尚無可比較的前期結果」；名次升降、新進退出及母體差異以合成資料測試。
+另以本機行情離線執行新三檔研究，確認訊號價保存；資料庫及來源報表雜湊不變。未下載行情、讀取 Gmail 憑證或寄送郵件。
+
+測試涵蓋權重／負動能／同分／缺值、前期選擇、HTML 跳脫、CSV 位元組一致、舊報表、預覽中斷、Gmail 模擬，以及工作台端到端操作。完整測試 **307 項通過**。
+本機 HTTP 已驗證報表、HTML／純文字預覽、CSV 與搜尋排序；目前沒有可用的瀏覽器自動化工具，未宣稱完成手機或 Gmail 各客戶端的實際版面驗證。
+
+### 憑證與輸出邊界檢查（2026-10-05）
+
+- Gmail 地址與應用程式密碼只由明確寄信函式讀取；網頁沒有憑證 API，背景研究只繼承列入白名單的執行環境變數。
+- 工作台維持 loopback、Host 檢查與 POST 表單驗證碼。錯誤頁只顯示錯誤類型，不回傳原始例外內容。
+- 舊報表、日誌與預覽輸出會遮蔽敏感欄位及常見秘密格式；不讀取真實環境憑證來比對。這不是能辨識任意無標籤秘密字串的保證，仍不可把憑證放進研究資料或設定。
+- Actions artifacts 改為指定研究檔案清單；cache 僅為 `data/research-cache.db`。本機工作台與郵件預覽不在目前 workflow 的上傳清單內。
+- 本機及已取得的 main 歷史未發現 `.env` 被追蹤或常見秘密格式；此結論不涵蓋已刪除的遠端物件、其他人的 clone 或任意無格式的密碼。
+
+安全測試使用合成值，包含網頁／郵件遮蔽、子程序環境隔離、錯誤訊息及跨站請求限制；完整測試 310 項通過。本次沒有寄信、push、啟用排程或改寫歷史。

@@ -234,11 +234,13 @@ def evaluate_research(stocks, settings, cutoff, *, as_of=None,
     by_id = {r["stock_id"]: r for r in rows}
     for stock in stocks:
         sid = stock["stock_id"]
+        signal = next((r for r in histories[sid] if r["date"] == target), None)
         evaluations.append({"stock_id": sid, "actual": actual[sid],
+                            "signal": {"date": signal["date"], "close": signal["close"]} if signal else None,
                             "status": "excluded" if sid in errors_by_id else "evaluated",
                             "reason": errors_by_id.get(sid, {}).get("reason"),
                             "factors": by_id.get(sid)})
-    return {"analysis_date": target, "cutoff": cutoff.isoformat(),
+    return {"ranking_mode": "factors", "analysis_date": target, "cutoff": cutoff.isoformat(),
             "date_rule": "explicit" if as_of else "latest_available_in_selected_universe",
             "lag_calendar_days": lag, "status": status,
             "exit_code": {"success": 0, "partial": 2, "failed": 1}[status],

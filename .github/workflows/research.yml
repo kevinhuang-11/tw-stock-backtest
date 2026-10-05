@@ -127,7 +127,18 @@ jobs:
         if: always()
         with:
           name: research-${{ github.run_id }}-${{ github.run_attempt }}
-          path: reports/research/
+          path: |
+            reports/research/**/settings.json
+            reports/research/**/universe.json
+            reports/research/**/progress.json
+            reports/research/**/summary.json
+            reports/research/**/failure.json
+            reports/research/**/rankings.json
+            reports/research/**/rankings.csv
+            reports/research/runner-diagnostic.txt
+            reports/research/database-check.json
+            !reports/research/**/.env
+            !reports/research/**/.env.*
           if-no-files-found: warn
           retention-days: 14
       - name: Check research result

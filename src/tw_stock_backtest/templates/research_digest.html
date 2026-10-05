@@ -1,0 +1,25 @@
+<section>
+<h2>{{ digest.title }}</h2>
+<p>指定 {{ digest.counts.get('requested', '未提供') }} 檔 · 成功評估 {{ digest.counts.get('evaluated', '未提供') }} 檔 · 排除 {{ digest.counts.get('excluded', '未提供') }} 檔</p>
+<p>分析日：{{ digest.analysis_date or '未提供' }}；名單來源：{{ digest.universe_source or '未提供' }}；來源時間：{{ digest.universe_downloaded_at or '未提供' }}</p>
+<details><summary>指定股票池與因子設定</summary><p>{{ digest.specified_pool | join(', ') if digest.specified_pool is not none else '未提供' }}</p><pre>{{ digest.factor_settings | pretty }}</pre></details>
+<p><a href="/reports/{{ report_key }}/preview?top={{ digest.top }}">HTML 郵件預覽</a> · <a href="/reports/{{ report_key }}/preview?top={{ digest.top }}&format=text">純文字預覽</a> · <a href="/reports/{{ report_key }}/csv">完整排名 CSV</a></p>
+<form><label>候選數 <input type="number" name="top" min="1" max="50" value="{{ digest.top }}"></label><button>更新顯示</button></form>
+<h3>候選股總覽</h3>
+{% for candidate in digest.candidates %}
+<article style="border-top:1px solid #dce3ec;padding:16px 0">
+<h3>{{ candidate.rank }}. {{ candidate.stock_id }} {{ candidate.name or '名稱未提供' }}</h3>
+<p>{{ candidate.industry or '產業未提供' }} · 總分 {{ candidate.score | score_text }} · 名次變化 {{ candidate.rank_change if candidate.rank_change is not none else '尚無可比較結果' }}（正數為上升）</p>
+<p>訊號日收盤：{{ candidate.close if candidate.close is not none else '未提供' }}（{{ candidate.price_date or '日期未提供' }}）；最後行情日：{{ candidate.latest_date or '未提供' }}</p>
+<ul>{% for line in candidate.explanations %}<li>{{ line }}</li>{% endfor %}</ul>
+{% for hint in candidate.hints %}<p>研究提示：{{ hint }}</p>{% endfor %}
+</article>{% else %}<p>本次沒有可呈現的候選股。</p>{% endfor %}
+<h3>歷史排名變化</h3><p>{{ digest.comparison.message }}</p>
+{% if digest.comparison.available %}<p>新進前 {{ digest.top }}：{{ digest.comparison.entered | join(', ') or '無' }}；退出：{{ digest.comparison.exited | join(', ') or '無' }}</p>{% endif %}
+{% for item in digest.comparison.limitations %}<p>{{ item }}</p>{% endfor %}
+{% if digest.comparison.get('previously_unranked') %}<p>前次未排名（不稱為新進）：{{ digest.comparison.previously_unranked | join(', ') }}</p>{% endif %}
+{% if digest.comparison.get('currently_unranked') %}<p>本次未排名（不稱為下跌）：{{ digest.comparison.currently_unranked | join(', ') }}</p>{% endif %}
+<h3>資料限制與研究提示</h3><ul>{% for hint in digest.hints %}<li>{{ hint }}</li>{% endfor %}</ul>
+<details><summary>排除原因（{{ digest.excluded | length }} 檔）</summary>{% for item in digest.excluded %}<p>{{ item.stock_id }}：{{ item.reason }}</p>{% endfor %}</details>
+<details><summary>執行資訊</summary><pre>{{ digest.execution | pretty }}</pre></details>
+</section>

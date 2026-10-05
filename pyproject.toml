@@ -9,8 +9,12 @@ description = "Taiwan stock screening and backtesting tools"
 requires-python = ">=3.12"
 dependencies = [
     "matplotlib>=3.8,<4",
+    "Flask>=3.1,<4",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["tw_stock_backtest*"]
+
+[tool.setuptools.package-data]
+tw_stock_backtest = ["templates/*.html"]
