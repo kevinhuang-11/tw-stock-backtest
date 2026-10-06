@@ -1,0 +1,5 @@
+[
+  {"id":"august","start":"2026-08-03","end":"2026-08-31","purpose":"development","previously_seen":true},
+  {"id":"september_first","start":"2026-09-01","end":"2026-09-15","purpose":"development","previously_seen":true},
+  {"id":"september_second","start":"2026-09-16","end":"2026-09-29","purpose":"development","previously_seen":true}
+]

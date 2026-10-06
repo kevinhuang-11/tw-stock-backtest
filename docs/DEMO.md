@@ -515,3 +515,238 @@ unset GMAIL_ADDRESS GMAIL_APP_PASSWORD
 - 本機及已取得的 main 歷史未發現 `.env` 被追蹤或常見秘密格式；此結論不涵蓋已刪除的遠端物件、其他人的 clone 或任意無格式的密碼。
 
 安全測試使用合成值，包含網頁／郵件遮蔽、子程序環境隔離、錯誤訊息及跨站請求限制；完整測試 310 項通過。本次沒有寄信、push、啟用排程或改寫歷史。
+
+## 策略庫、技術指標與比較
+
+### 發布與驗證界線
+
+前階段工作台、研究摘要與安全修正已發布至 `main`：
+`4caf55671dd851606c282a3eaecbb6afbcfa1b7e`。
+[對應 GitHub CI](https://github.com/kevinhuang-11/tw-stock-backtest/actions/runs/37274585944) 在乾淨 runner 通過 310 項測試。
+本節策略功能只完成本機實作，未 push、未啟用排程、未寄送真實郵件。
+
+### 策略管理
+
+策略使用 JSON schema 1，保存在 `strategies/`。只包含穩定 ID、名稱、說明、排名模式、指標期間、權重與條件。
+股票池、日期、初始資金、配置、費稅與滑價仍在執行設定中，不接受寫入策略檔。
+
+```bash
+# 清單與完整內容／雜湊
+.venv/bin/python -m tw_stock_backtest.cli.strategy_library list
+.venv/bin/python -m tw_stock_backtest.cli.strategy_library show baseline
+
+# 從目前設定建立；ID 需尚不存在
+.venv/bin/python -m tw_stock_backtest.cli.strategy_library create my_strategy --name "我的示例"
+
+# 複製，不改原策略
+.venv/bin/python -m tw_stock_backtest.cli.strategy_library copy baseline my_copy --name "基準副本"
+
+# 編輯 JSON 後驗證、原子儲存；更新現有 ID 必須明確 --replace
+.venv/bin/python -m tw_stock_backtest.cli.strategy_library save --file strategies/my_copy.json --replace
+```
+
+也可啟動 `.venv/bin/python -m tw_stock_backtest.cli.serve_workbench`，開啟 `/strategies` 建立、查看、複製及修改。
+期間與權重使用表單，AND 條件使用受限 JSON 清單編輯；沒有任意程式碼或巢狀運算樹。
+工作台預設讀取 `strategies/`，可用 `--strategy-dir` 指定自己的策略庫；所有路徑由策略 ID 控制，不接受網頁傳入任意檔案位置。
+
+### 選用策略
+
+```bash
+# 嚴格模式：條件未過不算錯誤，但指標資料不足會阻止排名
+.venv/bin/python -m tw_stock_backtest.cli.run_research \
+  --skip-download --as-of 2026-09-29 --stocks 2330 2317 2454 \
+  --strategy strategies/rsi_range.json --output-dir reports/strategy-research
+
+# 明確允許部分結果；保留每檔資料不足及條件結果
+.venv/bin/python -m tw_stock_backtest.cli.run_research \
+  --skip-download --as-of 2026-09-29 --stocks 2330 2317 2454 \
+  --strategy strategies/rsi_range.json --allow-partial \
+  --output-dir reports/strategy-research
+
+.venv/bin/python -m tw_stock_backtest.cli.run_portfolio \
+  --stocks 2330 2317 2454 --start 2026-09-01 --end 2026-09-29 \
+  --strategy strategies/baseline.json --export --output-dir reports/strategy-backtest
+```
+
+優先順序為：原 config → 策略的選股欄位 → 明確 CLI `--top`。CLI 的股票、日期、資金等執行參數維持原本覆寫規則。
+`run_portfolio --ranking` 若與策略模式衝突會拒絕，不偷偷改策略。未指定 `--strategy` 時保留原研究多因子／回測 rules 預設及運作方式。
+`run_research` 與 `run_portfolio` 是新的策略選擇入口；原 `screen_factors` 等簡易 CLI 保持既有功能。
+
+每次研究在 `summary.json`、回測在 `settings.json` 保存完整 `strategy_snapshot`（definition＋SHA-256）。
+雜湊以穩定排序的 JSON 內容計算；名稱、期間、權重或條件修改都會改變版本識別，不只依靠名稱。
+工作台在排入佇列時就另存策略副本，之後修改策略庫不影響已排入的工作。過去報表不回查目前策略檔。
+舊版簡化報表匯出 API 若未提供完整設定，策略快照標為未提供，不補造。
+
+### 指標公式與暖機
+
+所有指標計算使用 Decimal；圖表才轉為 float。不承諾和所有看盤軟體的初值、歷史長度或柱狀值完全相同。
+
+| 指標 | 定義與第一個有效值 |
+|---|---|
+| EMA(N) | 首 N 值的算術平均作種子；之後 `EMA + 2/(N+1) × (新值 − EMA)`。前 N−1 筆為 None |
+| RSI(N) | Wilder 平滑：先以 N 次漲／跌幅平均初始化，後續 `(前平均×(N−1)+本次)/N`；`100×平均漲幅/(平均漲幅+平均跌幅)`。需要 N+1 個價格；全平盤 50、只漲 100、只跌 0 |
+| MACD(F,S,M) | EMA(F)−EMA(S)，F<S；訊號線是前述 MACD 的 EMA(M)，以最初 M 個有效 MACD 平均初始化。MACD 需 S 筆，訊號線與柱狀值需 S+M−1 筆。柱狀＝MACD−訊號線，不乘 2 |
+| 突破(N) | 當日收盤 **嚴格大於前 N 筆行情最高價的最大值**；需 N+1 筆，門檻排除當日最高價 |
+
+EMA、RSI、MACD 的遞迴狀態從傳入歷史的第一筆開始，因此整個截至訊號日的輸入都要有效；不截取尾端任意重新初始化。
+資料不足在指標序列中為 None，條件評估則標為 unavailable；缺價、非有限值或非法價格不補零、不刪列湊足期間。
+突破與均線條件只驗證使用的窗口。所有條件先切到訊號日及以前，未來價格不影響結果。
+
+**既有回測的已確認停牌處理仍保留。** 基準排名沿用原回測的行情處理；新 RSI／MACD 等條件另外讀取未刪列的原始歷史。
+所以即使缺價是已確認停牌，遞迴指標仍可能無法計算；沒有新增補值或自動重置指標的規則。
+
+### 條件與排名母體
+
+有限的條件清單只採 AND；未列入表示不啟用：
+
+```json
+[
+  {"type":"rsi","period":14,"minimum":"30","maximum":"70"},
+  {"type":"macd","fast":12,"slow":26,"signal":9},
+  {"type":"breakout","period":20},
+  {"type":"trend","short_window":5,"long_window":20},
+  {"type":"volume","period":20,"minimum":"1"}
+]
+```
+
+RSI 使用含端點區間；MACD 嚴格大於訊號線；trend 為 Close>SMA(short)>SMA(long)；volume 為當日量／前 N 筆平均量嚴格大於 minimum。
+`rules` 模式仍包含原有均線與量比規則，上列清單是額外條件；要自由選用單項趨勢／量比條件，可用 factors 模式。
+
+多因子先對原本有效因子資料的股票池計分，再套用條件；條件不會重新正規化分數。
+`ranking_population` 記錄評分母體、`scored_rankings` 保存篩選前分數、`rankings.json/CSV` 保存符合條件者，故候選名次可能跳號。
+資料不足與 `filtered`（數值有效但未符合）分開記錄；每檔的 conditions 包含實際值、門檻、passed 與原因。
+
+新策略流程中：資料完整但沒有候選者仍是成功（退出碼 0）；有資料錯誤的嚴格模式為 1，允許部分且尚有有效股票時為 2。
+回測沿用原先對無法更新訊號持股的暫時保留規則；條件未通過則可按下一行情日調整持股。
+研究報告與 Gmail 顯示策略名稱、schema／內容雜湊及候選觸發值；歷史排名比較也要求策略雜湊一致，避免不同條件混比。
+
+### 同設定策略比較
+
+```bash
+.venv/bin/python -m tw_stock_backtest.cli.compare_strategies \
+  --strategies strategies/baseline.json strategies/rsi_range.json strategies/macd_breakout.json \
+  --stocks 2330 2317 2454 --start 2026-09-01 --end 2026-09-29 \
+  --output-dir reports/comparisons
+```
+
+一次限 2～5 份不同 ID 的策略。網頁首頁也有同樣的比較表單，排入既有背景佇列。
+同一次比較只載入一次行情，固定股票池、期間、現金、配置、費稅與滑價；共用一個買進持有基準。
+不接受任意不同來源報表直接拼接。資產日期不一致時拒絕發布完成報表。
+
+新目錄保存 `common.json`（共同設定、行情雜湊、程式版本）、`comparison.json/CSV`、`comparison.png`，以及每個策略原本完整的回測報表。
+比較報表用相對路徑引用各策略報表；全部完成後才將 `.incomplete` 目錄改名。
+無候選日與資料不足日可能重疊，二者不能直接相加當作交易日總數。
+
+### 固定示例與本機驗證
+
+三份示例只展示功能，沒有依回測結果調整：原多因子、RSI14 區間 30～70、MACD12/26/9 AND 前20筆突破。
+2026-09-01～09-29 的既有三檔資料有 19 個共同行情日。本機比較結果：
+
+| 策略 | 區間報酬 | 最大回撤 | 費稅 | 成交筆數 | 平均持股市值占比 | 無候選日 | 資料不足日 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| baseline | 5.1022% | 3.9149% | 978 | 2 | 65.8770% | 0 | 0 |
+| rsi_range | 10.6913% | 3.3785% | 6,087 | 5 | 50.2492% | 0 | 19 |
+| macd_breakout | −2.5309% | 2.5309% | 5,809 | 4 | 8.0432% | 16 | 19 |
+
+共用買進持有基準報酬為 5.21505%。RSI／MACD 的歷史輸入中，2317 有缺價，不能刪除該列，因此兩份策略在各訊號日都有該股票的資料不足紀錄；不是三檔皆可正常使用新指標。
+相同資料下，9/29 RSI 嚴格研究會失敗；明確 `--allow-partial` 才產生其餘兩檔候選。這是資料處理驗證，不是選出最佳策略，也不是樣本外有效性驗證。
+
+本機測試涵蓋 EMA／MACD 手算值、Wilder RSI、平盤與單向行情、缺值／暖機、突破排除當日、未來資料不影響結果、策略驗證與快照、原因子／rules 基準相容、CLI 覆寫、網頁策略操作及比較費稅一致性。
+HTTP 已驗證策略表單、複製、背景比較、比較頁、PNG 及含策略條件的郵件預覽。資料庫雜湊未變；沒有可用瀏覽器自動化工具，未宣稱已驗證實際瀏覽器排版。
+
+策略與跨期間階段本機完整 **326 項測試通過**；安裝後完整操作與缺值影響見下節。遠端驗證以對應提交的 Actions 結果為準。
+
+## 跨期間策略驗收與評估
+
+### 操作
+
+沿用同一比較 CLI；`--periods` 與 `--start/--end` 互斥。
+
+```bash
+# 已看過的三個探索期間，不讀取 2025 年保留期間績效
+.venv/bin/python -m tw_stock_backtest.cli.compare_strategies \
+  --strategies strategies/baseline.json strategies/rsi_range.json strategies/macd_breakout.json \
+  --stocks 2330 2317 2454 \
+  --periods experiments/periods_demo.json \
+  --output-dir /tmp/tw-period-comparison
+
+# 工作台首頁的「跨期間策略比較」使用相同核心
+.venv/bin/python -m tw_stock_backtest.cli.serve_workbench
+
+# 研究與郵件預覽；REPORT_DIR 換成指令印出的這次報表目錄
+.venv/bin/python -m tw_stock_backtest.cli.run_research \
+  --strategy strategies/rsi_range.json --skip-download \
+  --as-of 2026-09-29 --allow-partial --output-dir /tmp/tw-strategy-research
+.venv/bin/python -m tw_stock_backtest.cli.notify_report \
+  --summary REPORT_DIR/summary.json --dry-run --output /tmp/tw-strategy-preview.eml
+```
+
+期間 JSON 每筆包含 `id`、`start`、`end`、`purpose`、`previously_seen`。
+`purpose` 可為 `development`（開發／探索）或 `validation`（驗證）；
+`previously_seen` 記錄是否已看過结果。標為驗證不代表真正樣本外；看過或用來調參後不能稱為未見的最終測試集。
+最多 12 個期間、2～5 份策略，不自動搜尋參數或挑選勝者。
+
+每段獨立重置初始現金與持股，共用股票池、配置、費稅與滑價。
+行情先固定為一次輸入快照，各期間只傳入截至該段結束日的資料，開始日前行情僅供暖機。
+沒有交易日曆時採保守邊界規則：**每檔在指定起、迄日都必須有行情列**；否則記錄失敗，不改成附近日期。
+這也會拒絕週末作為邊界；請自行明確選擇已保存的行情日。資料最早／最晚日期不代表中間歷史完整。
+
+### 報表與退出碼
+
+每次產生獨立目錄，包含：
+
+- `common.json`：股票池、成本配置、資料來源、覆蓋範圍、輸入雜湊、策略快照與程式版本。
+- `progress.json`：各期間目前執行狀態；工作台重新整理可查看 `.incomplete` 的進度。
+- `comparison.json`／`comparison.csv`：各策略各期間報酬、基準報酬、雙方最大回撤、報酬差（百分點）、費稅、成交數、平均持股市值占比、無候選及不足日數。
+- 各期間目錄：原有策略比較圖、共同基準與各策略完整回測報表；彙總的 `report` 為相對路徑，可追查原始資產曲線與交易。
+
+退出碼：`0` 全部完成且沒有無法評估日，`2` 有完成結果但部分期間／策略失敗或資料不足，`1` 沒有可保存的成功子回測或流程失敗。
+單一子策略失敗仍保留其他策略；失敗原因與類型在 JSON 中，未產生報酬的項目不放入績效 CSV。
+中斷留在 `.incomplete`；最後完成標記及目錄改名後才視為正式結果。正式結果仍可能是部分成功或失敗，需讀取 `status`。
+
+「有效期間」只計入該策略沒有無法評估日且成功完成的期間；其他完成結果照樣列出，但不加入跑贏基準的分母與指標範圍。
+報酬 `0.05` 表示 5%；策略 5% 與基準 3% 的差是 **2 個百分點**。
+不加總獨立期間報酬。重疊期間會列入 `overlapping_periods`，不得視為獨立樣本；跑贏期間比例也不是未來獲利機率。
+
+### 遞迴缺值規則與實際影響
+
+RSI／MACD 檢查該股票已載入的**第一筆行情至訊號日**的全部收盤价，種子與遞迴沿用原公式。
+任意早期缺價都會持續阻擋後續計算，沒有自動重置或有限暖機裁切；排名與回測條件使用同一個原始行情前綴。
+一般因子與均線等局部窗口仍依既有規則計算。已知停牌的缺價也不會從遞迴輸入中刪除。
+診斷保存 `input_range`（起訖及筆數）、`invalid_inputs`（日期、從 1 起算的位置、欄位）與原因。
+
+2026-10-06 唯讀盤點，截至 9/29 的已存資料有 **33 檔、95 筆收盤缺值**。
+這是遞迴輸入的缺值盤點，不等同 33 檔是當日唯一無法評估股票；也未將未知缺漏判定為停牌。
+三檔示例各 547 筆，資料起點 2024-01-02、截止 2026-09-29。
+2317 的第 380 筆（2025-07-30）收盤缺失，造成以下 40 個示例訊號日的 RSI／MACD 條件無法評估；2330、2454 沒有收盤缺值。
+
+後續若要允許缺價後重新累積暖機，應建立**明確的新策略版本**，先定義連續有效資料段與重置種子，再與目前公式做敏感度比較。
+本次不更改預設，不刪掉缺價列拼接日期，也不以提高評估成功數為目標。
+
+### 本機實際結果（已看過的探索資料）
+
+三檔股票、三份固定示例策略；每段重置 100 萬元，其他設定沿用 `config.toml`，不調參。
+
+| 期間 | baseline | rsi_range | macd_breakout | 買進持有基準 |
+|---|---:|---:|---:|---:|
+| 2026-08-03～08-31 | -2.1540% | -1.0915% | 0.0000% | 0.94255% |
+| 2026-09-01～09-15 | -0.5978% | 1.5249% | -0.4799% | -0.24895% |
+| 2026-09-16～09-29 | 4.0508% | 7.5172% | -2.0510% | 5.2237% |
+
+baseline 跑贏基準 0／3 個有效期間。RSI 與 MACD 策略分別有 21、11、8 個無法評估日，因此有效期間分母均為 0；不得據上述報酬宣稱較佳。
+三段互不重疊，但相鄰市場環境仍可能相關。原始價未調整公司行動、股票池事後指定，結果僅展示可追查流程。
+
+### 安裝與介面驗收範圍
+
+已用 wheel 安裝至獨立暫存目錄，離開原始碼目錄執行：建立策略 → 複製修改 → 排名 → 回測 → 比較 → 郵件 dry-run。
+研究與回測有效策略雜湊相符，原 SQLite 雜湊不變，未呼叫 SMTP。
+策略 JSON 與 TOML 是使用者輸入，**不隨 wheel 內建**；安裝後請明確提供 `--config`、`--strategy`／`--strategies`，工作台提供 `--strategy-dir`。
+Jinja HTML 模板隨套件安裝；此工作台沒有另行編譯的 JS 或 CSS 產物。
+
+HTTP／整合測試涵蓋策略表單、背景比較、CSV、郵件預覽、Host 與 CSRF 防護。
+**尚未使用真實瀏覽器驗證桌面或窄螢幕版面。** 人工點選清單：
+
+1. 開啟首頁與「管理策略庫」，建立、複製、修改條件，確認列表與雜湊更新。
+2. 在寬桌面與約 390px 視窗下填入跨期間表單；確認文字可讀、比較表可水平捲動。
+3. 送出工作、重新整理狀態，打開正式報表及子回測、比較圖與 CSV。
+4. 查看部分成功原因與郵件預覽；確認操作沒有自動寄信。

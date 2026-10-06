@@ -114,13 +114,22 @@ editable 安裝讓原始碼修改直接生效，依賴由 pyproject.toml 安裝�
 每次工作產生 HTML／純文字郵件預覽與排名 CSV；只有 CLI 明確 `--send` 才寄信。
 [操作、輸出位置與自行寄信設定](docs/DEMO.md#本機網頁工作台與-gmail)。
 
+## 策略庫與比較
+
+可保存、複製 JSON 策略，使用 RSI、MACD、突破、均線與量比條件；因子先對原母體評分，再決定候選資格。
+每次執行保存策略快照與 SHA-256，策略比較共用行情、資金、成本及買進持有基準。
+在工作台點選「管理策略庫」，或依 [策略操作與指標定義](docs/DEMO.md#策略庫技術指標與比較) 使用 CLI。
+支援明確指定多個期間，獨立重置資金、記錄用途與資料不足原因，保存各子回測及比較摘要。
+[跨期間操作與驗收](docs/DEMO.md#跨期間策略驗收與評估)。示例僅展示軟體功能，不代表已驗證有效。
+
 ## 測試與驗證
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-2026-10-01 [GitHub 乾淨 runner 驗證](https://github.com/kevinhuang-11/tw-stock-backtest/actions/runs/36880915103)：**287 個測試通過**。
+2026-10-05 [安全修正的 GitHub CI](https://github.com/kevinhuang-11/tw-stock-backtest/actions/runs/37274585944)：**310 個測試通過**。
+策略庫與跨期間階段本機完整 **326 項測試通過**；遠端驗證以本次提交的 Actions 結果為準。
 三檔研究流程亦完成無 cache 初始化及 cache 還原後的增量更新；[驗收紀錄](docs/DEMO.md#github-遠端驗收2026-10-01)。
 測試使用暫存資料與模擬輸入，不需要先下載全市場行情。
 
