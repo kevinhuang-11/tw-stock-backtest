@@ -129,7 +129,7 @@ editable 安裝讓原始碼修改直接生效，依賴由 pyproject.toml 安裝�
 ```
 
 2026-10-05 [安全修正的 GitHub CI](https://github.com/kevinhuang-11/tw-stock-backtest/actions/runs/37274585944)：**310 個測試通過**。
-策略庫與跨期間階段本機完整 **326 項測試通過**；遠端驗證以本次提交的 Actions 結果為準。
+2026-10-06 策略庫與跨期間階段本機及 [策略與跨期間 GitHub CI](https://github.com/kevinhuang-11/tw-stock-backtest/actions/runs/37401510494) 均 **326 項測試通過**（提交 `2f2290b`，乾淨 runner 安裝套件後執行）。
 三檔研究流程亦完成無 cache 初始化及 cache 還原後的增量更新；[驗收紀錄](docs/DEMO.md#github-遠端驗收2026-10-01)。
 測試使用暫存資料與模擬輸入，不需要先下載全市場行情。
 

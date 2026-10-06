@@ -750,3 +750,5 @@ HTTP／整合測試涵蓋策略表單、背景比較、CSV、郵件預覽、Host
 2. 在寬桌面與約 390px 視窗下填入跨期間表單；確認文字可讀、比較表可水平捲動。
 3. 送出工作、重新整理狀態，打開正式報表及子回測、比較圖與 CSV。
 4. 查看部分成功原因與郵件預覽；確認操作沒有自動寄信。
+
+2026-10-06 遠端驗收：提交 `2f2290b` 的 [策略與跨期間 GitHub CI](https://github.com/kevinhuang-11/tw-stock-backtest/actions/runs/37401510494) 在 Python 3.12 乾淨 runner 安裝套件後，完整 **326 項測試通過**。本機工作分支為 `refactor/package-layout`，正常推送至既有 `main`；未啟用排程或寄信。
