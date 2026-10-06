@@ -29,8 +29,13 @@ def build_message(summary, address=None):
     message['Subject'] = f"研究工作台：{summary.get('status', 'unknown')}"
     # Only known summary fields; never attach settings, environment or logs.
     fields = ('run_id', 'kind', 'status', 'exit_code', 'analysis_date',
-              'started_at', 'finished_at', 'counts', 'excluded', 'error_type', 'strategy', 'benchmark')
+              'started_at', 'finished_at', 'counts', 'excluded', 'error_type', 'strategy', 'benchmark', 'last_signal', 'strategy_comparison')
     body = ['本機研究工作台執行摘要', '']
+    strategy = summary.get('strategy_snapshot')
+    if strategy:
+        body += [f"策略：{strategy['definition']['name']}（schema {strategy['definition']['schema_version']}）",
+                 '策略 SHA-256：' + strategy['sha256'],
+                 'AND 條件：' + json.dumps(strategy['definition']['conditions'], ensure_ascii=False), '']
     body += [f'{key}: {summary[key]}' for key in fields if key in summary]
     body += ['', '程式執行結果不代表策略已證明有效。']
     message.set_content('\n'.join(body))

@@ -32,8 +32,13 @@ def export_portfolio_report(
     performance,
     benchmark,
     benchmark_performance,
+    strategy=None,
 ):
     """將本次回測輸出到新的獨立資料夾，不覆寫舊報表。"""
+    from tw_stock_backtest.strategies import snapshot, from_settings
+    effective_strategy = snapshot(strategy) if strategy is not None else (
+        snapshot(from_settings(settings, result.get('ranking_method', 'rules')))
+        if 'factors' in settings and 'screening' in settings else None)
     strategy_curve = result["equity_curve"]
     benchmark_curve = benchmark["equity_curve"]
 
@@ -56,6 +61,7 @@ def export_portfolio_report(
             "requested_start": start_text,
             "requested_end": end_text,
             "settings": settings,
+            "strategy_snapshot": effective_strategy,
         },
         "results.json": {
             "schema_version": 1,
@@ -212,7 +218,7 @@ class ResearchReport:
             writer = csv.DictWriter(file, fieldnames=fields)
             writer.writeheader()
             for row in rankings:
-                writer.writerow({**{k: row[k] for k in fields[:4]}, **row["factors"]})
+                writer.writerow({**{k: row[k] for k in fields[:4]}, **{k: row.get("factors", {}).get(k, "") for k in fields[4:]}})
         self.write_json("summary.json", {**summary, "report_complete": True})
         self.path.rename(self.final_path)
         return self.final_path

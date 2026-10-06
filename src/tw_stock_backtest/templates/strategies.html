@@ -1,0 +1,16 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>策略庫</title>
+<style>body{font:16px/1.6 system-ui;max-width:1000px;margin:30px auto;padding:20px;background:#f3f6fa}section{background:white;padding:20px;margin:20px 0}label{display:inline-block;margin:8px}input,textarea,select,button{font:inherit;padding:6px;max-width:95%}textarea{width:95%;height:140px}code{overflow-wrap:anywhere}</style>
+<a href="/">返回工作台</a><h1>策略庫</h1><p>策略只保存選股邏輯。股票池、日期、資金與費稅仍在執行設定中。</p>
+<section><h2>策略列表</h2><a href="/strategies">建立新策略</a>{% for item in strategies %}<p><a href="/strategies?id={{ item.id }}">{{ item.name }}（{{ item.id }}）</a></p>{% endfor %}</section>
+<section><h2>{{ '修改策略' if editing else '建立策略' }}</h2><p>schema 1 · SHA-256：<code>{{ fingerprint }}</code></p>
+<form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><label>ID <input name="id" value="{{ strategy.id }}" required {{ 'readonly' if editing else '' }}></label><label>名稱 <input name="name" value="{{ strategy.name }}" required></label><label>模式 <select name="ranking_mode">{% for mode in ('factors','rules') %}<option {{ 'selected' if strategy.ranking_mode==mode else '' }}>{{ mode }}</option>{% endfor %}</select></label><p>rules 保留原有均線與量比篩選，再加入下方額外條件。</p><label>說明 <input name="description" value="{{ strategy.description }}" required size="70"></label>
+{% for group in ('factors','screening') %}<h3>{{ group }}</h3>{% for key,value in strategy[group].items() %}<label>{{ key }} <input name="{{ group }}.{{ key }}" value="{{ value }}" required size="8"></label>{% endfor %}{% endfor %}
+<h3>AND 條件 JSON</h3><p>未列入表示停用。只接受 rsi、macd、breakout、trend、volume，不能執行程式。</p><textarea name="conditions">{{ strategy.conditions | pretty }}</textarea>
+<details><summary>條件格式示例（可複製需要的項目）</summary><pre>[{"type":"rsi","period":14,"minimum":"30","maximum":"70"},
+ {"type":"macd","fast":12,"slow":26,"signal":9},
+ {"type":"breakout","period":20},
+ {"type":"trend","short_window":5,"long_window":20},
+ {"type":"volume","period":20,"minimum":"1"}]</pre></details>
+{% if editing %}<input type="hidden" name="replace" value="yes">{% endif %}<button>驗證並儲存</button></form></section>
+{% if editing %}<section><h2>複製策略</h2><form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="copy"><input type="hidden" name="source" value="{{ strategy.id }}"><label>新 ID <input name="id" required></label><label>新名稱 <input name="name" required></label><button>建立副本</button></form></section>{% endif %}
+</html>

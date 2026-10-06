@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "rsi_range",
+  "name": "RSI 區間示例",
+  "description": "僅展示功能，未證明策略有效。",
+  "ranking_mode": "factors",
+  "factors": {
+    "short_window": 5,
+    "long_window": 20,
+    "momentum_window": 20,
+    "volatility_window": 20,
+    "top_n": 3,
+    "momentum_weight": "1",
+    "trend_weight": "1",
+    "volatility_weight": "1"
+  },
+  "screening": {
+    "short_window": 5,
+    "long_window": 20,
+    "volume_window": 20,
+    "min_volume_ratio": "1",
+    "momentum_window": 20,
+    "top_n": 3
+  },
+  "conditions": [
+    {
+      "type": "rsi",
+      "period": 14,
+      "minimum": "30",
+      "maximum": "70"
+    }
+  ]
+}

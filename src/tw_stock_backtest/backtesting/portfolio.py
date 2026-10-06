@@ -121,8 +121,16 @@ def run_portfolio_backtest(
     confirmed_halts=None,
     sizing_mode="fixed_quantity",
     slippage_rate=Decimal("0"),
+    strategy=None,
 ):
 
+    strategy_diagnostics = []
+    if strategy is not None:
+        from tw_stock_backtest.strategies import validate_strategy, analyze_strategy, snapshot
+        strategy = validate_strategy(strategy)
+        ranking_method = strategy['ranking_mode']
+        factor_settings = {k: Decimal(v) if k.endswith('_weight') else v for k,v in strategy['factors'].items()}
+        screening_settings = {k: Decimal(v) if k == 'min_volume_ratio' else v for k,v in strategy['screening'].items()}
     start, end = parse_date_range(start_text, end_text)
 
     if (
@@ -399,6 +407,12 @@ def run_portfolio_backtest(
                 weights=weights,
             )
 
+        if strategy is not None:
+            analysis = analyze_strategy(histories, trading_date, strategy, indicator_records=records_by_stock)
+            candidates = analysis['candidates']
+            errors.update(analysis['errors'])
+            strategy_diagnostics.append({'date': trading_date, **analysis})
+
         # 停牌或無法更新訊號的既有持股暫時保留，仍占名額。
         frozen = sorted(
             stock_id
@@ -436,6 +450,7 @@ def run_portfolio_backtest(
     final_equity = equity_curve[-1]["equity"]
 
     return {
+        **({"strategy_snapshot": snapshot(strategy), "strategy_diagnostics": strategy_diagnostics} if strategy is not None else {}),
         "ranking_method": ranking_method,
         "sizing_mode": sizing_mode,
         "budget_per_position": (

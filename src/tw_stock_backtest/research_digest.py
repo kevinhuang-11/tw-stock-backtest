@@ -86,6 +86,9 @@ def pool(bundle):
 
 def differences(current, previous):
     reasons = []
+    a_strategy, b_strategy = (b['summary'].get('strategy_snapshot') for b in (current, previous))
+    if (a_strategy or b_strategy) and (not a_strategy or not b_strategy or a_strategy.get('sha256') != b_strategy.get('sha256')):
+        reasons.append('策略內容雜湊不同或未保存，不比較不同条件的名次')
     if current['mode'] is None or previous['mode'] is None or current['mode'] != previous['mode']:
         reasons.append('排名模式不同或未提供')
     a, b = (x['settings'].get('factors', {}) for x in (current, previous))
@@ -190,13 +193,17 @@ def build_digest(bundle, histories=(), *, top=10, today=None):
     for row in bundle['rankings'][:top]:
         sid = row['stock_id']
         info, evaluation = metadata.get(sid, {}), evaluations.get(sid, {})
-        lines, warnings, contributions = explain(row, settings)
+        if bundle['mode'] == 'rules':
+            lines, warnings, contributions = ['規則模式：依原有動能值排序；score 不是 0～100 的相對因子分數。'], [], {}
+        else:
+            lines, warnings, contributions = explain(row, settings)
         actual = evaluation.get('actual', {})
         snapshot = evaluation.get('signal') or {}
         candidates.append({**row, 'name': info.get('name') or None, 'industry': info.get('industry') or None,
                            'close': snapshot.get('close'), 'price_date': snapshot.get('date'),
                            'latest_date': actual.get('latest'), 'explanations': lines,
                            'hints': warnings, 'contributions': contributions,
+                           'conditions': evaluation.get('conditions', []),
                            'rank_change': comparison['changes'].get(sid)})
     industries = {}
     for row in candidates:
@@ -224,6 +231,7 @@ def build_digest(bundle, histories=(), *, top=10, today=None):
     mode = '多因子排名' if bundle['mode'] == 'factors' else shown(bundle['mode'])
     title = f'{"【歷史行情】" if lag is not None and lag > 0 else ""}{shown(analysis)}｜{mode}｜{marker}'
     return {'digest_schema_version': 1, 'title': title, 'analysis_date': analysis,
+            'strategy_snapshot': summary.get('strategy_snapshot'),
             'ranking_mode': bundle['mode'], 'status': summary.get('status'), 'top': top,
             'preview_date': str(today), 'lag_calendar_days': lag, 'counts': summary.get('counts', {}),
             'specified_pool': pool(bundle), 'ranking_population': summary.get('ranking_population'),
@@ -278,7 +286,9 @@ def render_digest(digest):
     counts = d['counts']
     scope = d['specified_pool']
     settings = d['factor_settings']
-    lines = [d['title'], '', '本次分析範圍',
+    strategy = d.get('strategy_snapshot')
+    strategy_lines = [] if not strategy else [f"策略：{strategy['definition']['name']}（{strategy['definition']['id']}；schema {strategy['definition']['schema_version']}）", '策略 SHA-256：' + strategy['sha256'], 'AND 條件：' + json.dumps(strategy['definition']['conditions'], ensure_ascii=False)]
+    lines = [d['title'], *strategy_lines, '', '本次分析範圍',
              f"指定 {shown(counts.get('requested'))} 檔；成功評估 {shown(counts.get('evaluated'))} 檔；排除 {shown(counts.get('excluded'))} 檔。",
              '指定股票池：' + ((', '.join(scope[:20]) + (f' … 共 {len(scope)} 檔（完整清單見保存摘要）' if len(scope) > 20 else '')) if scope is not None else MISSING),
              f"行情基準：{shown(d['analysis_date'])}；各候選股行情日另列。",
@@ -290,7 +300,8 @@ def render_digest(digest):
         change = '尚無可比較結果' if c['rank_change'] is None else f"{c['rank_change']:+d}（正數為上升）"
         lines.extend(['', f"{c['rank']}. {c['stock_id']} {shown(c['name'])}｜{shown(c['industry'])}",
                       f"訊號收盤 {shown(c['close'])}（{shown(c['price_date'])}）；行情最新日 {shown(c['latest_date'])}；總分 {score_text(c.get('score'))}；名次變化 {change}",
-                      *c['explanations'], *['研究提示：' + hint for hint in c['hints']]])
+                      *c['explanations'], *['研究提示：' + hint for hint in c['hints']],
+                      *['條件紀錄：' + json.dumps(condition, ensure_ascii=False) for condition in c.get('conditions', [])]])
     comparison = d['comparison']
     lines += ['', '排名變化', comparison['message']]
     if comparison['available']:

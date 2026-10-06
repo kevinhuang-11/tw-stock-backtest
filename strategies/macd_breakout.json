@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "macd_breakout",
+  "name": "MACD 與突破示例",
+  "description": "僅展示功能，未證明策略有效。",
+  "ranking_mode": "factors",
+  "factors": {
+    "short_window": 5,
+    "long_window": 20,
+    "momentum_window": 20,
+    "volatility_window": 20,
+    "top_n": 3,
+    "momentum_weight": "1",
+    "trend_weight": "1",
+    "volatility_weight": "1"
+  },
+  "screening": {
+    "short_window": 5,
+    "long_window": 20,
+    "volume_window": 20,
+    "min_volume_ratio": "1",
+    "momentum_window": 20,
+    "top_n": 3
+  },
+  "conditions": [
+    {
+      "type": "breakout",
+      "period": 20
+    },
+    {
+      "type": "macd",
+      "fast": 12,
+      "slow": 26,
+      "signal": 9
+    }
+  ]
+}

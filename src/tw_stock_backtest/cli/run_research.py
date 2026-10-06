@@ -21,6 +21,7 @@ class Parser(argparse.ArgumentParser):
 
 def parse_arguments(argv=None):
     parser = Parser(description=__doc__)
+    parser.add_argument("--strategy", help="策略 JSON 檔；CLI --top 優先於策略")
     parser.add_argument("--config", default=str(DEFAULT_CONFIG_PATH))
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--stocks", nargs="+")
@@ -66,6 +67,13 @@ def main(argv=None):
             "factors": {"top_n": args.top},
             "storage": {"database_path": Path(args.database).resolve() if args.database else None},
         })
+        strategy = None
+        if args.strategy:
+            from tw_stock_backtest.strategies import load_strategy, effective_settings
+            strategy = load_strategy(args.strategy)
+            settings = effective_settings(settings, strategy, args.top)
+            if args.top is not None:
+                strategy['factors']['top_n'] = strategy['screening']['top_n'] = args.top
         snapshot = load_universe(args.universe) if args.universe else None
         stocks = sorted(snapshot["stocks"], key=lambda s: s["stock_id"]) if snapshot else [
             {"stock_id": sid, "name": "", "industry": ""} for sid in settings["universe"]["stocks"]]
@@ -81,6 +89,9 @@ def main(argv=None):
                "start": args.start, "initial_days": args.initial_days,
                "stocks": stocks, "settings": settings,
                "allow_partial": args.allow_partial, "commit": version["commit"]}
+        if strategy is not None:
+            from tw_stock_backtest.strategies import snapshot as strategy_snapshot
+            job['strategy_snapshot'] = strategy_snapshot(strategy)
         plans, previous = [], []
         if args.resume:
             plans, previous = load_research_progress(args.resume, job)
@@ -112,8 +123,11 @@ def main(argv=None):
         )
         result = evaluate_research(
             stocks, settings, cutoff, as_of=args.as_of,
-            allow_partial=args.allow_partial, downloads=downloads,
+            allow_partial=args.allow_partial, downloads=downloads, strategy=strategy,
         )
+        if strategy is None:
+            from tw_stock_backtest.strategies import from_settings, snapshot as strategy_snapshot
+            result['strategy_snapshot'] = strategy_snapshot(from_settings(settings))
         result.update(run_id=report.run_id, version=version, requested_as_of=args.as_of,
                       taipei_today=today, lag_from_today_days=(today-date.fromisoformat(result["analysis_date"])).days if result["analysis_date"] else None,
                       started_at=started, finished_at=datetime.now(timezone.utc),
@@ -127,7 +141,7 @@ def main(argv=None):
         print(f"評估統計：{result['counts']}")
         if result["analysis_date"] and result["analysis_date"] < today.isoformat():
             print("注意：使用歷史行情，並非今日分析。")
-        for row in ranked[:settings["factors"]["top_n"]]:
+        for row in ranked[:settings["factors" if result["ranking_mode"] == "factors" else "screening"]["top_n"]]:
             print(f"{row['rank']}. {row['stock_id']} {row['score']:.2f}")
         print(f"報表：{output}")
         return result["exit_code"]

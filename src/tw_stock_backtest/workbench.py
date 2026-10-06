@@ -17,7 +17,9 @@ from flask import Flask, abort, redirect, render_template, request, send_file, u
 from tw_stock_backtest.cli.download_universe import save_progress
 from tw_stock_backtest.config import load_config
 from tw_stock_backtest.security import public_data, safe_text, child_environment
+from tw_stock_backtest.strategies import StrategyLibrary, from_settings, snapshot, FACTOR_FIELDS, RULE_FIELDS
 from tw_stock_backtest.notifications import preview_message
+from tw_stock_backtest.strategy_comparison import validate_periods
 from tw_stock_backtest.research import program_version
 from tw_stock_backtest.research_digest import load_digest, render_digest, load_bundle, differences, score_text
 
@@ -35,7 +37,11 @@ def report_details(path):
     if any(child.is_symlink() for child in path.iterdir()):
         raise ValueError('報表不可包含符號連結')
     if path.name.endswith('.incomplete'):
-        return {'kind': 'research', 'status': 'incomplete'}
+        return {'kind': 'research', 'status': 'incomplete',
+                'progress': read_json(path / 'progress.json') if (path / 'progress.json').is_file() else None}
+    if (path / 'comparison.json').exists():
+        data = read_json(path / 'comparison.json')
+        return {**data, 'status': data.get('status', 'complete')}
     if (path / 'summary.json').exists():
         summary = read_json(path / 'summary.json')
         if not summary.get('report_complete'):
@@ -66,9 +72,10 @@ def compare_rankings(left, right):
 
 
 class Workbench:
-    def __init__(self, config, reports, state, runner=None):
+    def __init__(self, config, reports, state, runner=None, strategy_root=None):
         self.config = Path(config).resolve()
         self.settings = load_config(self.config)
+        self.library = StrategyLibrary(strategy_root or self.config.parent / "strategies")
         self.reports = Path(reports).resolve()
         self.state = Path(state).resolve()
         self.state.mkdir(parents=True, exist_ok=True)
@@ -96,7 +103,7 @@ class Workbench:
         paths = set()
         for root in (self.reports, self.state):
             if root.exists():
-                for name in ('summary.json', 'results.json', 'failure.json', 'progress.json'):
+                for name in ('summary.json', 'results.json', 'failure.json', 'progress.json', 'comparison.json'):
                     paths.update(p.parent for p in root.rglob(name)
                                  if p.resolve().is_relative_to(root))
         result = {}
@@ -116,12 +123,17 @@ class Workbench:
 
     def submit(self, form):
         kind = form.get('kind')
-        if kind not in ('research', 'backtest'):
+        if kind not in ('research', 'backtest', 'comparison', 'period_comparison'):
             raise ValueError('未知工作類型')
         stocks = form.get('stocks', '').split() or self.settings['universe']['stocks']
         if len(stocks) > 10 or len(set(stocks)) != len(stocks) or any(
                 not re.fullmatch(r'[0-9]{4}', s) for s in stocks):
             raise ValueError('股票池需為不重複的四位數代號，最多 10 檔')
+        selected = self.library.load(form['strategy_id']) if form.get('strategy_id') else None
+        selected_many = [self.library.load(sid) for sid in form.get('strategies', '').split()] if kind in ('comparison', 'period_comparison') else []
+        if kind in ('comparison', 'period_comparison') and (not 2 <= len(selected_many) <= 5 or len({s['id'] for s in selected_many}) != len(selected_many)):
+            raise ValueError('比較需要 2～5 份不同策略')
+        periods = validate_periods(json.loads(form.get('periods', '[]'))) if kind == 'period_comparison' else None
         args = ['--config', str(self.config), '--stocks', *stocks]
         if kind == 'research':
             as_of = form.get('as_of', '')
@@ -132,20 +144,36 @@ class Workbench:
             if form.get('partial') == 'yes':
                 args += ['--allow-partial']
             args += ['--initial-days', '90']
-        else:
+        elif kind != 'period_comparison':
             start, end = (date.fromisoformat(form.get(k, '')) for k in ('start', 'end'))
             if start > end:
                 raise ValueError('起日不可晚於迄日')
-            ranking = form.get('ranking', 'factors')
+            ranking = form.get('ranking') or (selected['ranking_mode'] if selected else 'factors')
+            if selected and ranking != selected['ranking_mode']:
+                raise ValueError('排名模式與策略不一致')
             if ranking not in ('rules', 'factors'):
                 raise ValueError('未知排名方式')
-            args += ['--start', str(start), '--end', str(end), '--ranking', ranking, '--export']
+            args += ['--start', str(start), '--end', str(end)]
+            if kind == 'backtest':
+                args += ['--ranking', ranking, '--export']
         with self.lock:
             if self.pending >= 4:
                 raise ValueError('佇列已滿，請等待現有工作完成')
             job_id = uuid4().hex
             directory = self.state / job_id
             directory.mkdir()
+            if periods:
+                save_progress(periods, directory / 'periods.json')
+                args += ['--periods', str(directory / 'periods.json')]
+            if selected:
+                save_progress(selected, directory / 'strategy.json')
+                args += ['--strategy', str(directory / 'strategy.json')]
+            if selected_many:
+                paths = []
+                for s in selected_many:
+                    path = directory / (s['id'] + '.strategy.json')
+                    save_progress(s, path); paths.append(str(path))
+                args += ['--strategies', *paths]
             job = {'run_id': job_id, 'kind': kind, 'status': 'queued', 'started_at': now(),
                    'stocks': stocks, 'notification': 'pending', 'queued_at': now(),
                    'arguments': args, 'version': program_version()}
@@ -159,7 +187,7 @@ class Workbench:
             job['status'] = 'running'
             job['started_at'] = now()
             save_progress(job, directory / 'job.json')
-            module = 'run_research' if job['kind'] == 'research' else 'run_portfolio'
+            module = {'research':'run_research', 'backtest':'run_portfolio', 'comparison':'compare_strategies', 'period_comparison':'compare_strategies'}[job['kind']]
             command = [sys.executable, '-m', f'tw_stock_backtest.cli.{module}',
                        *args, '--output-dir', str(directory / 'reports')]
             # Credentials are unnecessary for research child processes.
@@ -178,7 +206,7 @@ class Workbench:
                                           env=env, check=False)
                     code = plotted.returncode
             job.update(exit_code=code, status='success' if code == 0 else
-                       'partial' if code == 2 and job['kind'] == 'research' else 'failed')
+                       'partial' if code == 2 and job['kind'] in ('research', 'period_comparison') else 'failed')
         except Exception as error:
             job.update(status='failed', exit_code=1, error_type=type(error).__name__)
         finally:
@@ -199,7 +227,13 @@ class Workbench:
                     if len(results) == 1:
                         data = read_json(results[0])
                         summary.update(strategy=data['strategy']['performance'],
-                                       benchmark=data['benchmark']['performance'])
+                                       benchmark=data['benchmark']['performance'],
+                                       strategy_snapshot=read_json(results[0].parent / 'settings.json').get('strategy_snapshot'),
+                                       last_signal=(data['strategy']['result'].get('strategy_diagnostics') or [None])[-1])
+                if job['kind'] in ('comparison', 'period_comparison') and job['status'] in ('success', 'partial'):
+                    compared = list((directory / 'reports').glob('*/comparison.json'))
+                    if len(compared) == 1:
+                        summary['strategy_comparison'] = read_json(compared[0])['strategies']
                 preview_message(summary, directory / 'notification.eml')
                 job['notification'] = 'dry-run'
             except Exception as error:
@@ -233,7 +267,34 @@ def create_app(workbench):
     @app.get('/')
     def index():
         return render_template('workbench.html', catalog=workbench.catalog(), jobs=workbench.jobs(),
-                               csrf=token, stocks=' '.join(workbench.settings['universe']['stocks']))
+                               csrf=token, strategies=workbench.library.list(), stocks=' '.join(workbench.settings['universe']['stocks']))
+
+    @app.get('/strategies')
+    def strategies():
+        selected = request.args.get('id')
+        try:
+            value = workbench.library.load(selected) if selected else from_settings(workbench.settings, strategy_id='new_strategy', name='新策略')
+        except (ValueError, OSError):
+            abort(404)
+        return render_template('strategies.html', strategies=workbench.library.list(), strategy=value,
+                               fingerprint=snapshot(value)['sha256'], csrf=token, editing=bool(selected))
+
+    @app.post('/strategies')
+    def save_strategy():
+        try:
+            if request.form.get('action') == 'copy':
+                workbench.library.copy(request.form['source'], request.form['id'], request.form['name'])
+            else:
+                value = {'schema_version':1, 'id':request.form['id'], 'name':request.form['name'],
+                         'description':request.form['description'], 'ranking_mode':request.form['ranking_mode'],
+                         'conditions':json.loads(request.form.get('conditions','[]'))}
+                for group,fields in [('factors',FACTOR_FIELDS),('screening',RULE_FIELDS)]:
+                    value[group] = {k:request.form[group+'.'+k] if k.endswith('_weight') or k=='min_volume_ratio'
+                                    else int(request.form[group+'.'+k]) for k in fields}
+                workbench.library.save(value, replace=request.form.get('replace')=='yes')
+        except (ValueError, OSError, KeyError):
+            return '策略格式錯誤或 ID 已存在；未儲存', 400
+        return redirect(url_for('strategies'))
 
     @app.post('/jobs')
     def submit():
@@ -265,18 +326,19 @@ def create_app(workbench):
             from decimal import Decimal
             visible.sort(key=lambda r: (-Decimal(str(r['score'])), r['stock_id']))
         return render_template('workbench.html', digest=digest, visible_rankings=visible, detail=entry['details'], report_key=key,
-                               image=(entry['path'] / 'performance.png').is_file())
+                               image=any((entry['path'] / name).is_file() for name in ('performance.png','comparison.png')))
 
     @app.get('/reports/<key>/csv')
     def ranking_csv(key):
         entry = workbench.catalog().get(key)
-        if not entry or entry['details'].get('kind') != 'research':
+        if not entry or entry['details'].get('kind') not in ('research', 'comparison', 'period_comparison'):
             abort(404)
-        path = entry['path'] / 'rankings.csv'
+        filename = 'rankings.csv' if entry['details']['kind'] == 'research' else 'comparison.csv'
+        path = entry['path'] / filename
         if not path.is_file() or path.is_symlink():
             abort(404)
         return app.response_class(safe_text(path.read_bytes().decode('utf-8')).encode('utf-8'),
-                                  mimetype='text/csv', headers={'Content-Disposition': 'attachment; filename=rankings.csv'})
+                                  mimetype='text/csv', headers={'Content-Disposition': f'attachment; filename={filename}'})
 
     @app.get('/reports/<key>/preview')
     def research_preview(key):
@@ -298,7 +360,7 @@ def create_app(workbench):
         entry = workbench.catalog().get(key)
         if not entry:
             abort(404)
-        path = entry['path'] / 'performance.png'
+        path = entry['path'] / ('comparison.png' if entry['details']['kind']=='comparison' else 'performance.png')
         if not path.resolve().is_relative_to(entry['path'].resolve()) or not path.is_file():
             abort(404)
         return send_file(path, mimetype='image/png')

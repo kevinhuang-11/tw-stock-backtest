@@ -1,5 +1,5 @@
 <section>
-<h2>{{ digest.title }}</h2>
+<h2>{{ digest.title }}</h2>{% if digest.get('strategy_snapshot') %}<p>策略：{{ digest.strategy_snapshot.definition.name }}（{{ digest.strategy_snapshot.definition.id }}）</p><details><summary>完整策略與內容雜湊</summary><pre>{{ digest.strategy_snapshot | pretty }}</pre></details>{% endif %}
 <p>指定 {{ digest.counts.get('requested', '未提供') }} 檔 · 成功評估 {{ digest.counts.get('evaluated', '未提供') }} 檔 · 排除 {{ digest.counts.get('excluded', '未提供') }} 檔</p>
 <p>分析日：{{ digest.analysis_date or '未提供' }}；名單來源：{{ digest.universe_source or '未提供' }}；來源時間：{{ digest.universe_downloaded_at or '未提供' }}</p>
 <details><summary>指定股票池與因子設定</summary><p>{{ digest.specified_pool | join(', ') if digest.specified_pool is not none else '未提供' }}</p><pre>{{ digest.factor_settings | pretty }}</pre></details>
@@ -12,7 +12,7 @@
 <p>{{ candidate.industry or '產業未提供' }} · 總分 {{ candidate.score | score_text }} · 名次變化 {{ candidate.rank_change if candidate.rank_change is not none else '尚無可比較結果' }}（正數為上升）</p>
 <p>訊號日收盤：{{ candidate.close if candidate.close is not none else '未提供' }}（{{ candidate.price_date or '日期未提供' }}）；最後行情日：{{ candidate.latest_date or '未提供' }}</p>
 <ul>{% for line in candidate.explanations %}<li>{{ line }}</li>{% endfor %}</ul>
-{% for hint in candidate.hints %}<p>研究提示：{{ hint }}</p>{% endfor %}
+{% if candidate.get('conditions') %}<details open><summary>入選條件與實際指標值</summary><pre>{{ candidate.conditions | pretty }}</pre></details>{% endif %}{% for hint in candidate.hints %}<p>研究提示：{{ hint }}</p>{% endfor %}
 </article>{% else %}<p>本次沒有可呈現的候選股。</p>{% endfor %}
 <h3>歷史排名變化</h3><p>{{ digest.comparison.message }}</p>
 {% if digest.comparison.available %}<p>新進前 {{ digest.top }}：{{ digest.comparison.entered | join(', ') or '無' }}；退出：{{ digest.comparison.exited | join(', ') or '無' }}</p>{% endif %}

@@ -198,7 +198,10 @@ def choose_analysis_date(histories, cutoff):
 
 
 def evaluate_research(stocks, settings, cutoff, *, as_of=None,
-                      allow_partial=False, downloads=()):
+                      allow_partial=False, downloads=(), strategy=None):
+    if strategy is not None:
+        return evaluate_strategy_research(stocks, settings, cutoff, as_of=as_of,
+                                          allow_partial=allow_partial, downloads=downloads, strategy=strategy)
     histories = read_histories(stocks, settings["storage"]["database_path"], cutoff)
     target = as_of or choose_analysis_date(histories, cutoff)
     actual = {sid: {"first": rows[0]["date"] if rows else None,
@@ -250,3 +253,38 @@ def evaluate_research(stocks, settings, cutoff, *, as_of=None,
             "counts": {"requested": len(stocks), "evaluated": len(rows),
                        "excluded": len(errors_by_id), "ranked": len(ranked),
                        "downloads": dict(Counter(r["status"] for r in downloads))}}
+
+
+def evaluate_strategy_research(stocks, settings, cutoff, *, as_of, allow_partial, downloads, strategy):
+    from tw_stock_backtest.strategies import analyze_strategy, snapshot
+    histories = read_histories(stocks, settings['storage']['database_path'], cutoff)
+    target = as_of or choose_analysis_date(histories, cutoff)
+    if target is None:
+        result = evaluate_research(stocks, settings, cutoff, as_of=as_of, allow_partial=allow_partial, downloads=downloads)
+        result['strategy_snapshot'] = snapshot(strategy)
+        return result
+    bad_updates = {r['stock_id']: r['status'] for r in downloads if r['status'] != 'success' and r.get('skip_reason') != 'resumed_success'}
+    # Failed downloads are excluded before scoring, exactly as in the original research path.
+    analysis = analyze_strategy({sid: rows for sid,rows in histories.items() if sid not in bad_updates}, target, strategy)
+    errors = {**analysis['errors'], **{sid: '本次更新未完整：'+status for sid,status in bad_updates.items()}}
+    valid_count = len(stocks) - len(errors)
+    status = 'failed' if valid_count == 0 or (errors and not allow_partial) else 'partial' if errors else 'success'
+    rankings = analysis['candidates'] if status != 'failed' else []
+    evaluations = []
+    for stock in stocks:
+        sid = stock['stock_id']; records = histories[sid]
+        signal = next((r for r in records if r['date']==target), None)
+        evaluations.append({'stock_id': sid, 'actual': {'first':records[0]['date'] if records else None,
+            'latest': records[-1]['date'] if records else None, 'rows':len(records)},
+            'signal': {'date':target, 'close':signal['close']} if signal else None,
+            **analysis['diagnostics'].get(sid, {'status':'unavailable'}), 'reason':errors.get(sid)})
+    return {'analysis_date':target, 'cutoff':str(cutoff), 'date_rule':'explicit' if as_of else 'latest_available_in_selected_universe',
+        'lag_calendar_days': (cutoff-date.fromisoformat(target)).days, 'status':status,
+        'exit_code': {'success':0,'partial':2,'failed':1}[status], 'ranking_mode':strategy['ranking_mode'],
+        'strategy_snapshot':snapshot(strategy), 'rankings':rankings,
+        'scored_rankings':analysis['rankings'] if status!='failed' else [],
+        'ranking_population':analysis['ranking_population'], 'evaluations':evaluations,
+        'excluded':[{'stock_id':sid,'reason':reason} for sid,reason in errors.items()],
+        'counts':{'requested':len(stocks),'evaluated':valid_count,'excluded':len(errors),'ranked':len(rankings),
+                  'filtered':sum(d['status']=='filtered' for d in analysis['diagnostics'].values()),
+                  'downloads':dict(Counter(r['status'] for r in downloads))}}

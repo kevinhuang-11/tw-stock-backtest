@@ -28,6 +28,7 @@ def parse_arguments():
         description="依每日選股排名，執行共用資金的多股票回測"
     )
 
+    parser.add_argument("--strategy", help="策略 JSON 檔；--top 優先，--ranking 不可與策略模式衝突")
     parser.add_argument(
         "--config",
         default=str(DEFAULT_CONFIG_PATH),
@@ -90,7 +91,7 @@ def parse_arguments():
     parser.add_argument(
         "--ranking",
         choices=("rules", "factors"),
-        default="rules",
+        default=None,
         help="排名方式：rules 為規則篩選，factors 為多因子評分",
     )
     parser.add_argument(
@@ -143,6 +144,17 @@ def main():
             },
         )
 
+        strategy = None
+        if args.strategy:
+            from tw_stock_backtest.strategies import load_strategy, effective_settings
+            strategy = load_strategy(args.strategy)
+            if args.ranking is not None and args.ranking != strategy['ranking_mode']:
+                raise ValueError('--ranking 與策略排名模式衝突')
+            args.ranking = strategy['ranking_mode']
+            settings = effective_settings(settings, strategy, args.top)
+            if args.top is not None:
+                strategy['factors']['top_n'] = strategy['screening']['top_n'] = args.top
+        args.ranking = args.ranking or 'rules'
         stocks = settings["universe"]["stocks"]
         screening_settings = settings["screening"]
         backtest_settings = settings["backtest"]
@@ -171,6 +183,7 @@ def main():
             max_positions=backtest_settings["max_positions"],
             cost_settings=cost_settings,
             ranking_method=args.ranking,
+            strategy=strategy,
             factor_settings=settings["factors"],
             sizing_mode=backtest_settings["sizing_mode"],
             slippage_rate=backtest_settings["slippage_rate"],
@@ -438,6 +451,7 @@ def main():
             report_dir = export_portfolio_report(
                 output_root,
                 settings=settings,
+                strategy=strategy,
                 start_text=start.isoformat(),
                 end_text=end.isoformat(),
                 records_by_stock=records_by_stock,
