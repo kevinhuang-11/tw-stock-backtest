@@ -688,3 +688,13 @@ img.chart { display: block; width: 100%; height: auto; border-radius: var(--radi
 .sum-card { padding: var(--s-3) var(--s-4); border: 1px solid var(--c-border); border-radius: var(--radius-1); display: grid; gap: var(--s-2); }
 .card > .card-footer:first-child { border-top: 0; }
 @media (max-width: 640px) { #chart canvas { height: 480px; } }
+
+/* ---------- 策略庫 ---------- */
+.strategy-list .item-list > li { padding: 0; }
+.strategy-link { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-3) var(--s-5); color: var(--c-text); text-decoration: none; width: 100%; }
+.strategy-link span { display: grid; min-width: 0; }
+.strategy-link small { color: var(--c-text-2); font-size: var(--text-xs); }
+.strategy-link:hover { background: var(--c-surface-2); color: var(--c-text); }
+.strategy-link.is-current { background: var(--c-primary-soft); color: var(--c-primary); box-shadow: inset 3px 0 0 var(--c-primary); }
+.grow { flex: 1 1 16em; width: auto; }
+legend .badge { margin-left: var(--s-1); vertical-align: 2px; }

@@ -426,6 +426,33 @@ class StockPageTests(PageCase):
         self.assertIn('action="/supplemental/update"', text)
 
 
+class StrategyPageTests(PageCase):
+    def test_list_and_form_keep_every_field(self):
+        self.workbench.library.save(from_settings(self.workbench.settings))
+        text = self.client.get("/strategies?id=baseline").text
+        self.assertIn('href="/strategies?id=baseline" aria-current="page"', text)
+        form = text[text.index('class="strategy-form'):].split("</form>")[0]
+        for key in ("short_window", "long_window", "momentum_window", "volatility_window",
+                    "momentum_weight", "trend_weight", "volatility_weight", "top_n"):
+            self.assertIn(f'name="factors.{key}"', form)
+        for key in ("short_window", "long_window", "momentum_window", "volume_window",
+                    "min_volume_ratio", "top_n"):
+            self.assertIn(f'name="screening.{key}"', form)
+        for name in ("csrf", "id", "name", "ranking_mode", "description", "conditions", "replace"):
+            self.assertIn(f'name="{name}"', form)
+        # 欄位依閱讀順序：短窗口在長窗口之前。
+        self.assertLess(form.index('name="factors.short_window"'), form.index('name="factors.long_window"'))
+        self.assertIn('class="copy-form', text)
+        self.assertIn('class="import-form', text)
+        self.assert_navigation_works(text)
+
+    def test_new_strategy_form_is_the_default(self):
+        text = self.client.get("/strategies").text
+        self.assertIn("建立策略", text)
+        self.assertIn('href="/strategies" aria-current="page"', text)
+        self.assertNotIn('class="copy-form', text)
+
+
 class ReportDescriptionTests(unittest.TestCase):
     def describe(self, details, name="20260929T010000_000000Z_aaaaaaaa"):
         with TemporaryDirectory() as directory:
