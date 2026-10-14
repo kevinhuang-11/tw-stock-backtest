@@ -453,6 +453,18 @@ def create_app(workbench, dev=False):
             return {'errors':{'_form':'工作參數或檔案無法使用；未執行。請核對日期與策略。'}},400
         return redirect(url_for('index'))
 
+    @app.get('/reports')
+    def reports():
+        from tw_stock_backtest.web_views import REPORT_KINDS, kind_counts, report_list
+        catalog = workbench.catalog()
+        selected = request.args.get('kind') or None
+        if selected is not None and selected not in REPORT_KINDS:
+            abort(400)
+        research = [r for r in report_list(catalog, 'research') if r['status'] in ('success', 'partial')]
+        return render_template('reports.html', reports=report_list(catalog, selected), selected=selected,
+                               kinds=REPORT_KINDS, counts=kind_counts(catalog), total=len(catalog),
+                               research_reports=research)
+
     @app.get('/reports/<key>')
     def report(key):
         entry = workbench.catalog().get(key)

@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% import '_components.html' as ui %}
+{% block title %}報表 · 台股研究工作台{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>報表</h1>
+    <p>研究排名、回測、策略比較與自選快照都保存在這裡。每份報表固定保存當時的設定與資料，之後不會被覆寫。</p>
+  </div>
+  <div class="page-actions">
+    {% if research_reports | length >= 2 %}<a class="btn" href="#compare">{{ ui.icon('backtest') }}比較兩份排名</a>{% endif %}
+  </div>
+</div>
+
+<div class="stack">
+<nav class="filter-bar" aria-label="報表類型">
+  <a class="chip" href="/reports"{% if not selected %} aria-current="true"{% endif %}>全部 <span class="chip-count">{{ total }}</span></a>
+  {% for kind in kinds if counts.get(kind) %}
+  <a class="chip" href="/reports?kind={{ kind }}"{% if selected == kind %} aria-current="true"{% endif %}>{{ kind | kind_label }} <span class="chip-count">{{ counts[kind] }}</span></a>
+  {% endfor %}
+</nav>
+
+<div class="card">
+  {% if reports %}
+  <div class="table-wrap"><table class="table table-sticky">
+    <thead><tr><th>報表</th><th>類型</th><th>狀態</th><th class="num">重點</th><th>建立時間</th></tr></thead>
+    <tbody>
+    {% for report in reports %}
+      <tr>
+        <td><a class="cell-main" href="/reports/{{ report.key }}">{{ report.title }}</a>{% if report.subtitle %}<span class="cell-sub">{{ report.subtitle }}</span>{% endif %}</td>
+        <td>{{ report.kind_label }}</td>
+        <td>{{ ui.status(report.status) }}</td>
+        <td class="num">{% if report.metric %}<span class="cell-sub">{{ report.metric.label }}</span><span class="{{ report.metric.value | trend }}">{{ report.metric.text }}</span>{% else %}<span class="subtle">—</span>{% endif %}</td>
+        <td class="num" title="{{ report.folder }}">{{ report.created | dt }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% elif selected %}
+    {{ ui.empty('沒有這個類型的報表', '換一個類型，或查看全部報表。', '查看全部', '/reports', 'report') }}
+  {% else %}
+    {{ ui.empty('還沒有任何報表', '建立研究或回測後，結果會出現在這裡。', '回到總覽', '/', 'report') }}
+  {% endif %}
+</div>
+
+{% if research_reports | length >= 2 %}
+<section class="card" id="compare">
+  <div class="card-header"><div><h2>比較兩份研究排名</h2><p>只有策略、股票池與有效母體相同的兩份排名，才會顯示名次升降。</p></div></div>
+  <div class="card-body">
+    <form action="/compare" class="stack-sm">
+      <div class="form-grid">
+        <div class="field"><label for="compare-left">較早的一份</label><select id="compare-left" name="left">{% for report in research_reports | reverse %}<option value="{{ report.key }}">{{ report.subtitle }} · {{ report.title }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="compare-right">較晚的一份</label><select id="compare-right" name="right">{% for report in research_reports %}<option value="{{ report.key }}">{{ report.subtitle }} · {{ report.title }}</option>{% endfor %}</select></div>
+      </div>
+      <div class="form-actions"><button class="btn-primary">比較排名</button></div>
+    </form>
+  </div>
+</section>
+{% endif %}
+</div>
+{% endblock %}

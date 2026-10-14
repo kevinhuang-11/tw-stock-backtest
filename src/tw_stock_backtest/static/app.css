@@ -582,3 +582,20 @@ details.disclosure > .disclosure-body { padding: 0 var(--s-4) var(--s-4); }
 .table td { max-width: 28em; }
 .table .cell-main, .table .cell-sub { white-space: nowrap; }
 .table td.wrap { min-width: 16em; white-space: normal; }
+
+/* ---------- 篩選列 ---------- */
+.filter-bar { display: flex; gap: var(--s-2); overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.filter-bar::-webkit-scrollbar { display: none; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 34px; padding: 0 var(--s-3);
+  border: 1px solid var(--c-border-strong); border-radius: 999px;
+  background: var(--c-surface); color: var(--c-text-2);
+  font-size: var(--text-sm); font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.chip:hover { color: var(--c-text); border-color: var(--c-text-3); }
+.chip[aria-current="true"] { background: var(--c-primary); border-color: var(--c-primary); color: var(--c-on-primary); }
+.chip-count { font-size: var(--text-xs); font-weight: 600; opacity: .75; }
+
+/* 由 forms.js 動態加入的提交狀態 */
+.form-status { margin: var(--s-2) 0 0; font-size: var(--text-sm); color: var(--c-text-2); white-space: pre-wrap; }
