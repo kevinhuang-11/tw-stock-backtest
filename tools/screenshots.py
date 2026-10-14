@@ -129,7 +129,7 @@ def start_server(root, port, extra):
                               stderr=subprocess.DEVNULL)
     for _ in range(100):
         try:
-            urllib.request.urlopen(f"http://127.0.0.1:{port}/static/forms.css", timeout=1)
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/static/app.css", timeout=1)
             return server
         except OSError:
             if server.poll() is not None:

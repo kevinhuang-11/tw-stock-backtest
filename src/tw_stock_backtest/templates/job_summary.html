@@ -1,1 +1,25 @@
-<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/stock.css"><title>工作摘要</title><nav><a href="/">工作台</a> <a href="/watchlist">自選研究總覽</a></nav><h1>工作摘要</h1><p>{{ job.kind }}：{{ job.status }}；股票 {{ job.stocks|join('、') }}</p><p>工作成功只表示流程完成，不表示股票通過策略條件。</p>{% for link in links %}<p><a href="/reports/{{ link.key }}">查看結果 {{ link.name }}</a></p>{% else %}<p>尚無可取得的結果報表；可能仍執行中、已取消或寫入失敗。不會自動重跑。</p>{% endfor %}<a href="/jobs/{{ job.run_id }}/output.log">診斷日誌</a><details><summary>進階執行資訊</summary><a href="/jobs/{{ job.run_id }}/job.json">原始工作 JSON</a></details></html>
+{% extends 'base.html' %}
+{% import '_components.html' as ui %}
+{% block title %}工作摘要 · 台股研究工作台{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="eyebrow"><a href="/">總覽</a>{{ ui.icon('chevron-right') }}工作摘要</div>
+    <h1>{{ job.kind | kind_label }} {{ ui.status(job.status) }}</h1>
+    <p>股票 {{ job.stocks|join('、') }} · 建立於 {{ job.get('queued_at') | dt }}</p>
+  </div>
+  <div class="page-actions"><a class="btn" href="/jobs/{{ job.run_id }}/output.log">{{ ui.icon('note') }}診斷日誌</a></div>
+</div>
+<div class="stack">
+  {% call ui.alert('info') %}工作成功只表示流程完成，不表示股票通過策略條件。{% endcall %}
+  <section class="card">
+    <div class="card-header"><h2>結果報表</h2></div>
+    {% if links %}
+    <ul class="item-list">{% for link in links %}<li><div class="item-main"><a class="item-title" href="/reports/{{ link.key }}">查看結果</a><div class="item-meta" title="報表資料夾">{{ link.name }}</div></div><div class="item-side">{{ ui.icon('arrow-right') }}</div></li>{% endfor %}</ul>
+    {% else %}
+    {{ ui.empty('尚無可取得的結果報表', '可能仍執行中、已取消或寫入失敗。不會自動重跑。', icon_name='clock') }}
+    {% endif %}
+  </section>
+  <details class="disclosure"><summary>進階執行資訊</summary><div class="disclosure-body"><a href="/jobs/{{ job.run_id }}/job.json">原始工作 JSON</a></div></details>
+</div>
+{% endblock %}

@@ -1,1 +1,25 @@
-<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>自選研究快照</title><nav><a href="/watchlist">自選清單</a> <a href="/reports/{{ report_key }}/preview">郵件 HTML 預覽（不寄信）</a> <a href="/reports/{{ report_key }}/preview?format=text">純文字</a> <a href="/reports/{{ report_key }}/csv">CSV（不含筆記）</a></nav><p>個股來源：{% for r in rows %}<a href="/stocks/{{ r.stock_id }}">{{ r.stock_id }} 目前資料</a>{% if r.research %} <a href="/stocks/{{ r.stock_id }}?report={{ r.research.report_key }}">原研究快照</a>{% endif %} {% endfor %}</p><main>{{ body|safe }}</main></html>
+{% extends 'base.html' %}
+{% import '_components.html' as ui %}
+{% block title %}自選研究快照 · 台股研究工作台{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="eyebrow"><a href="/watchlist">自選股</a>{{ ui.icon('chevron-right') }}快照</div>
+    <h1>自選研究快照</h1>
+    <p>保存當時的條件、數值與來源；之後修改策略或更新資料都不會改變這份快照。</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn" href="/reports/{{ report_key }}/preview">{{ ui.icon('mail') }}郵件 HTML 預覽（不寄信）</a>
+    <a class="btn" href="/reports/{{ report_key }}/preview?format=text">純文字</a>
+    <a class="btn" href="/reports/{{ report_key }}/csv">{{ ui.icon('download') }}CSV（不含筆記）</a>
+  </div>
+</div>
+<div class="stack">
+  <section class="card">
+    <div class="card-header"><h2>個股來源</h2></div>
+    <ul class="item-list">{% for r in rows %}<li><div class="item-main"><strong>{{ r.stock_id }} {{ r.name or '名稱未提供' }}</strong></div><div class="item-links"><a href="/stocks/{{ r.stock_id }}">{{ r.stock_id }} 目前資料</a>{% if r.research %}<a href="/stocks/{{ r.stock_id }}?report={{ r.research.report_key }}">原研究快照</a>{% endif %}</div></li>{% endfor %}</ul>
+  </section>
+  {# 內容由 research_digest.render_digest 產生，每一行都已跳脫。 #}
+  <section class="card"><div class="card-body digest-body">{{ body|safe }}</div></section>
+</div>
+{% endblock %}

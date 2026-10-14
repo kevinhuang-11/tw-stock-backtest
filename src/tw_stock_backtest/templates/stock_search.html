@@ -1,1 +1,34 @@
-<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/stock.css"><title>個股搜尋</title><nav><a href="/">工作台</a><a href="/watchlist">自選與筆記</a></nav><h1>個股搜尋</h1><form><label>股票代號或名稱<input name="q" maxlength="40" value="{{ query }}"></label><button>搜尋</button></form><p>只讀本機股票名單與資料庫代號，最多顯示 30 筆；輸入四位數代號即可查看無資料個股。</p><section>{% for item in items %}<p><a href="/stocks/{{ item.stock_id }}">{{ item.stock_id }} {{ item.get('name') or '名稱未提供' }}</a> · {{ item.get('industry') or '產業未提供' }}</p>{% else %}<p>沒有符合的本機名單，不會自動下載。</p>{% endfor %}</section></html>
+{% extends 'base.html' %}
+{% import '_components.html' as ui %}
+{% block title %}個股 · 台股研究工作台{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>個股</h1>
+    <p>搜尋本機名單與資料庫中的股票，查看走勢、策略條件、營收法人與研究歷史。只讀本機資料，不會自動下載。</p>
+  </div>
+</div>
+<div class="stack">
+  <form class="card toolbar" role="search">
+    <div class="search-row">
+      <label class="visually-hidden" for="stock-q">股票代號或名稱</label>
+      <input id="stock-q" type="search" name="q" maxlength="40" value="{{ query }}" placeholder="輸入代號或名稱，例如 2330 或 台積電" autofocus>
+      <button class="btn-primary">{{ ui.icon('search') }}搜尋</button>
+    </div>
+    <span class="hint">最多顯示 30 筆；輸入完整的四位數代號，即使名單中沒有也能開啟該股頁面。</span>
+  </form>
+  {% if items %}
+  <div class="stock-grid">
+    {% for item in items %}
+    <a class="card card-link stock-card" href="/stocks/{{ item.stock_id }}">
+      <span class="stock-code">{{ item.stock_id }}</span>
+      <span class="stock-name">{{ item.get('name') or '名稱未提供' }}</span>
+      <span class="item-meta">{{ item.get('industry') or '產業未提供' }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card">{{ ui.empty('沒有符合的本機名單', '換個關鍵字，或輸入完整的四位數代號。不會自動下載。', icon_name='search') }}</div>
+  {% endif %}
+</div>
+{% endblock %}

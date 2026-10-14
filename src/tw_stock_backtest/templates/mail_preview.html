@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% import '_components.html' as ui %}
+{% block title %}郵件預覽 · 台股研究工作台{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="eyebrow"><a href="/">總覽</a>{{ ui.icon('chevron-right') }}郵件預覽</div>
+    <h1>{{ mail.subject }}</h1>
+    <p>收寄件人：{{ mail.to }} · 僅預覽，未寄出</p>
+  </div>
+</div>
+<section class="card"><div class="card-body"><pre class="mail-body">{{ mail.body }}</pre></div></section>
+{% endblock %}

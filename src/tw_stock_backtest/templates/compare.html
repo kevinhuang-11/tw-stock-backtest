@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% import '_components.html' as ui %}
+{% block title %}排名比較 · 台股研究工作台{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="eyebrow"><a href="/reports">報表</a>{{ ui.icon('chevron-right') }}排名比較</div>
+    <h1>排名變化</h1>
+    <p>日期：{{ left.analysis_date }} → {{ right.analysis_date }}</p>
+  </div>
+</div>
+<div class="stack">
+  {% if changed %}
+    {% call ui.alert('warn', '注意：排名母體或有效設定有變更。') %}母體、設定或日期不符合跨日比較條件，不顯示名次升降。請核對兩份報表設定與排除原因。{% endcall %}
+  {% else %}
+    {% call ui.alert('info', '排名母體與有效設定相同。') %}正數代表名次上升；空白表示新增或退出。排名是相對分數，不同母體或設定不代表策略改善。{% endcall %}
+    <section class="card">
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>股票</th><th class="num">前次</th><th class="num">後次</th><th class="num">上升名次</th></tr></thead>
+        <tbody>{% for row in comparison %}<tr><td><a href="/stocks/{{ row.stock_id }}">{{ row.stock_id }}</a></td><td class="num">{{ row.before if row.before is not none else '—' }}</td><td class="num">{{ row.after if row.after is not none else '—' }}</td><td class="num">{% if row.change is not none %}{{ ui.change(row.change, percent=False, digits=0) }}{% else %}—{% endif %}</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

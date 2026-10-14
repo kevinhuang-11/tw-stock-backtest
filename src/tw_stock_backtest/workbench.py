@@ -541,7 +541,7 @@ def create_app(workbench, dev=False):
                 trades = [row for row in trades if row.get('source') in ('strategy', 'benchmark')]
             return render_template('report_backtest.html', detail=entry['details'], report_key=key,
                                    image=image, trades=trades, fees=fees)
-        return render_template('workbench.html', visible_rankings=visible, detail=entry['details'], report_key=key,
+        return render_template('report_other.html', detail=entry['details'], report_key=key,
                                image=any((entry['path'] / name).is_file() for name in ('performance.png','comparison.png')))
 
     @app.get('/reports/<key>/csv')
@@ -594,7 +594,7 @@ def create_app(workbench, dev=False):
                        left['analysis_date'] >= right['analysis_date'])
         except (KeyError, ValueError):
             abort(400)
-        return render_template('workbench.html', comparison=rows, left=left, right=right, changed=changed)
+        return render_template('compare.html', comparison=rows, left=left, right=right, changed=changed)
 
     @app.post('/jobs/<job_id>/cancel')
     def cancel_job(job_id):
@@ -623,7 +623,7 @@ def create_app(workbench, dev=False):
             abort(404)
         if name == 'notification.eml':
             message = BytesParser(policy=policy.default).parsebytes(path.read_bytes())
-            return render_template('workbench.html', mail={
+            return render_template('mail_preview.html', mail={
                 'subject': safe_text(str(message['Subject'])), 'to': str(message['To']),
                 'body': safe_text(message.get_body(preferencelist=('plain',)).get_content() if message.is_multipart() else message.get_content())})
         content = json.dumps(read_json(path), ensure_ascii=False, indent=2) if name == 'job.json' else safe_text(path.read_text(encoding='utf-8', errors='replace'))

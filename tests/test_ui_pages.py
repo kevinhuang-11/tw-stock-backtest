@@ -453,6 +453,41 @@ class StrategyPageTests(PageCase):
         self.assertNotIn('class="copy-form', text)
 
 
+class SmallPageTests(PageCase):
+    def test_every_page_uses_the_shared_layout(self):
+        self.add_research()
+        self.add_research("20260922T010000_000000Z_cccccccc", "2026-09-22")
+        keys = sorted(self.workbench.catalog())
+        urls = ["/", "/new/research", "/new/backtest", "/reports", "/watchlist", "/stocks",
+                "/stocks?q=2330", "/stocks/2330", "/stocks/2330/supplemental", "/strategies",
+                f"/reports/{keys[0]}", f"/compare?left={keys[0]}&right={keys[1]}"]
+        for url in urls:
+            with self.subTest(url=url):
+                page = self.client.get(url)
+                self.assertEqual(page.status_code, 200)
+                self.assertIn('<link rel="stylesheet" href="/static/app.css">', page.text)
+                self.assertIn('<nav class="site-nav"', page.text)
+                self.assertNotIn("/static/forms.css", page.text)
+                self.assertNotIn("/static/stock.css", page.text)
+
+    def test_stock_search_empty_and_results(self):
+        self.assertIn("沒有符合的本機名單", self.client.get("/stocks?q=zzzz").text)
+        text = self.client.get("/stocks?q=2330").text
+        self.assertIn('<a class="card card-link stock-card" href="/stocks/2330">', text)
+
+    def test_unknown_report_explains_instead_of_failing(self):
+        write(self.reports / "half-written", "progress.json", {"status": "running"})
+        (self.reports / "half-written.incomplete").mkdir()
+        write(self.reports / "half-written.incomplete", "progress.json", {"status": "running"})
+        expected = {"half-written": "這份報表尚未完成或無法辨識",
+                    # 未完成的研究目錄依研究報表顯示，說明沒有排名與目前狀態。
+                    "half-written.incomplete": "這份研究沒有可顯示的排名"}
+        for key, entry in self.workbench.catalog().items():
+            with self.subTest(path=entry["path"].name):
+                text = self.client.get(f"/reports/{key}").text
+                self.assertIn(expected[entry["path"].name], text)
+
+
 class ReportDescriptionTests(unittest.TestCase):
     def describe(self, details, name="20260929T010000_000000Z_aaaaaaaa"):
         with TemporaryDirectory() as directory:

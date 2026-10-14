@@ -698,3 +698,16 @@ img.chart { display: block; width: 100%; height: auto; border-radius: var(--radi
 .strategy-link.is-current { background: var(--c-primary-soft); color: var(--c-primary); box-shadow: inset 3px 0 0 var(--c-primary); }
 .grow { flex: 1 1 16em; width: auto; }
 legend .badge { margin-left: var(--s-1); vertical-align: 2px; }
+
+/* ---------- 其餘頁面 ---------- */
+.search-row { display: flex; gap: var(--s-2); }
+.search-row input { flex: 1; min-height: 44px; font-size: var(--text-md); }
+.search-row button { min-height: 44px; }
+.stock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s-3); }
+.stock-card { display: grid; gap: 2px; padding: var(--s-4); }
+.stock-code { font-size: var(--text-lg); font-weight: 700; font-variant-numeric: tabular-nums; }
+.stock-name { font-weight: 600; }
+.digest-body { overflow-wrap: anywhere; }
+.digest-body > * { max-width: none; }
+pre.mail-body { white-space: pre-wrap; overflow-wrap: anywhere; background: transparent; padding: 0; font-family: var(--font); font-size: var(--text-sm); line-height: 1.8; }
+h1 .badge { font-size: var(--text-sm); vertical-align: 4px; }

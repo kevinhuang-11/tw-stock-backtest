@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% import '_components.html' as ui %}
+{% block title %}{{ detail.kind | kind_label }} · 台股研究工作台{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="eyebrow"><a href="/reports">報表</a>{{ ui.icon('chevron-right') }}{{ detail.kind | kind_label }}</div>
+    <h1>{{ '補充資料更新' if detail.kind == 'supplemental' else detail.kind | kind_label }} {{ ui.status(detail.status) }}</h1>
+    {% if detail.kind == 'supplemental' %}<p>工作是否完成：{{ '是' if detail.complete else '否' }}；股票池 {{ detail.identity.stocks|join("、") }}</p>{% endif %}
+  </div>
+  {% if detail.kind == 'supplemental' %}<div class="page-actions">{% for sid in detail.identity.stocks %}<a class="btn btn-sm" href="/stocks/{{ sid }}/supplemental">查看 {{ sid }} 資料</a>{% endfor %}</div>{% endif %}
+</div>
+<div class="stack">
+{% if detail.kind == 'supplemental' %}
+  <section class="card"><div class="table-wrap"><table class="table">
+    <thead><tr><th>資料／期間</th><th>狀態</th><th class="num">筆數</th><th>原因與各股結果</th></tr></thead>
+    <tbody>{% for key,r in detail.results.items() %}<tr><td class="nowrap">{{ key }}</td><td>{{ ui.status(r.status) }}</td><td class="num">{{ r.get("rows",0) }}</td><td class="wrap small">{{ r.get("reason","") }} {{ r.get("limitation","") }}{% for sid,item in r.stocks.items() %}<p>{{ sid }}：{{ item.status | status_label }} {{ item.get("reason","") }}</p>{% endfor %}</td></tr>{% endfor %}</tbody>
+  </table></div></section>
+{% else %}
+  {% call ui.alert('warn', '這份報表尚未完成或無法辨識') %}可能仍在執行、已取消或寫入失敗。下方是目前可讀取的內容。{% endcall %}
+{% endif %}
+<details class="disclosure"><summary>完整摘要、設定與排除原因（原始資料）</summary><div class="disclosure-body"><pre>{{ detail | pretty }}</pre></div></details>
+</div>
+{% endblock %}
