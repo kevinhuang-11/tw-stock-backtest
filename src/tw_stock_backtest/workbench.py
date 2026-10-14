@@ -523,6 +523,24 @@ def create_app(workbench, dev=False):
         if entry['details'].get('kind') == 'research':
             return render_template('report_research.html', digest=digest, visible_rankings=visible,
                                    detail=entry['details'], report_key=key)
+        image = any((entry['path'] / name).is_file() for name in ('performance.png', 'comparison.png'))
+        if entry['details'].get('kind') in ('backtest', 'comparison', 'period_comparison'):
+            trades, fees = [], 0
+            trades_path = entry['path'] / 'trades.csv'
+            if entry['details']['kind'] == 'backtest' and trades_path.is_file() and not trades_path.is_symlink():
+                import csv
+                from decimal import Decimal, InvalidOperation
+                with trades_path.open(encoding='utf-8-sig', newline='') as file:
+                    trades = [public_data(row) for row in csv.DictReader(file)]
+                for row in trades:
+                    if row.get('source') == 'strategy':
+                        try:
+                            fees += Decimal(row.get('commission') or 0) + Decimal(row.get('tax') or 0)
+                        except InvalidOperation:
+                            pass
+                trades = [row for row in trades if row.get('source') in ('strategy', 'benchmark')]
+            return render_template('report_backtest.html', detail=entry['details'], report_key=key,
+                                   image=image, trades=trades, fees=fees)
         return render_template('workbench.html', visible_rankings=visible, detail=entry['details'], report_key=key,
                                image=any((entry['path'] / name).is_file() for name in ('performance.png','comparison.png')))
 

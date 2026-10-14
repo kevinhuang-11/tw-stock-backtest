@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% import '_components.html' as ui %}
+{% set kind = detail.kind %}
+{% set config = detail.get('configuration') or {} %}
+{% set strategy_name = ((config.get('strategy_snapshot') or {}).get('definition') or {}).get('name') %}
+{% block title %}{{ kind | kind_label }} · 台股研究工作台{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="eyebrow"><a href="/reports">報表</a>{{ ui.icon('chevron-right') }}{{ kind | kind_label }}</div>
+    {% if kind == 'backtest' %}
+      <h1>回測{% if strategy_name %} · {{ strategy_name }}{% endif %}</h1>
+      <p>{{ config.get('requested_start', '—') }} 至 {{ config.get('requested_end', '—') }} · 每日排名、隔日開盤成交，與買進持有基準比較。</p>
+    {% elif kind == 'comparison' %}
+      <h1>策略比較 · {{ detail.strategies | length }} 份策略</h1>
+      <p>{{ detail.common.get('start', '—') }} 至 {{ detail.common.get('end', '—') }} · 股票池 {{ detail.common.get('stocks', []) | join('、') }}</p>
+    {% else %}
+      <h1>跨期間比較</h1>
+      <p>各期間獨立重置資金與持股；報酬差以百分點表示。</p>
+    {% endif %}
+  </div>
+  <div class="page-actions">
+    {% if kind in ('comparison', 'period_comparison') %}<a class="btn" href="/reports/{{ report_key }}/csv">{{ ui.icon('download') }}比較 CSV</a>{% endif %}
+    <a class="btn btn-primary" href="/new/backtest{{ '#compare' if kind == 'comparison' else '#periods' if kind == 'period_comparison' else '' }}">{{ ui.icon('backtest') }}建立新的回測</a>
+  </div>
+</div>
+
+<div class="stack">
+{% if kind == 'backtest' %}
+  {% set s, b = detail.strategy, detail.benchmark %}
+  <div class="stat-grid">
+    {{ ui.stat('策略報酬率', s.get('total_return') | pct(2, True), '基準 ' ~ (b.get('total_return') | pct(2, True))) }}
+    {{ ui.stat('最大回撤', s.get('max_drawdown') | pct, '基準 ' ~ (b.get('max_drawdown') | pct)) }}
+    {{ ui.stat('平均持股比重', s.get('average_exposure') | pct, '基準 ' ~ (b.get('average_exposure') | pct)) }}
+    {{ ui.stat('策略累計費稅', fees | int, '策略共 ' ~ (trades | selectattr('source', 'equalto', 'strategy') | list | length) ~ ' 筆成交', hint='手續費與交易稅，已計入報酬') }}
+  </div>
+  <p class="muted small">報酬率以紅色表示上漲、綠色表示下跌。策略與基準的資金配置不同，報酬率不能直接當成選股能力的證明。</p>
+{% endif %}
+
+{% if image %}
+  <section class="card">
+    <div class="card-header"><h2>資產與回撤</h2></div>
+    <div class="card-body"><img class="chart" alt="{{ '各策略與買進持有基準的資產與回撤' if kind == 'comparison' else '策略與買進持有基準的資產與回撤' }}" src="/reports/{{ report_key }}/image"></div>
+  </section>
+{% endif %}
+
+{% if kind == 'backtest' %}
+  <div class="grid-2">
+    <section class="card">
+      <div class="card-header"><h2>績效比較</h2></div>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>指標</th><th class="num">策略</th><th class="num">買進持有</th></tr></thead>
+        <tbody>
+          <tr><td>報酬率</td><td class="num">{{ ui.change(s.get('total_return')) }}</td><td class="num">{{ ui.change(b.get('total_return')) }}</td></tr>
+          <tr><td>最大回撤</td><td class="num">{{ s.get('max_drawdown') | pct }}</td><td class="num">{{ b.get('max_drawdown') | pct }}</td></tr>
+          <tr><td>持股天數</td><td class="num">{{ s.get('invested_days', '—') }}{% if s.get('total_days') %} / {{ s.total_days }}{% endif %}</td><td class="num">{{ b.get('invested_days', '—') }}{% if b.get('total_days') %} / {{ b.total_days }}{% endif %}</td></tr>
+          <tr><td>平均持股比重</td><td class="num">{{ s.get('average_exposure') | pct }}</td><td class="num">{{ b.get('average_exposure') | pct }}</td></tr>
+          <tr><td>最高總資產</td><td class="num">{{ s.get('highest_equity') | int }}</td><td class="num">{{ b.get('highest_equity') | int }}</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+    <section class="card">
+      <div class="card-header"><h2>執行設定</h2></div>
+      <div class="card-body">
+        {% set run = (config.get('settings') or {}).get('backtest') or {} %}
+        {% set costs = (config.get('settings') or {}).get('costs') or {} %}
+        <dl class="kv">
+          <dt>股票池</dt><dd>{{ ((config.get('settings') or {}).get('universe') or {}).get('stocks', []) | join('、') or '—' }}</dd>
+          <dt>初始資金</dt><dd class="num">{{ run.get('initial_cash') | int }} 元</dd>
+          <dt>配置方式</dt><dd>{{ {'fixed_quantity': '固定股數', 'fixed_budget': '固定預算'}.get(run.get('sizing_mode'), '—') }} · 持股上限 {{ run.get('max_positions', '—') }} 檔</dd>
+          <dt>手續費率</dt><dd class="num">{{ costs.get('commission_rate') | pct(4) }}（最低 {{ costs.get('minimum_commission') | int }} 元）</dd>
+          <dt>賣出交易稅</dt><dd class="num">{{ costs.get('sell_tax_rate') | pct }}</dd>
+          <dt>單邊滑價</dt><dd class="num">{{ run.get('slippage_rate') | pct }}</dd>
+        </dl>
+      </div>
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="card-header"><div><h2>成交紀錄</h2><p>訊號在收盤後產生，下一個行情日開盤成交。</p></div></div>
+    {% if trades %}
+    <div class="table-wrap"><table class="table table-compact table-sticky">
+      <thead><tr><th>成交日</th><th>來源</th><th>股票</th><th>方向</th><th class="num">價格</th><th class="num">股數</th><th class="num">手續費</th><th class="num">交易稅</th><th class="num">剩餘現金</th></tr></thead>
+      <tbody>{% for t in trades[:200] %}<tr>
+        <td class="nowrap">{{ t.date }}<span class="cell-sub">訊號 {{ t.signal_date or '—' }}</span></td>
+        <td>{{ '策略' if t.source == 'strategy' else '基準' }}</td>
+        <td><a href="/stocks/{{ t.stock_id }}">{{ t.stock_id }}</a></td>
+        <td>{{ ui.badge('買進', 'info') if t.action == 'BUY' else ui.badge('賣出', 'neutral') }}</td>
+        <td class="num">{{ t.price | num }}</td><td class="num">{{ t.quantity | int }}</td>
+        <td class="num">{{ t.commission | int }}</td><td class="num">{{ t.tax | int }}</td><td class="num">{{ t.cash_after | int }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    {% if trades | length > 200 %}<div class="card-footer">只顯示前 200 筆，共 {{ trades | length }} 筆；完整紀錄在報表資料夾的 trades.csv。</div>{% endif %}
+    {% else %}{{ ui.empty('這段期間沒有成交', '可能是沒有候選股，或資金不足以買進。', icon_name='empty') }}{% endif %}
+  </section>
+
+{% elif kind == 'comparison' %}
+  <section class="card">
+    <div class="card-header"><div><h2>各策略結果</h2><p>{{ detail.note }}</p></div></div>
+    <div class="table-wrap"><table class="table table-sticky">
+      <thead><tr><th>策略</th><th class="num">報酬率</th><th class="num">最大回撤</th><th class="num">費稅</th><th class="num">成交數</th><th class="num">平均持股比重</th><th class="num">無候選／不足日數</th></tr></thead>
+      <tbody>
+      {% for row in detail.strategies %}
+        <tr><td class="cell-main">{{ row.name }}</td><td class="num">{{ ui.change(row.total_return) }}</td><td class="num">{{ row.max_drawdown | pct }}</td><td class="num">{{ row.fees_and_taxes | int }}</td><td class="num">{{ row.trades }}</td><td class="num">{{ row.average_exposure | pct }}</td><td class="num">{{ row.no_candidate_days }} / {{ row.unavailable_days }}</td></tr>
+      {% endfor %}
+      {% if detail.get('benchmark') %}
+        <tr class="row-muted"><td>買進持有基準</td><td class="num">{{ ui.change(detail.benchmark.get('total_return')) }}</td><td class="num">{{ detail.benchmark.get('max_drawdown') | pct }}</td><td class="num">—</td><td class="num">—</td><td class="num">{{ detail.benchmark.get('average_exposure') | pct }}</td><td class="num">—</td></tr>
+      {% endif %}
+      </tbody>
+    </table></div>
+    {% if detail.get('failures') %}<div class="card-footer">{% for f in detail.failures %}<p>{{ f.id }}：{{ f.reason }}</p>{% endfor %}</div>{% endif %}
+  </section>
+
+{% else %}
+  <section class="card">
+    <div class="card-header"><div><h2>各期間結果</h2><p>{{ detail.note }}</p></div><div>{{ ui.status(detail.status) }}</div></div>
+    <div class="table-wrap"><table class="table table-sticky">
+      <thead><tr><th>期間／策略</th><th class="num">報酬／基準</th><th class="num">回撤／基準</th><th class="num">報酬差（百分點）</th><th class="num">費稅／成交</th><th class="num">持股比重／不足日</th></tr></thead>
+      <tbody>{% for r in detail.strategies %}
+        <tr><td><span class="cell-main">{{ r.name }}</span><span class="cell-sub">{{ r.period_id }} · {{ r.start }} 至 {{ r.end }}</span></td>
+        <td class="num">{{ ui.change(r.total_return) }}<span class="cell-sub">{{ r.benchmark_return | pct(2, True) }}</span></td>
+        <td class="num">{{ r.max_drawdown | pct }}<span class="cell-sub">{{ r.benchmark_drawdown | pct }}</span></td>
+        <td class="num"><span class="{{ r.return_difference_pp | trend }}">{{ r.return_difference_pp | signed }}</span></td>
+        <td class="num">{{ r.fees_and_taxes | int }}<span class="cell-sub">{{ r.trades }} 筆</span></td>
+        <td class="num">{{ r.average_exposure | pct }}<span class="cell-sub">{{ r.unavailable_days }} 日</span></td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  </section>
+  <div class="grid-2">
+    <section class="card">
+      <div class="card-header"><h2>期間狀態與原因</h2></div>
+      <ul class="item-list">{% for p in detail.periods %}<li><div class="item-main"><strong>{{ p.id }}</strong><div class="item-meta">{{ p.start }} 至 {{ p.end }} · {{ '驗證' if p.purpose == 'validation' else '開發／探索' }}{% if p.get('reason') %} · {{ p.reason }}{% endif %} {{ p.get('missing_boundaries','') }}</div></div><div class="item-side">{{ ui.status(p.status) }}</div></li>{% endfor %}</ul>
+    </section>
+    <section class="card">
+      <div class="card-header"><h2>有效期間彙總</h2></div>
+      <div class="card-body stack-sm small">
+        {% for a in detail.aggregate %}<p><strong>{{ a.id }}</strong>：跑贏基準 {{ a.outperform_periods }} / {{ a.valid_periods }} 個有效期間（完成 {{ a.completed_periods }} 個）</p>{% endfor %}
+        <p class="muted">有無法評估日的期間不納入分母；勝出期數不是未來獲利的機率。</p>
+        {% if detail.overlapping_periods %}<p class="muted">重疊期間：{{ detail.overlapping_periods }}</p>{% endif %}
+      </div>
+    </section>
+  </div>
+{% endif %}
+
+<details class="disclosure"><summary>完整摘要與設定（原始資料）</summary><div class="disclosure-body"><pre>{{ detail | pretty }}</pre></div></details>
+</div>
+{% endblock %}

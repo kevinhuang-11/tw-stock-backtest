@@ -315,6 +315,52 @@ class ResearchReportPageTests(PageCase):
         self.assertIn("本次沒有可呈現的候選股", text)
 
 
+class BacktestReportPageTests(PageCase):
+    def key(self):
+        return next(iter(self.workbench.catalog()))
+
+    def test_backtest_shows_key_figures_trades_and_settings(self):
+        folder = self.add_backtest()
+        (folder / "trades.csv").write_text(
+            "source,stock_id,signal_date,date,action,price,quantity,amount,commission,tax,cash_change,cash_after\n"
+            "strategy,2330,2026-09-01,2026-09-02,BUY,100.5,1000,100500,143,0,-100643,899357\n"
+            "strategy,2330,2026-09-10,2026-09-11,SELL,110,1000,110000,156,330,109514,1008871\n"
+            "benchmark,2330,,2026-09-01,BUY,99,1000,99000,141,0,-99141,900859\n", encoding="utf-8-sig")
+        text = self.client.get(f"/reports/{self.key()}").text
+        self.assertIn("回測 · 基準示例", text)
+        self.assertIn('<div class="stat-value num">+10.76%</div>', text)
+        self.assertIn("基準 +5.00%", text)
+        self.assertIn('<div class="stat-value num">629</div>', text)  # 143 + 156 + 330，只算策略
+        self.assertIn("策略共 2 筆成交", text)
+        self.assertIn('<td class="num">100.50</td>', text)
+        self.assertIn('<span class="badge badge-info">買進</span>', text)
+        self.assertIn("訊號 2026-09-10", text)
+        self.assertNotIn("total_return</td>", text)
+        self.assert_navigation_works(text)
+
+    def test_backtest_without_trades_has_an_empty_state(self):
+        self.add_backtest(total="-0.0321")
+        text = self.client.get(f"/reports/{self.key()}").text
+        self.assertIn("這段期間沒有成交", text)
+        self.assertIn('<span class="num down">−3.21%</span>', text)
+
+    def test_comparison_lists_strategies_and_benchmark(self):
+        write(self.reports / "20260930T030000_000000Z_cmp", "comparison.json", {
+            "kind": "comparison", "report_complete": True, "note": "不選出最佳策略。",
+            "common": {"stocks": ["2330"], "start": "2026-09-01", "end": "2026-09-29"},
+            "strategies": [{"id": "a", "name": "甲策略", "total_return": "0.0115", "max_drawdown": "0.0003",
+                            "fees_and_taxes": "40", "trades": 2, "average_exposure": "0.0213",
+                            "no_candidate_days": 0, "unavailable_days": 32}],
+            "benchmark": {"total_return": "0.05", "max_drawdown": "0.01", "average_exposure": "0.9"}})
+        text = self.client.get(f"/reports/{self.key()}").text
+        self.assertIn("策略比較 · 1 份策略", text)
+        self.assertIn('<span class="num up">+1.15%</span>', text)
+        self.assertIn("買進持有基準", text)
+        self.assertIn("0 / 32", text)
+        self.assertIn("不選出最佳策略。", text)
+        self.assertIn(f'href="/reports/{self.key()}/csv"', text)
+
+
 class ReportDescriptionTests(unittest.TestCase):
     def describe(self, details, name="20260929T010000_000000Z_aaaaaaaa"):
         with TemporaryDirectory() as directory:

@@ -652,3 +652,6 @@ fieldset > .field-error, form > .field-error { margin-top: var(--s-2); }
 
 .input-sm, select.input-sm, input.input-sm { min-height: 30px; width: auto; max-width: 9em; padding: 2px var(--s-2); font-size: var(--text-xs); }
 .section-label { font-size: var(--text-sm); color: var(--c-text-2); }
+
+img.chart { display: block; width: 100%; height: auto; border-radius: var(--radius-1); }
+.table .row-muted td { color: var(--c-text-2); background: var(--c-surface-2); }
