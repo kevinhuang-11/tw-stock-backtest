@@ -120,5 +120,48 @@ class TestCollectFactorRows(unittest.TestCase):
             self.collect()
 
 
+
+class TestAnalysisDateMessages(unittest.TestCase):
+    """非交易日與行情未更新要給不同的說明。"""
+
+    def setUp(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from tw_stock_backtest.data.database import save_records
+
+        self.tmp = TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.db = Path(self.tmp.name) / "stocks.db"
+        # 2026-07-31 是星期五、2026-08-03 是星期一，中間是週末。
+        save_records([
+            {"stock_id": "2330", "date": day, "open": Decimal("10"), "high": Decimal("11"),
+             "low": Decimal("9"), "close": Decimal("10"), "volume": 1000,
+             "turnover": 10000, "trade_count": 10}
+            for day in ("2026-07-30", "2026-07-31", "2026-08-03")
+        ], db_path=self.db)
+
+    def reason(self, as_of):
+        rows, errors = collect_factor_rows(
+            [{"stock_id": "2330"}], as_of, db_path=self.db, factor_settings={})
+        self.assertEqual(rows, [])
+        return errors[0]["reason"]
+
+    def test_weekend_is_not_reported_as_stale_data(self):
+        reason = self.reason("2026-08-01")
+        self.assertIn("2026-08-01 沒有這檔股票的行情（可能是休市日或當日未交易）", reason)
+        self.assertIn("前一個行情日為 2026-07-31，下一個為 2026-08-03", reason)
+        self.assertNotIn("未更新", reason)
+
+    def test_date_after_latest_data_is_still_stale(self):
+        reason = self.reason("2026-08-05")
+        self.assertEqual(reason, "行情未更新至分析日期；最後行情日期為 2026-08-03")
+
+    def test_missing_database_keeps_the_original_message(self):
+        from tw_stock_backtest.data.database import next_record_date
+        self.assertIsNone(next_record_date("2330", "2026-08-01", db_path="no-such.db"))
+        self.assertEqual(next_record_date("2330", "2026-08-01", db_path=self.db), "2026-08-03")
+        self.assertIsNone(next_record_date("2330", "2026-08-03", db_path=self.db))
+
+
 if __name__ == "__main__":
     unittest.main()

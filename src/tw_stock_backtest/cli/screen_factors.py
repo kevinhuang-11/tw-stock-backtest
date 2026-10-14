@@ -7,7 +7,7 @@ from tw_stock_backtest.config import (
     apply_overrides,
     load_config,
 )
-from tw_stock_backtest.data.database import load_records
+from tw_stock_backtest.data.database import load_records, next_record_date
 from tw_stock_backtest.data.universe import load_universe
 from tw_stock_backtest.analysis.factors import (
     calculate_factor_row,
@@ -95,6 +95,16 @@ def collect_factor_rows(
             latest_date = records[-1]["date"]
 
             if latest_date != as_of:
+                # 分析日之後還有行情，代表那天本來就沒有交易（例如週末或休市），
+                # 不是資料沒更新；兩種情況要給不同的說明。
+                following = next_record_date(stock_id, as_of, db_path=db_path)
+
+                if following is not None:
+                    raise ValueError(
+                        f"{as_of} 沒有這檔股票的行情（可能是休市日或當日未交易）；"
+                        f"前一個行情日為 {latest_date}，下一個為 {following}"
+                    )
+
                 raise ValueError(
                     f"行情未更新至分析日期；"
                     f"最後行情日期為 {latest_date}"

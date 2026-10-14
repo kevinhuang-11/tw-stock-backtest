@@ -118,3 +118,24 @@ def load_records(stock_id, start_text, end_text, db_path=DEFAULT_DB_PATH):
         records.append(record)
 
     return records
+
+
+def next_record_date(stock_id, after_text, db_path=DEFAULT_DB_PATH):
+    """回傳該股在 after_text 之後的第一個行情日；沒有或資料庫不存在時回傳 None。
+
+    用來區分「指定日期沒有行情（例如休市日）」與「行情還沒更新到那天」。
+    """
+    db_path = Path(db_path).resolve()
+
+    if not db_path.is_file():
+        return None
+
+    uri = db_path.as_uri() + "?mode=ro"
+
+    with closing(sqlite3.connect(uri, uri=True)) as connection:
+        row = connection.execute(
+            "SELECT MIN(date) FROM stock_prices WHERE stock_id = ? AND date > ?",
+            (stock_id, after_text),
+        ).fetchone()
+
+    return row[0]
