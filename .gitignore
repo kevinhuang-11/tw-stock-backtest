@@ -9,6 +9,8 @@ reports/
 build/
 dist/
 .env.*
+# 個人筆記與未公開文件
+/private/
 /docs/REHEARSAL.md
 /docs/demo-assets/ranking.txt
 /docs/demo-assets/factors.txt
