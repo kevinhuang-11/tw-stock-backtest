@@ -11,11 +11,16 @@ from pathlib import Path
 from tw_stock_backtest.config import load_config
 from tw_stock_backtest.data.database import save_records
 from tw_stock_backtest.data.supplemental import Store, growth, timestamp
+from tw_stock_backtest.data.universe import save_synthetic_universe
 from tw_stock_backtest.stock_research import Watchlist
 from tw_stock_backtest.strategies import StrategyLibrary, from_settings
 from tw_stock_backtest.workbench import Workbench
 from tw_stock_backtest.watchlist_research import observations, save_snapshot
 from tw_stock_backtest.cli.run_research import main as run_research
+
+# 名稱與產業都明確標示為示範；9001～9003 不在上市普通股名單內。
+DEMO_NAMES={'9001':('示範股 A（合成）','示範產業甲'),'9002':('示範股 B（合成）','示範產業乙'),
+            '9003':('示範股 C（合成）','示範產業丙')}
 
 
 def prepare(output):
@@ -24,6 +29,10 @@ def prepare(output):
     (root/'config.toml').write_bytes(Path(__file__).with_name('demo.toml').read_bytes())
     (root/'SYNTHETIC.txt').write_text('合成展示資料；非 TWSE 實際行情，不可用於投資或策略績效證明。\n',encoding='utf-8')
     settings=load_config(root/'config.toml')
+    # 工作台從行情庫旁的名單檔讀取名稱；合成名單如實標示來源，並使示例環境停用連網更新。
+    listed=Path(settings['storage']['database_path']).with_name('listed_stocks.json')
+    save_synthetic_universe([{'stock_id':sid,'name':DEMO_NAMES[sid][0],'industry':DEMO_NAMES[sid][1],'market':'合成示例'}
+        for sid in settings['universe']['stocks']],listed,source_url='synthetic://offline-example')
     days=[];day=date(2026,7,1)
     while day<=date(2026,9,29):
         if day.weekday()<5:days.append(day.isoformat())
@@ -63,7 +72,7 @@ def prepare(output):
     state=root/'workbench'
     notes=Watchlist(state/'private/watchlist.sqlite3')
     for sid in settings['universe']['stocks']:notes.save(sid,'',0)
-    code=run_research(['--config',str(root/'config.toml'),'--skip-download','--as-of','2026-09-29',
+    code=run_research(['--config',str(root/'config.toml'),'--skip-download','--as-of','2026-09-29','--universe',str(listed),
         '--strategy',str(library.path('baseline')),'--output-dir',str(root/'reports')])
     if code!=0:raise RuntimeError('合成示例研究未完整成功，請查看輸出；原資料未受影響')
     wb=Workbench(root/'config.toml',root/'reports',state,strategy_root=root/'strategies')
