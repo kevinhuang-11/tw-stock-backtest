@@ -36,6 +36,35 @@
   {{ ui.stat('最近研究的分析日', latest_research or '—', '尚未建立研究' if not latest_research else '最新一份研究排名') }}
 </div>
 
+<section class="card" id="data-status">
+  <div class="card-header">
+    <div><h2>資料狀態</h2><p>本機各類資料更新到哪一天。落後的行情日是依本機行情庫推算；專案沒有交易日曆。</p></div>
+    {% if status.price_latest %}{{ ui.freshness(status.price_latest) }}{% endif %}
+  </div>
+  <div class="card-body grid-2 status-grid">
+    <dl class="kv">
+      <dt>行情最新日</dt><dd>{% if status.price_latest %}{{ status.price_latest }} <span class="subtle">（距今天 {{ status.calendar_days }} 個日曆日）</span>{% else %}尚無行情資料{% endif %}</dd>
+      <dt>停在較舊日期</dt><dd>{% if status.behind %}{{ status.behind }} / {{ status.stocks }} 檔，最早停在 {{ status.behind_oldest }}{% else %}{{ status.stocks }} 檔都到最新日{% endif %}</dd>
+      <dt>上市名單</dt><dd>{% if status.listing %}{{ status.listing.count }} 檔 · {{ '合成示例' if status.listing.synthetic else '下載於 ' ~ (status.listing.downloaded_at | dt) }}{% else %}尚未下載{% endif %}</dd>
+      {% for kind, label in [('revenue_history','月營收（歷史）'),('revenue','月營收（最新快照）'),('institution','法人買賣超')] %}{% set s = status.supplemental.get(kind) %}
+      <dt>{{ label }}</dt><dd>{% if s %}{{ s.latest }} <span class="subtle">· {{ s.stocks }} 檔</span>{% else %}<span class="subtle">尚未取得</span>{% endif %}</dd>
+      {% endfor %}
+    </dl>
+    <div class="stack-sm small">
+      {% if offline_reason %}
+        <p class="offline-note">離線示範不提供更新：{{ offline_reason }}。</p>
+      {% else %}
+        <p><strong>怎麼更新</strong></p>
+        <p>單檔：在個股頁按「更新這檔行情」。自選股（最多 10 檔）：自選頁的「更新自選股資料」。</p>
+        <p>全部上市股票（增量，每檔約 2 次請求、間隔 3 秒，約 2 小時）：</p>
+        <pre class="command">.venv/bin/python -m tw_stock_backtest.cli.run_research \
+  --universe data/listed_stocks.json --allow-partial</pre>
+        <p class="hint">詳見 docs/OPERATIONS.md 的「研究排名與更新」。</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
 <div class="grid-2">
   <section class="card">
     <div class="card-header">

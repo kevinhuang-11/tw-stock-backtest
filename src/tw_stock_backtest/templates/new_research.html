@@ -53,6 +53,9 @@
   </form>
 
   <aside class="stack-sm">
+  {% if status.price_latest %}
+  {% call ui.alert('warn' if status.behind else 'info', '本機行情最新到 ' ~ status.price_latest) %}{% if status.behind %}有 {{ status.behind }} 檔停在較舊日期（最早 {{ status.behind_oldest }}）；分析日或期間超出某檔的資料時，該檔會被排除。<a href="/#data-status">查看資料狀態</a>{% else %}所有股票都更新到這一天。{% endif %}{% endcall %}
+  {% endif %}
     {% call ui.alert('info', '送出後會發生什麼') %}工作會排入佇列並在背景依序執行。回到總覽可以看到進度，完成後結果出現在報表中。{% endcall %}
     <div class="card"><div class="card-body stack-sm">
       <h3>怎麼解讀結果</h3>

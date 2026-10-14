@@ -711,3 +711,9 @@ legend .badge { margin-left: var(--s-1); vertical-align: 2px; }
 .digest-body > * { max-width: none; }
 pre.mail-body { white-space: pre-wrap; overflow-wrap: anywhere; background: transparent; padding: 0; font-family: var(--font); font-size: var(--text-sm); line-height: 1.8; }
 h1 .badge { font-size: var(--text-sm); vertical-align: 4px; }
+
+/* ---------- 資料新鮮度 ---------- */
+.status-grid { align-items: start; }
+pre.command { white-space: pre; overflow-x: auto; font-size: var(--text-xs); }
+.freshness-line { margin-top: var(--s-2); }
+.form-notice { margin-bottom: var(--s-4); }

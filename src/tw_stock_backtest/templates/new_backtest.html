@@ -28,6 +28,12 @@
   </div>
 </div>
 
+<div class="stack-sm form-notice">
+  {% if status.price_latest %}
+  {% call ui.alert('warn' if status.behind else 'info', '本機行情最新到 ' ~ status.price_latest) %}{% if status.behind %}有 {{ status.behind }} 檔停在較舊日期（最早 {{ status.behind_oldest }}）；分析日或期間超出某檔的資料時，該檔會被排除。<a href="/#data-status">查看資料狀態</a>{% else %}所有股票都更新到這一天。{% endif %}{% endcall %}
+  {% endif %}
+</div>
+
 <div data-tabs>
   <div class="tabs" role="tablist" aria-label="回測類型">
     <button role="tab" id="tab-single" aria-controls="single" aria-selected="true">單一策略回測</button>

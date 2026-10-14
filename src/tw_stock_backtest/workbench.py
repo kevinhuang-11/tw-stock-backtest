@@ -371,6 +371,17 @@ def create_app(workbench, dev=False):
         return {'offline_reason': offline_reason(workbench.settings['storage']['database_path']),
                 'nav_items': navigation(request.path)}
 
+    def lag_for(day):
+        # 「落後幾個行情日」以本機行情庫的日期推算；同一次請求只讀一次行情庫。
+        from flask import g
+        from tw_stock_backtest.data_status import market_lag, price_summary
+        if 'price_dates' not in g:
+            g.price_dates = price_summary(workbench.settings['storage']['database_path'])[0]
+        return market_lag(day, g.price_dates)
+
+    # 以全域函式提供，匯入的巨集（_components.html）也能使用。
+    app.jinja_env.globals['market_lag'] = lag_for
+
     # 導覽列：(圖示, 標籤, 連結, 視為同一區域的路徑開頭)。只列出已註冊路由的項目，不會連到不存在的頁面。
     NAVIGATION = [('home', '總覽', '/', ()), ('research', '研究', '/new/research', ('/new/research',)),
                   ('backtest', '回測', '/new/backtest', ('/new/backtest',)), ('watchlist', '自選', '/watchlist', ('/watchlist',)),
@@ -411,7 +422,9 @@ def create_app(workbench, dev=False):
             watchlist_count = 0
         latest = max((entry['details'].get('analysis_date') or '' for entry in catalog.values()
                       if entry['details'].get('kind') == 'research'), default='')
+        from tw_stock_backtest.data_status import data_status
         return render_template('home.html', jobs=jobs, reports=reports, csrf=token,
+                               status=data_status(workbench.settings['storage']['database_path']),
                                report_count=len(reports), watchlist_count=watchlist_count,
                                active_count=sum(job['status'] in ('queued', 'running') for job in jobs),
                                latest_research=latest or None, research_reports=research,
@@ -426,12 +439,16 @@ def create_app(workbench, dev=False):
 
     @app.get('/new/research')
     def new_research():
+        from tw_stock_backtest.data_status import data_status
         return render_template('new_research.html', csrf=token, strategies=workbench.library.list(),
+                               status=data_status(workbench.settings['storage']['database_path']),
                                stocks=prefilled_stocks(), selected_strategy=request.args.get('strategy_id', ''))
 
     @app.get('/new/backtest')
     def new_backtest():
+        from tw_stock_backtest.data_status import data_status
         return render_template('new_backtest.html', csrf=token, strategies=workbench.library.list(),
+                               status=data_status(workbench.settings['storage']['database_path']),
                                execution=workbench.settings['backtest'], stocks=prefilled_stocks(),
                                selected_strategy=request.args.get('strategy_id', ''))
 

@@ -53,3 +53,11 @@
 {% macro loading(text='載入中…') -%}
 <div class="loading" role="status"><span class="spinner" aria-hidden="true"></span>{{ text }}</div>
 {%- endmacro %}
+
+{# 資料新鮮度：day 之後本機行情庫還有幾個行情日（依本機資料推算，不是交易日曆） #}
+{% macro freshness(day) -%}
+{% set lag = market_lag(day) %}
+{% if not day %}{{ badge('沒有行情資料', 'warn', 'warning') }}
+{% elif lag is none or lag == 0 %}<span class="badge badge-ok" title="與本機行情庫最新日相同">{{ icon('check') }}資料截至 {{ day }}</span>
+{% else %}<span class="badge badge-warn" title="依本機行情庫中其他股票的日期推算，不是交易日曆">{{ icon('clock') }}資料截至 {{ day }} · 落後 {{ lag }} 個行情日</span>{% endif %}
+{%- endmacro %}

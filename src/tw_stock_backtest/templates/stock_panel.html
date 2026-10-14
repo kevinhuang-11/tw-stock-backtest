@@ -7,6 +7,7 @@
     <div class="eyebrow"><a href="/stocks">個股</a>{{ ui.icon('chevron-right') }}{{ stock.stock_id }}</div>
     <h1>{{ stock.stock_id }} {{ stock.metadata.get('name') or '名稱未提供' }}</h1>
     <p>{{ stock.metadata.get('industry') or '產業未提供' }} · {{ stock.source }}</p>
+    <div class="cluster freshness-line">{{ ui.freshness(stock.latest) }}</div>
   </div>
   <div class="page-actions">
     {% if note.active %}{{ ui.badge('已在自選', 'info', 'watchlist') }}{% endif %}

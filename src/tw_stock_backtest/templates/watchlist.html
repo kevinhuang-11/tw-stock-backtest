@@ -49,7 +49,7 @@
       <thead><tr><th>股票</th><th class="num">收盤</th><th>策略條件</th><th class="num">保存的研究</th><th class="num">營收月增／年增</th><th>法人累計（股）</th><th>提醒</th></tr></thead>
       <tbody>{% for r in rows %}<tr>
         <td><a class="cell-main" href="/stocks/{{ r.stock_id }}">{{ r.stock_id }} {{ r.name or '名稱未提供' }}</a><span class="cell-sub">{{ r.industry or '產業未提供' }}</span></td>
-        <td class="num">{{ r.close | num }}<span class="cell-sub">{{ r.price_date or '未提供' }}</span></td>
+        <td class="num">{{ r.close | num }}<span class="cell-sub">{{ r.price_date or '未提供' }}</span>{% set lag = market_lag(r.price_date) %}{% if lag %}<span class="cell-sub">{{ ui.badge('落後 ' ~ lag ~ ' 個行情日', 'warn') }}</span>{% endif %}</td>
         <td>{{ ui.status(r.status if r.status in ('eligible','filtered') else 'unavailable') }}<span class="cell-sub">{{ r.condition_date or '—' }}</span>
           {% if (r.diagnostic or {}).get('conditions') or (r.diagnostic or {}).get('reason') %}<details class="cell-details"><summary>條件數值</summary>{% for c in (r.diagnostic or {}).get('conditions',[]) %}<p>{{ c.get('type') }}：{{ c.get('status') | status_label }}{% if c.get('reason') %} · {{ c.reason }}{% endif %}</p>{% endfor %}{% if (r.diagnostic or {}).get('reason') %}<p>{{ r.diagnostic.reason }}</p>{% endif %}</details>{% endif %}</td>
         <td class="num">{% if r.research %}<a href="/stocks/{{ r.stock_id }}?report={{ r.research.report_key }}">第 {{ r.rank if r.rank is not none else '—' }} 名</a><span class="cell-sub">分數 {{ r.score | num }} · {{ r.research.date }}</span>
