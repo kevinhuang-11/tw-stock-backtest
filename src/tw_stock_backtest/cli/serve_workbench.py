@@ -10,7 +10,7 @@ def main(argv=None):
     parser.add_argument('--reports-dir', default='reports')
     parser.add_argument('--state-dir', default='reports/workbench')
     parser.add_argument('--strategy-dir', default='strategies')
-    parser.add_argument('--port', type=int, default=8765)
+    parser.add_argument('--port', type=int, default=9000)
     args = parser.parse_args(argv)
     workbench = Workbench(args.config, args.reports_dir, args.state_dir, strategy_root=args.strategy_dir)
     try:
