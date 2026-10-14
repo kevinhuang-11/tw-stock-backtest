@@ -86,121 +86,134 @@ def plot_portfolio_report(report_dir):
     import matplotlib.pyplot as plt
     from matplotlib.ticker import PercentFormatter, StrMethodFormatter
 
-    fig, (equity_ax, drawdown_ax) = plt.subplots(
-        2,
-        1,
-        figsize=(12, 8),
-        sharex=True,
-        gridspec_kw={"height_ratios": [2, 1]},
+    from tw_stock_backtest.chart_style import (
+        BENCHMARK_COLOR, MUTED, STRATEGY_COLORS, TEXT, style,
     )
 
+    # 有中文字型時用中文標籤，否則改用英文，避免出現方框。
+    language, rc, _ = style()
+    text = TEXT[language]
+    slippage = Decimal(str(document["strategy"]["result"].get("slippage_rate") or 0))
+
+    with plt.rc_context(rc):
+        fig, (equity_ax, drawdown_ax) = plt.subplots(
+            2,
+            1,
+            figsize=(12, 8),
+            sharex=True,
+            gridspec_kw={"height_ratios": [2, 1]},
+        )
+
     try:
-        for label, series, color in (
-            ("Strategy", strategy, "#2563eb"),
-            ("Buy and hold", benchmark, "#d97706"),
-        ):
-            performance = series["performance"]
+        with plt.rc_context(rc):
+            for label, series, color, width in (
+                (text["strategy"], strategy, STRATEGY_COLORS[0], 2.2),
+                (text["benchmark"], benchmark, BENCHMARK_COLOR, 1.8),
+            ):
+                performance = series["performance"]
 
-            # Decimal 保留到繪圖邊界才轉成 float。
-            equities = [
-                float(value)
-                for value in series["equities"]
-            ]
-            drawdowns = [
-                float(value)
-                for value in series["drawdowns"]
-            ]
+                # Decimal 保留到繪圖邊界才轉成 float。
+                equities = [
+                    float(value)
+                    for value in series["equities"]
+                ]
+                drawdowns = [
+                    float(value)
+                    for value in series["drawdowns"]
+                ]
 
-            equity_ax.plot(
-                series["dates"],
-                equities,
-                color=color,
-                linewidth=2,
-                label=(
-                    f"{label} | Return "
-                    f"{performance['total_return']:.2%}"
-                ),
+                equity_ax.plot(
+                    series["dates"],
+                    equities,
+                    color=color,
+                    linewidth=width,
+                    label=(
+                        f"{label} | {text['return']} "
+                        f"{performance['total_return']:.2%}"
+                    ),
+                )
+
+                drawdown_ax.plot(
+                    series["dates"],
+                    drawdowns,
+                    color=color,
+                    linewidth=width - .4,
+                    label=(
+                        f"{label} | {text['drawdown_label']} "
+                        f"{performance['max_drawdown']:.2%}"
+                    ),
+                )
+
+            equity_ax.axhline(
+                float(strategy["initial_cash"]),
+                color=MUTED,
+                linestyle="--",
+                linewidth=1,
+                label=text["initial"],
             )
 
-            drawdown_ax.plot(
-                series["dates"],
-                drawdowns,
-                color=color,
-                linewidth=1.8,
-                label=(
-                    f"{label} | Max drawdown "
-                    f"{performance['max_drawdown']:.2%}"
-                ),
+            first_date = strategy["dates"][0]
+            last_date = strategy["dates"][-1]
+
+            equity_ax.set_title(
+                text["portfolio_title"] + "\n"
+                + text["period"].format(start=first_date, end=last_date),
+                loc="left",
+                fontsize=14,
+            )
+            equity_ax.set_ylabel(text["equity_axis"])
+            equity_ax.yaxis.set_major_formatter(
+                StrMethodFormatter("{x:,.0f}")
             )
 
-        equity_ax.axhline(
-            float(strategy["initial_cash"]),
-            color="#64748b",
-            linestyle="--",
-            linewidth=1,
-            label="Initial capital",
-        )
+            drawdown_ax.set_ylabel(text["drawdown_axis"])
+            drawdown_ax.set_xlabel(text["date_axis"])
+            drawdown_ax.yaxis.set_major_formatter(
+                PercentFormatter(xmax=1)
+            )
+            drawdown_ax.axhline(
+                0,
+                color=MUTED,
+                linewidth=1,
+            )
 
-        first_date = strategy["dates"][0]
-        last_date = strategy["dates"][-1]
+            locator = mdates.AutoDateLocator(
+                minticks=4,
+                maxticks=8,
+            )
+            drawdown_ax.xaxis.set_major_locator(locator)
+            drawdown_ax.xaxis.set_major_formatter(
+                mdates.ConciseDateFormatter(locator)
+            )
 
-        equity_ax.set_title(
-            "Portfolio backtest vs buy-and-hold benchmark\n"
-            f"{first_date} to {last_date}",
-            loc="left",
-            fontsize=14,
-        )
-        equity_ax.set_ylabel("Total equity (TWD)")
-        equity_ax.yaxis.set_major_formatter(
-            StrMethodFormatter("{x:,.0f}")
-        )
+            for ax in (equity_ax, drawdown_ax):
+                ax.legend(loc="best", fontsize=9)
 
-        drawdown_ax.set_ylabel("Drawdown")
-        drawdown_ax.set_xlabel("Date")
-        drawdown_ax.yaxis.set_major_formatter(
-            PercentFormatter(xmax=1)
-        )
-        drawdown_ax.axhline(
-            0,
-            color="#64748b",
-            linewidth=1,
-        )
+            # 註記依實際設定說明是否計入滑價。
+            # 中文句子之間不加空白；英文句子之間空一格。
+            costs = text["fees"] + ("" if language == "zh" else " ") + (
+                text["slippage"].format(rate=f"{slippage:.2%}")
+                if slippage
+                else text["no_slippage"]
+            )
+            fig.text(
+                0.5,
+                0.025,
+                costs + "\n" + text["limits"],
+                ha="center",
+                fontsize=9,
+                color=MUTED,
+            )
 
-        locator = mdates.AutoDateLocator(
-            minticks=4,
-            maxticks=8,
-        )
-        drawdown_ax.xaxis.set_major_locator(locator)
-        drawdown_ax.xaxis.set_major_formatter(
-            mdates.ConciseDateFormatter(locator)
-        )
+            fig.tight_layout(rect=(0, 0.08, 1, 1))
 
-        for ax in (equity_ax, drawdown_ax):
-            ax.grid(True, alpha=0.25)
-            ax.legend(loc="best", fontsize=9)
-            ax.spines["top"].set_visible(False)
-            ax.spines["right"].set_visible(False)
+            output_path = report_dir / "performance.png"
 
-        fig.text(
-            0.5,
-            0.025,
-            "Daily closing equity; configured fees and taxes included.\n"
-            "Excludes slippage, dividends and splits; "
-            "no forced liquidation. Allocations differ.",
-            ha="center",
-            fontsize=9,
-            color="#475569",
-        )
-
-        fig.tight_layout(rect=(0, 0.08, 1, 1))
-
-        output_path = report_dir / "performance.png"
-
-        fig.savefig(
-            output_path,
-            dpi=180,
-            facecolor="white",
-        )
+            fig.savefig(
+                output_path,
+                dpi=180,
+                facecolor="white",
+            )
 
     finally:
         plt.close(fig)

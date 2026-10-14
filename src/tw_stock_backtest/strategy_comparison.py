@@ -63,26 +63,34 @@ def compare_strategies(settings, strategies, start, end, output_root, *, frozen_
                          'trades':len(result['trades']),'average_exposure':metrics['average_exposure'],
                          'no_candidate_days':sum(not d['candidates'] for d in result['strategy_diagnostics']),
                          'unavailable_days':sum(bool(d['errors']) for d in result['strategy_diagnostics'])})
-            series.append((strategy['id'],prepare_series(result)))
+            series.append((strategy,prepare_series(result)))
         except Exception as error:
             if not tolerate_failures:
                 raise
             failures.append({'id': strategy['id'], 'strategy_snapshot': snapshot(strategy),
                              'error_type': type(error).__name__, 'reason': '子策略回測失敗；保留其他策略結果'})
-    series.append(('Buy and hold',prepare_series(benchmark)))
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    from matplotlib.ticker import PercentFormatter
-    fig,axes=plt.subplots(2,1,sharex=True,figsize=(11,8))
+    from matplotlib.ticker import PercentFormatter, StrMethodFormatter
+    from tw_stock_backtest.chart_style import BENCHMARK_COLOR, STRATEGY_COLORS, TEXT, label, style
+    # 有中文字型時用中文標籤；策略名稱畫不出來時改用策略 ID（只含英數），避免方框。
+    language,rc,font_path=style();text=TEXT[language]
+    lines=[(label(s['name'],s['id'],font_path),points,STRATEGY_COLORS[i%len(STRATEGY_COLORS)],'-') for i,(s,points) in enumerate(series)]
+    lines.append((text['benchmark'],prepare_series(benchmark),BENCHMARK_COLOR,'--'))
+    with plt.rc_context(rc):
+        fig,axes=plt.subplots(2,1,sharex=True,figsize=(11,8),gridspec_kw={'height_ratios':[2,1]})
     try:
-        for name,points in series:
-            axes[0].plot(points['dates'],[float(v) for v in points['equities']],label=name)
-            axes[1].plot(points['dates'],[float(v) for v in points['drawdowns']],label=name)
-        axes[0].set_ylabel('Equity');axes[1].set_ylabel('Drawdown')
-        axes[1].yaxis.set_major_formatter(PercentFormatter(1))
-        axes[0].legend();fig.autofmt_xdate();fig.tight_layout()
-        fig.savefig(report.path/'comparison.png')
+        with plt.rc_context(rc):
+            for name,points,color,dash in lines:
+                axes[0].plot(points['dates'],[float(v) for v in points['equities']],label=name,color=color,linestyle=dash,linewidth=2)
+                axes[1].plot(points['dates'],[float(v) for v in points['drawdowns']],label=name,color=color,linestyle=dash,linewidth=1.6)
+            axes[0].set_title(text['comparison_title'],loc='left',fontsize=14)
+            axes[0].set_ylabel(text['equity_axis']);axes[1].set_ylabel(text['drawdown_axis'])
+            axes[0].yaxis.set_major_formatter(StrMethodFormatter('{x:,.0f}'))
+            axes[1].yaxis.set_major_formatter(PercentFormatter(1))
+            axes[0].legend(fontsize=9);fig.autofmt_xdate();fig.tight_layout()
+            fig.savefig(report.path/'comparison.png',dpi=150,facecolor='white')
     finally:
         plt.close(fig)
     fields=['id','total_return','max_drawdown','fees_and_taxes','trades','average_exposure','no_candidate_days','unavailable_days']
