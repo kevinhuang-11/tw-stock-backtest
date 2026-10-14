@@ -7,9 +7,19 @@
 
 合成資料只用來展示軟體功能，**數值不是實際行情，不能當成策略有效的證據**。
 
+## 最快的方式
+
+先完成 [README 的安裝步驟](../README.md#quick-start)，然後一行建立示例並啟動工作台：
+
+```bash
+.venv/bin/python examples/prepare_demo.py --serve
+```
+
+開啟 **http://127.0.0.1:9000/watchlist**，按 Ctrl+C 結束。再次執行時會沿用已建立的示例。下面兩節是同一件事分開做的方式。
+
 ## 1. 建立示例環境
 
-先完成 [README 的安裝步驟](../README.md#quick-start)，然後在專案根目錄執行：
+在專案根目錄執行：
 
 ```bash
 .venv/bin/python examples/prepare_demo.py

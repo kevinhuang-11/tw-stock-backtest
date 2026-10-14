@@ -85,9 +85,25 @@ def prepare(output):
     return root
 
 
+def serve(root, port):
+    """以示例目錄啟動工作台；只監聽本機，Ctrl+C 結束。"""
+    from tw_stock_backtest.cli.serve_workbench import main as serve_workbench
+    print(f'開啟 http://127.0.0.1:{port}/ （Ctrl+C 結束）')
+    serve_workbench(['--config',str(root/'config.toml'),'--reports-dir',str(root/'reports'),
+                     '--state-dir',str(root/'workbench'),'--strategy-dir',str(root/'strategies'),'--port',str(port)])
+
+
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output',default='reports/offline-demo',help='必須是不存在的新目錄')
+    parser.add_argument('--output',default='reports/offline-demo',help='必須是不存在的新目錄；搭配 --serve 時可沿用既有示例')
+    parser.add_argument('--serve',action='store_true',help='建立（或沿用既有）示例後直接啟動工作台')
+    parser.add_argument('--port',type=int,default=9000)
     args=parser.parse_args()
-    try:prepare(args.output)
-    except FileExistsError:parser.exit(1,'展示目錄已存在；不覆寫，請沿用或指定新的 --output。\n')
+    root=Path(args.output).resolve()
+    # 只有確認是本程式建立的示例才沿用，避免把其他目錄當成示例。
+    if args.serve and (root/'SYNTHETIC.txt').is_file():
+        print('沿用既有示例：',args.output)
+    else:
+        try:prepare(args.output)
+        except FileExistsError:parser.exit(1,'展示目錄已存在且不是示例目錄；不覆寫，請沿用或指定新的 --output。\n')
+    if args.serve:serve(root,args.port)
