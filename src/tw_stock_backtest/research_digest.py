@@ -247,6 +247,8 @@ def build_digest(bundle, histories=(), *, top=10, today=None):
 def load_digest(path, *, top=10, history_roots=()):
     saved = read_json(path)
     if saved.get('digest_schema_version') == 1:
+        if saved.get('digest_kind')=='watchlist' and (not saved.get('report_complete') or any(p.endswith('.incomplete') for p in Path(path).parts)):
+            raise ValueError('自選快照尚未完成')
         return saved
     bundle = load_bundle(path)
     if bundle is None:
@@ -283,6 +285,13 @@ def html_line(line, index):
 def render_digest(digest):
     """One semantic text representation feeds both HTML and plain text."""
     d = public_data(digest)
+    if d.get('digest_kind') == 'watchlist':
+        from tw_stock_backtest.watchlist_research import digest_lines
+        lines = digest_lines(d)
+        return '\n'.join(lines), ('<!doctype html><html lang="zh-Hant"><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<body style="font:16px/1.7 sans-serif;max-width:900px;margin:auto;padding:16px;overflow-wrap:anywhere">'
+            + ''.join(html_line(line, i) for i, line in enumerate(lines)) + '</body></html>')
     counts = d['counts']
     scope = d['specified_pool']
     settings = d['factor_settings']

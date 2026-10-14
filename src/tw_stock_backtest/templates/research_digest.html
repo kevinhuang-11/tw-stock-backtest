@@ -8,7 +8,7 @@
 <h3>候選股總覽</h3>
 {% for candidate in digest.candidates %}
 <article style="border-top:1px solid #dce3ec;padding:16px 0">
-<h3>{{ candidate.rank }}. {{ candidate.stock_id }} {{ candidate.name or '名稱未提供' }}</h3>
+<h3>{{ candidate.rank }}. <a href="/stocks/{{ candidate.stock_id }}?report={{ report_key }}">{{ candidate.stock_id }}</a> {{ candidate.name or '名稱未提供' }}</h3>
 <p>{{ candidate.industry or '產業未提供' }} · 總分 {{ candidate.score | score_text }} · 名次變化 {{ candidate.rank_change if candidate.rank_change is not none else '尚無可比較結果' }}（正數為上升）</p>
 <p>訊號日收盤：{{ candidate.close if candidate.close is not none else '未提供' }}（{{ candidate.price_date or '日期未提供' }}）；最後行情日：{{ candidate.latest_date or '未提供' }}</p>
 <ul>{% for line in candidate.explanations %}<li>{{ line }}</li>{% endfor %}</ul>
