@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% import '_components.html' as ui %}
+{% import '_form_assets.html' as assets %}
+{% block title %}建立回測 · 台股研究工作台{% endblock %}
+{% block head %}{{ assets.styles() }}{% endblock %}
+{% block scripts %}{{ assets.scripts() }}{% endblock %}
+
+{% macro strategy_checks(prefix) %}
+<fieldset>
+  <legend>比較的策略（選 2～5 份）</legend>
+  {% if strategies | length >= 2 %}
+  <div class="check-grid">
+    {% for item in strategies %}
+    <label class="check check-card"><input type="checkbox" name="strategies" value="{{ item.id }}"><span><strong>{{ item.name }}</strong><small>{{ '多因子排名' if item.ranking_mode == 'factors' else '規則篩選' }}{% if item.conditions %} · {{ item.conditions | length }} 個額外條件{% endif %}</small></span></label>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted small">策略庫至少要有兩份策略才能比較。<a href="/strategies">前往策略庫</a></p>
+  {% endif %}
+</fieldset>
+{% endmacro %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>建立回測</h1>
+    <p>以歷史行情模擬每日排名、隔日開盤成交，並與買進持有基準比較。已計入手續費、交易稅與滑價；價格未調整除權息。</p>
+  </div>
+</div>
+
+<div data-tabs>
+  <div class="tabs" role="tablist" aria-label="回測類型">
+    <button role="tab" id="tab-single" aria-controls="single" aria-selected="true">單一策略回測</button>
+    <button role="tab" id="tab-compare" aria-controls="compare" aria-selected="false">策略比較</button>
+    <button role="tab" id="tab-periods" aria-controls="periods" aria-selected="false">跨期間比較</button>
+  </div>
+
+  <div role="tabpanel" id="single" aria-labelledby="tab-single">
+    <form class="card" method="post" action="/jobs">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="kind" value="backtest">
+      <div class="card-body stack">
+        <div class="form-grid">
+          <div class="field">
+            <label for="bt-strategy">策略</label>
+            <select id="bt-strategy" name="strategy_id">
+              <option value="">沿用設定檔</option>
+              {% for item in strategies %}<option value="{{ item.id }}"{% if item.id == selected_strategy %} selected{% endif %}>{{ item.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="bt-ranking">排名方式</label>
+            <select id="bt-ranking" name="ranking">
+              <option value="">依策略（未選策略時為多因子）</option>
+              <option value="factors">多因子</option>
+              <option value="rules">規則</option>
+            </select>
+            <span class="hint">已選策略時必須與策略的模式一致。</span>
+          </div>
+        </div>
+
+        <input name="stocks" value="{{ stocks }}" required placeholder="以空白分隔代號，例如 2330 2317" aria-label="股票代號">
+
+        <div class="form-grid">
+          <div class="field"><label for="bt-start">開始日期</label><input id="bt-start" type="date" name="start" required></div>
+          <div class="field"><label for="bt-end">結束日期</label><input id="bt-end" type="date" name="end" required></div>
+        </div>
+        <p class="muted small">開始日之前的行情只用來暖機指標；資金與持股從開始日才開始模擬。</p>
+
+        <details class="disclosure">
+          <summary>資金、配置與滑價（已帶入設定檔的值）</summary>
+          <div class="disclosure-body stack-sm">
+            <div class="form-grid">
+              <div class="field"><label for="bt-cash">初始資金（元）</label><input id="bt-cash" type="number" name="cash" min="0" step="any" value="{{ execution.initial_cash }}" required></div>
+              <div class="field"><label for="bt-max">持股上限（檔）</label><input id="bt-max" type="number" name="max_positions" min="1" step="1" value="{{ execution.max_positions }}" required></div>
+              <div class="field"><label for="bt-sizing">配置方式</label><select id="bt-sizing" name="sizing"><option value="fixed_quantity" {% if execution.sizing_mode=='fixed_quantity' %}selected{% endif %}>固定股數</option><option value="fixed_budget" {% if execution.sizing_mode=='fixed_budget' %}selected{% endif %}>固定預算</option></select><span class="hint">固定預算：每檔上限為初始資金 ÷ 持股上限。</span></div>
+              <div class="field"><label for="bt-quantity">每次股數（股）</label><input id="bt-quantity" type="number" name="quantity" min="1" step="1" value="{{ execution.quantity }}" required><span class="hint">只在固定股數時使用。</span></div>
+              <div class="field"><label for="bt-slippage">單邊滑價（%）</label><input id="bt-slippage" type="number" name="slippage_percent" step="any" min="0" max="100" value="{{ execution.slippage_rate|percent_input }}" required><span class="hint">買進加價、賣出減價；0 含至 100 不含。</span></div>
+            </div>
+            <p class="muted small">手續費與交易稅沿用設定檔，不在這裡修改。</p>
+          </div>
+        </details>
+
+        <div class="form-actions">
+          <button class="btn-primary">{{ ui.icon('backtest') }}排入回測佇列</button>
+          <a class="btn btn-ghost" href="/">取消</a>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div role="tabpanel" id="compare" aria-labelledby="tab-compare" hidden>
+    <form class="card" method="post" action="/jobs">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="kind" value="comparison">
+      <div class="card-body stack">
+        <p class="muted small">多份策略使用相同的股票池、行情、資金、費稅與滑價，各自獨立回測。結果並列呈現，不選出「最佳」策略。</p>
+        {{ strategy_checks('cmp') }}
+        <input name="stocks" value="{{ stocks }}" placeholder="以空白分隔代號，例如 2330 2317" aria-label="股票代號">
+        <div class="form-grid">
+          <div class="field"><label for="cmp-start">開始日期</label><input id="cmp-start" type="date" name="start" required></div>
+          <div class="field"><label for="cmp-end">結束日期</label><input id="cmp-end" type="date" name="end" required></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary">{{ ui.icon('backtest') }}排入比較佇列</button>
+          <a class="btn btn-ghost" href="/">取消</a>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div role="tabpanel" id="periods" aria-labelledby="tab-periods" hidden>
+    <form class="card" method="post" action="/jobs">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="kind" value="period_comparison">
+      <div class="card-body stack">
+        <p class="muted small">每個期間獨立重置資金與持股。「驗證」只是用途標記，不保證該期間是沒看過的資料；各期間的報酬不會相加。</p>
+        {{ strategy_checks('per') }}
+        <input name="stocks" value="{{ stocks }}" placeholder="以空白分隔代號，例如 2330 2317" aria-label="股票代號">
+        <fieldset data-period-editor>
+          <legend>研究期間（最多 12 段）</legend>
+          <input type="hidden" name="periods" value="[]">
+          <div class="rows"></div>
+          <div class="cluster editor-actions"><button type="button" class="btn-sm" data-add-period>{{ ui.icon('plus') }}新增期間</button></div>
+          <details class="disclosure disclosure-flat">
+            <summary>進階：以 JSON 檢視或匯入期間設定</summary>
+            <div class="disclosure-body stack-sm">
+              <textarea class="period-json" rows="6" aria-label="期間設定 JSON"></textarea>
+              <div><button type="button" class="btn-sm" data-import-periods>驗證後載入表單（不執行）</button></div>
+            </div>
+          </details>
+        </fieldset>
+        <div class="form-actions">
+          <button class="btn-primary">{{ ui.icon('backtest') }}排入跨期間佇列</button>
+          <a class="btn btn-ghost" href="/">取消</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

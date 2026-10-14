@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from test_end_to_end import TEST_CONFIG
+from tw_stock_backtest.strategies import from_settings
 from tw_stock_backtest.web_views import created_at, describe_report, report_list
 from tw_stock_backtest.workbench import Workbench, create_app
 
@@ -167,6 +168,65 @@ class NewResearchPageTests(PageCase):
         text = self.client.get("/new/research").text
         self.assertIn('<input type="checkbox" name="download" value="yes">', text)
         self.assertNotIn("連線更新已停用", text)
+
+
+class NewBacktestPageTests(PageCase):
+    def add_strategies(self, *ids):
+        for sid in ids:
+            self.workbench.library.save({**from_settings(self.workbench.settings), "id": sid, "name": sid})
+
+    def forms(self, text):
+        return {re.search(r'name="kind" value="([a-z_]+)"', form)[1]: form
+                for form in re.findall(r'<form class="card" method="post" action="/jobs">.*?</form>', text, re.S)}
+
+    def test_three_forms_post_the_same_fields_as_before(self):
+        self.add_strategies("first", "second")
+        page = self.client.get("/new/backtest")
+        self.assertEqual(page.status_code, 200)
+        forms = self.forms(page.text)
+        self.assertEqual(set(forms), {"backtest", "comparison", "period_comparison"})
+        expected = {
+            "backtest": ("csrf", "strategy_id", "ranking", "stocks", "start", "end", "cash",
+                         "quantity", "max_positions", "sizing", "slippage_percent"),
+            "comparison": ("csrf", "strategies", "stocks", "start", "end"),
+            "period_comparison": ("csrf", "strategies", "stocks", "periods"),
+        }
+        for kind, names in expected.items():
+            for name in names:
+                with self.subTest(kind=kind, field=name):
+                    self.assertIn(f'name="{name}"', forms[kind])
+        # 執行參數預設帶入設定檔的值。
+        self.assertIn('name="cash" min="0" step="any" value="1000" required', forms["backtest"])
+        self.assertIn('name="quantity" min="1" step="1" value="10" required', forms["backtest"])
+        self.assert_navigation_works(page.text)
+
+    def test_strategies_are_checkboxes_not_a_multi_select(self):
+        self.add_strategies("second", "first")
+        forms = self.forms(self.client.get("/new/backtest").text)
+        for kind in ("comparison", "period_comparison"):
+            with self.subTest(kind=kind):
+                self.assertNotIn("<select", forms[kind].split('name="strategies"')[0][-200:])
+                self.assertNotIn("multiple", forms[kind])
+                self.assertEqual(
+                    re.findall(r'<input type="checkbox" name="strategies" value="([a-z_]+)">', forms[kind]),
+                    ["first", "second"])
+
+    def test_checkbox_selection_is_accepted_by_the_unchanged_backend(self):
+        from unittest.mock import Mock
+        self.add_strategies("first", "second")
+        self.workbench.runner = Mock(return_value=Mock(returncode=0))
+        token = re.search('name="csrf" value="([^"]+)"', self.client.get("/new/backtest").text)[1]
+        base = {"csrf": token, "kind": "comparison", "stocks": "2330",
+                "start": "2026-09-01", "end": "2026-09-29"}
+        # 勾選框以多個同名欄位送出，與原本的多選清單相同。
+        self.assertEqual(self.client.post("/jobs", data={**base, "strategies": ["first", "second"]}).status_code, 302)
+        self.assertEqual(self.client.post("/jobs", data={**base, "strategies": ["first"]}).status_code, 400)
+        self.workbench.pool.shutdown(wait=True)
+        self.assertEqual([job["kind"] for job in self.workbench.jobs()], ["comparison"])
+
+    def test_fewer_than_two_strategies_explains_instead_of_offering_checkboxes(self):
+        text = self.client.get("/new/backtest").text
+        self.assertIn("策略庫至少要有兩份策略才能比較", text)
 
 
 class ReportDescriptionTests(unittest.TestCase):

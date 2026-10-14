@@ -416,6 +416,12 @@ def create_app(workbench, dev=False):
         return render_template('new_research.html', csrf=token, strategies=workbench.library.list(),
                                stocks=prefilled_stocks(), selected_strategy=request.args.get('strategy_id', ''))
 
+    @app.get('/new/backtest')
+    def new_backtest():
+        return render_template('new_backtest.html', csrf=token, strategies=workbench.library.list(),
+                               execution=workbench.settings['backtest'], stocks=prefilled_stocks(),
+                               selected_strategy=request.args.get('strategy_id', ''))
+
     @app.get('/strategies')
     def strategies():
         selected = request.args.get('id')

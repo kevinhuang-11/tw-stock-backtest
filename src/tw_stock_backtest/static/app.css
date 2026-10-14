@@ -317,7 +317,7 @@ hr { border: 0; border-top: 1px solid var(--c-border); margin: var(--s-5) 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ---------- 表單 ---------- */
-.field { display: grid; gap: var(--s-1); min-width: 0; }
+.field { display: grid; gap: var(--s-1); min-width: 0; align-content: start; }
 .field > label, .field-label { font-size: var(--text-sm); font-weight: 600; color: var(--c-text); }
 .field .hint { font-size: var(--text-xs); color: var(--c-text-2); line-height: 1.5; }
 .field .error, .field-error {
@@ -613,3 +613,23 @@ details.disclosure > .disclosure-body { padding: 0 var(--s-4) var(--s-4); }
 .form-row > label:has(input[type=checkbox]) { display: inline-flex; align-items: center; gap: var(--s-2); flex: 0 1 auto; min-height: 38px; }
 .form-row > .form-row { flex: 1 1 100%; padding: 0; border: 0; }
 @media (max-width: 960px) { .sidebar-layout.sidebar-right { grid-template-columns: minmax(0, 1fr); } }
+
+/* 勾選卡：策略多選，不需要任何組合鍵 */
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--s-2); }
+.check-card {
+  align-items: flex-start; gap: var(--s-3);
+  min-height: 52px; padding: var(--s-3);
+  border: 1px solid var(--c-border-strong); border-radius: var(--radius-1);
+  background: var(--c-surface); cursor: pointer;
+}
+.check-card input { margin-top: 4px; }
+.check-card span { display: grid; min-width: 0; }
+.check-card strong { font-weight: 600; line-height: 1.4; }
+.check-card small { font-size: var(--text-xs); color: var(--c-text-2); }
+.check-card:hover { border-color: var(--c-text-3); }
+.check-card:has(input:checked) { border-color: var(--c-primary); background: var(--c-primary-soft); }
+.editor-actions { margin-top: var(--s-3); }
+details.disclosure-flat { margin-top: var(--s-3); border: 0; background: transparent; }
+details.disclosure-flat > summary { padding-left: 0; color: var(--c-text-2); }
+details.disclosure-flat > .disclosure-body { padding: 0; }
+fieldset > .field-error, form > .field-error { margin-top: var(--s-2); }

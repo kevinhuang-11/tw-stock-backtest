@@ -38,6 +38,9 @@ STATIC_PAGES = {
     "watchlist": "/watchlist",
     "reports": "/reports",
     "new-research": "/new/research",
+    "new-backtest": "/new/backtest",
+    "new-backtest-compare": "/new/backtest#compare",
+    "new-backtest-periods": "/new/backtest#periods",
 }
 
 
@@ -198,12 +201,16 @@ def main():
                     for name, path in pages.items():
                         response = page.goto(base + path)
                         page.wait_for_load_state("networkidle")
+                        # 錨點會讓頁面捲到中段；整頁截圖前回到頂端，固定的導覽列才不會出現在中間。
+                        page.evaluate("window.scrollTo(0, 0)")
                         page.screenshot(path=str(args.out / f"{name}-{size}.png"),
                                         full_page=True)
                         scroll_width = page.evaluate(
                             "document.documentElement.scrollWidth")
                         note = "  橫向溢出" if scroll_width > width else ""
-                        print(f"{size:8} {response.status} {name}{note}")
+                        # 只改變 # 的網址在同一頁內切換，不會有新的回應。
+                        status = response.status if response else "#"
+                        print(f"{size:8} {status} {name}{note}")
                 browser.close()
         finally:
             server.terminate()
