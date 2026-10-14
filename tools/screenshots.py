@@ -7,10 +7,13 @@
 
 用法：
 
-    .venv/bin/python tools/screenshots.py --out private/ui-after
+    .venv/bin/python tools/screenshots.py --out private/ui-after            # 離線合成示例
+    .venv/bin/python tools/screenshots.py --out private/ui-after --real     # 本機真實行情
 
-腳本會在暫存目錄建立離線合成示例、另外跑一次回測與策略比較，啟動工作台後逐頁截圖。
-全程不連網，也不讀寫專案的 data/ 與 reports/。
+預設在暫存目錄建立離線合成示例。加上 --real 時改用專案的 config.toml 與真實行情庫，
+只讀取行情；研究、回測、比較、自選快照與工作狀態都寫在暫存目錄，所以畫面上不會出現
+你原本的報表、自選清單或私人筆記，自選股只放 --stocks 指定的股票且筆記留白。
+兩種模式都只在本機計算，不連網，也不寫入專案的 data/ 與 reports/。
 """
 import argparse
 import hashlib
@@ -32,9 +35,9 @@ STATIC_PAGES = {
     "strategies": "/strategies",
     "strategy-edit": "/strategies?id=baseline",
     "stock-search": "/stocks",
-    "stock-search-query": "/stocks?q=示範",
-    "stock": "/stocks/9001",
-    "stock-supplemental": "/stocks/9001/supplemental",
+    "stock-search-query": "/stocks?q={query}",
+    "stock": "/stocks/{stock}",
+    "stock-supplemental": "/stocks/{stock}/supplemental",
     "watchlist": "/watchlist",
     "reports": "/reports",
     "new-research": "/new/research",
@@ -55,6 +58,9 @@ def run_cli(module, *args):
 
 def build_demo(root):
     """建立示例，並補上回測、策略比較與第二份研究，讓每種報表頁都有內容。"""
+    env = {"config": root / "config.toml", "reports": root / "reports",
+           "state": root / "workbench", "strategies": root / "strategies",
+           "stock": "9001", "query": "示範"}
     subprocess.run(
         [sys.executable, str(ROOT / "examples" / "prepare_demo.py"),
          "--output", str(root)],
@@ -79,6 +85,52 @@ def build_demo(root):
     run_cli("compare_strategies", *config, *period, "--strategies", baseline,
             str(strategies / "rsi_range.json"),
             "--output-dir", str(root / "reports"))
+    return env
+
+
+
+def build_real(root, config, stocks):
+    """真實行情：只讀行情庫，其餘產物都寫在 root。"""
+    from tw_stock_backtest.config import load_config
+    from tw_stock_backtest.data_status import price_summary
+    from tw_stock_backtest.stock_research import Watchlist
+    from tw_stock_backtest.strategies import StrategyLibrary
+    from tw_stock_backtest.watchlist_research import observations, save_snapshot
+    from tw_stock_backtest.workbench import Workbench
+
+    settings = load_config(config)
+    dates = price_summary(settings["storage"]["database_path"])[0]
+    if len(dates) < 45:
+        raise RuntimeError("行情庫的資料不足 45 個行情日，無法建立真實資料截圖")
+    env = {"config": Path(config).resolve(), "reports": root / "reports",
+           "state": root / "workbench", "strategies": ROOT / "strategies",
+           "stock": stocks[0], "query": stocks[0][:2]}
+    base = ["--config", str(env["config"]), "--stocks", *stocks]
+    baseline = str(env["strategies"] / "baseline.json")
+    for day in (dates[-6], dates[-1]):
+        run_cli("run_research", *base, "--skip-download", "--as-of", day,
+                "--strategy", baseline, "--output-dir", str(env["reports"]))
+    period = ["--start", dates[-40], "--end", dates[-1]]
+    run_cli("run_portfolio", *base, *period, "--strategy", baseline,
+            "--sizing", "fixed_budget", "--export", "--output-dir", str(env["reports"]))
+    for results in env["reports"].glob("*/results.json"):
+        run_cli("plot_report", "--report-dir", str(results.parent))
+    run_cli("compare_strategies", *base, *period, "--strategies", baseline,
+            str(env["strategies"] / "rsi_range.json"), "--output-dir", str(env["reports"]))
+
+    # 暫存的自選清單：只放指定股票，筆記留白。
+    notes = Watchlist(env["state"] / "private" / "watchlist.sqlite3")
+    for sid in stocks:
+        notes.save(sid, "", 0)
+    workbench = Workbench(env["config"], env["reports"], env["state"],
+                          strategy_root=env["strategies"])
+    try:
+        StrategyLibrary(env["strategies"]).load("baseline")
+        save_snapshot(observations(workbench, stocks, "baseline"),
+                      env["state"] / "watchlist-reports")
+    finally:
+        workbench.close()
+    return env
 
 
 def report_pages(root):
@@ -116,13 +168,17 @@ def free_port():
         return probe.getsockname()[1]
 
 
-def start_server(root, port, extra):
+def start_server(env, port, extra):
+    if not isinstance(env, dict):
+        # 相容舊的呼叫方式：直接傳入示例目錄。
+        env = {"config": env / "config.toml", "reports": env / "reports",
+               "state": env / "workbench", "strategies": env / "strategies"}
     command = [
         sys.executable, "-m", "tw_stock_backtest.cli.serve_workbench",
-        "--config", str(root / "config.toml"),
-        "--reports-dir", str(root / "reports"),
-        "--state-dir", str(root / "workbench"),
-        "--strategy-dir", str(root / "strategies"),
+        "--config", str(env["config"]),
+        "--reports-dir", str(env["reports"]),
+        "--state-dir", str(env["state"]),
+        "--strategy-dir", str(env["strategies"]),
         "--port", str(port), *extra,
     ]
     server = subprocess.Popen(command, stdout=subprocess.DEVNULL,
@@ -166,17 +222,23 @@ def main():
                         metavar="NAME=PATH", help="額外頁面，例如 components=/dev/components")
     parser.add_argument("--server-arg", action="append", default=[],
                         help="額外傳給 serve_workbench 的參數")
+    parser.add_argument("--real", action="store_true",
+                        help="改用本機真實行情（只讀）；其餘產物寫在暫存目錄")
+    parser.add_argument("--config", default=str(ROOT / "config.toml"),
+                        help="--real 時使用的設定檔")
+    parser.add_argument("--stocks", nargs="+", default=["2330", "2317", "2454"],
+                        help="--real 時的股票池與暫存自選股")
     args = parser.parse_args()
 
     from playwright.sync_api import sync_playwright
 
     args.out.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="workbench-shots-") as temporary:
-        root = Path(temporary) / "demo"
-        build_demo(root)
+        root = Path(temporary) / ("real" if args.real else "demo")
+        env = build_real(root, args.config, args.stocks) if args.real else build_demo(root)
         port = free_port()
         base = f"http://127.0.0.1:{port}"
-        server = start_server(root, port, args.server_arg)
+        server = start_server(env, port, args.server_arg)
         try:
             with sync_playwright() as playwright:
                 browser = playwright.chromium.launch()
@@ -184,7 +246,8 @@ def main():
                 page.set_viewport_size({"width": 1440, "height": 900})
                 job = submit_research_job(page, base)
 
-                pages = dict(STATIC_PAGES)
+                pages = {name: path.format(stock=env["stock"], query=env["query"])
+                         for name, path in STATIC_PAGES.items()}
                 pages.update(report_pages(root))
                 if job:
                     pages["job-summary"] = f"/jobs/{job}/summary"
