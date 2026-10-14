@@ -42,6 +42,7 @@ CI（`.github/workflows/ci.yml`）是 `pip install .` 後**從乾淨目錄**對�
 - **兩個 `strategies.py`**：`tw_stock_backtest/strategies.py` 是策略庫與條件評估；`analysis/strategies.py` 是早期的均線交叉訊號。同樣地，`backtesting/backtest.py` 是單檔引擎，`backtesting/portfolio.py` 是多股票引擎（`rules`／`factors` 兩種排名模式）。
 - **三個各自獨立的 SQLite**：行情庫 `stock_prices`（`data/database.py`，價格以字串保存 Decimal，缺價為 NULL）；行情庫旁的 `supplemental.sqlite3`（`data/supplemental.py`，營收與法人，依來源分開並保留修訂）；工作台私人筆記 `watchlist.sqlite3`（`stock_research.py`，不進任何匯出）。營收與法人只供研究展示，不送入排名或回測。
 - **合成示例名單會停用連網**：行情庫旁的 `listed_stocks.json` 範圍若是 `synthetic_example`（`data/universe.py`，由 `examples/prepare_demo.py` 產生），`ensure_network_allowed` 會讓所有下載與更新入口在發出請求前失敗，工作台按鈕也會停用。新增任何會連網的入口時要呼叫它；合成名單不可帶官方網址或上市欄位。
+- **工作台介面**：所有頁面 `extends 'base.html'`，共用 `static/app.css`（設計變數、元件）、`static/icons.svg` 與 `templates/_components.html` 的巨集；不用 CDN、不用前端框架。顯示用的數字與狀態格式化在 `web_format.py`，只改畫面、不改保存或匯出的數值；報表標題在 `web_views.py`，資料新鮮度在 `data_status.py`。台股慣例紅漲綠跌，狀態標籤不用綠色。互動行為 CI 無法測，改 JS 後跑 `tools/check_stock_picker.py`；截圖用 `tools/screenshots.py`（`--real` 只讀真實行情）。
 - **金額一律用 `Decimal`**：費稅、滑價與資金計算不使用 float；費率與捨入方式來自 `[costs]` 設定（`backtesting/costs.py` 的 `CostSettings`）。
 - **時間隔離**：訊號只用截至分析日的資料，成交在訊號之後的行情日；缺價不刪列、不補零。
 - **遞迴指標的已知問題**：RSI、MACD 要求從第一筆到分析日的收盤價全部有效。歷史中只要有一筆缺價（包含已確認的停牌日），該股票之後每一天的 RSI／MACD 條件都會回報無法評估。這是目前的行為，不是要維持的設計原則。

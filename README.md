@@ -1,22 +1,58 @@
-# TW Stock Research & Backtesting Workbench
+# 台股研究與回測工作台
 
-## Overview
+以官方公開資料做台股選股排名、歷史回測與自選股追蹤的本機工具。Python 抓取證交所行情與營收法人資料存進 SQLite，依策略產生候選排名、模擬多股票回測並與買進持有比較，所有結果都保存成不可覆寫的報表。重點是**不偷看未來資料、計入台股費稅、資料不足時直接說明**。
 
-以 Python 建立的台股資料研究與回測工作台，串接官方資料取得、SQLite 儲存、策略篩選與排名、歷史模擬及研究報告。
-使用者可從候選股進入個股研究、自選總覽，保存研究快照並比較相容的前次結果。
-工程重點是**可重複執行、能追查來源與設定、能說明資料不足的研究流程**。
-v1 版本提供單人本機操作；測試驗證軟體行為，不代表策略已證明能獲利。
+v1 版本供單人在本機使用；測試驗證的是軟體行為，不代表任何策略已證明能獲利。
 
-**Python 3.12 · Flask · SQLite · Decimal · Matplotlib · unittest · GitHub Actions**
+**Python 3.12 · Flask · SQLite · Decimal · Matplotlib · 原生 JavaScript · unittest · GitHub Actions**
 
 [操作導覽](docs/DEMO.md) · [操作與設計細節](docs/OPERATIONS.md)
 
-## Key Features
+## 一行試用（離線示範）
+
+```bash
+python3.12 -m venv .venv && .venv/bin/python -m pip install -e . && .venv/bin/python examples/prepare_demo.py --serve
+```
+
+開啟 **http://127.0.0.1:9000**。示範使用三檔合成股票，不需要網路、不讀取任何個人資料；示範環境中連網更新的按鈕會停用並說明原因。
+
+![總覽：資料狀態、最近的工作與報表](docs/images/overview.png)
+
+## 技術亮點
+
+- **不使用未來資料**：訊號以當日收盤計算、下一個行情日開盤成交；指標只看分析日以前的資料，有專門測試確認加入未來行情不會改變過去結果（[portfolio.py](src/tw_stock_backtest/backtesting/portfolio.py)、[test_factors.py](tests/test_factors.py)）。
+- **計入台股成本**：手續費 0.1425%（最低 20 元、可設折扣）、賣出證交稅 0.3%、單邊滑價，全程以 `Decimal` 計算並依規則捨去（[costs.py](src/tw_stock_backtest/backtesting/costs.py)）。
+- **資料品質優先於結果好看**：缺價不補零、不刪列湊窗口，未確認的缺漏不當成停牌；介面標示每檔資料截至哪天、落後幾個行情日（[data_status.py](src/tw_stock_backtest/data_status.py)）。
+- **可追查的報表**：每份研究與回測都固定保存當時的設定、股票池、輸入資料與策略 SHA-256，之後修改策略或更新資料都不會改變舊報表。
+- **離線示範與連網防護**：合成示範名單會讓所有下載入口在發出請求前拒絕執行，測試以攔截網路函式確認（[test_offline_demo.py](tests/test_offline_demo.py)）。
+- **不依賴前端框架與 CDN**：Flask＋Jinja＋原生 JS，自繪 SVG 圖示、系統字型；可鍵盤操作的股票選擇器；台股慣例紅漲綠跌，狀態標籤刻意不用綠色以免與下跌混淆。
+- **工程流程**：離線單元與整合測試、CI 以安裝後的套件從乾淨目錄執行測試；Playwright 只在開發依賴，用來截圖與檢查瀏覽器互動（[tools/](tools/)）。
+- **AI 協作的約束**：開發時與 AI 工具共用 [AGENTS.md](AGENTS.md) 與 [CLAUDE.md](CLAUDE.md) 的規則，例如不得使用分析日之後的資料、未經同意不檢視保留期間的績效、不自動下載全市場資料。
+
+## 畫面
+
+以下截圖使用本機真實行情（資料截至 2026-10-14，股票池為 2330、2317、2454），只展示功能，**不是投資建議或策略績效證明**。
+
+| 自選股 | 個股 |
+|---|---|
+| ![自選股：條件狀態、研究名次、營收與法人](docs/images/watchlist.png) | ![個股頁：資料截至日期、重點數字、K 線與指標](docs/images/stock.png) |
+
+| 研究排名 | 回測報表 |
+|---|---|
+| ![研究排名：候選股、總分與名次變化](docs/images/research-report.png) | ![回測報表：與買進持有並列的重點數字、資產與回撤](docs/images/backtest-report.png) |
+
+<details>
+<summary>手機寬度：建立研究</summary>
+
+<img src="docs/images/mobile-new-research.png" alt="手機寬度的建立研究頁：股票以可移除的標籤呈現" width="320">
+</details>
+
+## 功能一覽
 
 - **官方資料整合**：TWSE 行情、上市普通股名單、月營收與法人買賣超；來源分開保存，支援修訂追查。
 - **策略篩選與排名**：策略庫、RSI／MACD／突破等有限條件、多因子相對排名，保存有效設定與雜湊。
 - **回測與比較**：多股票、費稅與滑價、買進持有基準；多策略、多期間採相同設定獨立模擬。
-- **個股與自選研究**：價格／指標圖、策略條件、营收與法人覆蓋；私人筆記與研究產物分離。
+- **個股與自選研究**：價格／指標圖、策略條件、營收與法人覆蓋；私人筆記與研究產物分離。
 - **增量與背景更新**：月份規劃、有限重試、接續進度、背景佇列、取消與失敗診斷。
 - **不可覆寫的研究快照**：保存所用數值與來源，區分條件改變、資料更新及同期間修訂。
 - **共用報告內容**：HTML、純文字與郵件預覽共用摘要，CSV 不包含私人筆記。
@@ -60,10 +96,6 @@ Private notes SQLite: workbench only; excluded from report exports
 
 工作台與 CLI 呼叫共用核心，沒有另外實作一套交易模擬。
 
-## Example Workflow
-
-準備／更新官方資料 → 執行策略 → 檢視候選排名 → 加入自選 → 查看個股與補充資料 → 保存快照 → 比較相容前次 → 開啟 HTML／郵件預覽。
-
 ## Quick Start
 
 WSL2 Ubuntu 24.04／Python 3.12。在專案根目錄執行；已有 `.venv` 不需重建：
@@ -74,15 +106,15 @@ python3.12 -m venv .venv
 .venv/bin/python -m tw_stock_backtest.cli.serve_workbench --port 9000
 ```
 
-開啟 **http://127.0.0.1:9000**。只有本機 loopback 監聽；無資料時顯示空狀態，不自動下載。主要入口：`/watchlist`、`/stocks`、`/strategies`。
+開啟 **http://127.0.0.1:9000**。只有本機 loopback 監聽；無資料時首頁會說明從哪裡開始，不自動下載。上方導覽列可前往總覽、研究、回測、自選、個股、策略與報表。
 
 新環境可依 [DEMO](docs/DEMO.md) 建立**無網路、無私人資料的合成範例**；使用真實資料的準備方式見 [操作指南](docs/OPERATIONS.md#真實資料準備)。資料庫相對路徑以設定檔所在目錄為基準。
 
 ## Demo
 
-[操作導覽](docs/DEMO.md) 帶你用離線的合成資料走一遍：啟動 → 自選總覽 → 個股頁 → 保存與比較快照 → HTML 與郵件預覽。
+完整的離線示範步驟見 [操作導覽](docs/DEMO.md)：啟動 → 自選總覽 → 個股頁 → 保存與比較快照 → HTML 與郵件預覽。
 
-以下是既有歷史回測匯出的圖表，**不是工作台截圖，也不是合成範例的績效**。假設見圖注；只展示報表能力。
+下面是先前以真實歷史行情匯出的回測圖表，**不是合成範例的績效**；假設見圖注，只用來展示報表能力。
 
 ![既有回測報表：策略與買進持有基準的資產及回撤](docs/demo-assets/performance.png)
 
@@ -132,6 +164,7 @@ src/tw_stock_backtest/
   reporting.py         報表輸出
 strategies/            少量示例策略
 examples/              隔離的離線展示準備
+tools/                 開發用：截圖與瀏覽器互動檢查（需 dev 依賴）
 tests/                單元、整合與安全測試
 docs/                 展示、操作與作品說明
 ```
