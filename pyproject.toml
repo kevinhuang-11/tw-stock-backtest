@@ -12,6 +12,12 @@ dependencies = [
     "Flask>=3.1,<4",
 ]
 
+[project.optional-dependencies]
+# 只供本機開發：產生工作台截圖。正式安裝與 CI 測試都不需要。
+dev = [
+    "playwright>=1.49,<2",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["tw_stock_backtest*"]
