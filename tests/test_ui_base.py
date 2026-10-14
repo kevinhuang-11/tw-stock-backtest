@@ -92,6 +92,22 @@ class UiBaseTests(unittest.TestCase):
         self.assertNotIn("/dev/components", page.text)
         self.assertNotIn("元件展示</a>", page.text)
 
+    def test_components_render_formatted_values_and_status_labels(self):
+        text = create_app(self.workbench, dev=True).test_client().get(
+            "/dev/components").text
+
+        # 原始的長小數與內部代碼不直接出現在畫面上。
+        self.assertNotIn("66.66666666666666666666666667", text)
+        self.assertIn('<td class="num">66.67</td>', text)
+        self.assertIn('<span class="num up">+12.00%</span>', text)
+        self.assertIn('<span class="num down">−1.25%</span>', text)
+        self.assertIn('<span class="num flat">—</span>', text)
+        self.assertIn('<span class="badge badge-ok">通過</span>', text)
+        self.assertIn('<span class="badge badge-warn">無法評估</span>', text)
+        self.assertIn('<span class="badge badge-err">失敗</span>', text)
+        self.assertIn("2026-10-14 10:41", text)
+        self.assertIn('role="alert"', text)
+
 
 if __name__ == "__main__":
     unittest.main()

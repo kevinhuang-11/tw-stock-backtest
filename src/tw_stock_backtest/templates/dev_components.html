@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% import '_components.html' as ui %}
 {% block title %}元件展示 · 台股研究工作台{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -30,6 +31,119 @@
   </div>
   <p>數字一律等寬對齊：<span class="num up">+12.34%</span>　<span class="num down">−5.67%</span>　<span class="num flat">0.00%</span></p>
 </section>
-{% block components %}{% endblock %}
+
+<section class="stack-sm">
+  <h2>按鈕</h2>
+  <div class="cluster">
+    <button class="btn-primary">{{ ui.icon('plus') }}排入研究佇列</button>
+    <button>次要操作</button>
+    <button class="btn-ghost">文字按鈕</button>
+    <button class="btn-danger">{{ ui.icon('trash') }}移除</button>
+    <button disabled>已停用</button>
+    <button class="btn-primary is-loading" aria-busy="true">處理中</button>
+    <a class="btn btn-sm" href="#">{{ ui.icon('download') }}下載 CSV</a>
+  </div>
+</section>
+
+<section class="stack-sm">
+  <h2>狀態標籤</h2>
+  <div class="cluster">
+    {% for code in ['success','partial','failed','queued','running','cancelled','eligible','filtered','unavailable'] %}{{ ui.status(code) }}{% endfor %}
+    {{ ui.badge('上漲', 'up', 'arrow-up') }}{{ ui.badge('下跌', 'down', 'arrow-down') }}{{ ui.badge('離線示範', 'warn', 'offline') }}
+  </div>
+  <p class="muted small">成功用藍綠、警告用琥珀，刻意不使用綠色，避免和「下跌」混淆。</p>
+</section>
+
+<section class="stack-sm">
+  <h2>重點數字</h2>
+  <div class="stat-grid">
+    {{ ui.stat('策略報酬率', '0.1076' | pct, '基準 ' ~ ('0.1026' | pct)) }}
+    {{ ui.stat('最大回撤', '0.0928' | pct, '基準 ' ~ ('0.0702' | pct)) }}
+    {{ ui.stat('期末總資產', '1107563.4' | int, '較期初', '0.1076') }}
+    {{ ui.stat('今日收盤', '92.9' | num, '較前一日', '-0.0123') }}
+    {{ ui.stat('累計費稅', '3712' | int, '共 12 筆成交') }}
+    {{ ui.stat('年增率', none | pct, hint='缺少去年同月資料，無法計算') }}
+  </div>
+</section>
+
+<section class="stack-sm">
+  <h2>表單</h2>
+  <div class="card"><div class="card-body stack-sm">
+    <div class="form-grid">
+      <div class="field"><label for="d1">策略<span class="required-mark">*</span></label><select id="d1"><option>基準示例</option><option>RSI 區間示例</option></select><span class="hint">只包含選股邏輯，不含資金與費稅。</span></div>
+      <div class="field"><label for="d2">分析日期</label><input id="d2" type="date"><span class="hint">空白時採用各股最新行情日。</span></div>
+      <div class="field"><label for="d3">初始資金</label><input id="d3" type="text" value="1000000" inputmode="numeric"></div>
+      <div class="field"><label for="d4">滑價率</label><input id="d4" type="text" value="1.5" aria-invalid="true" aria-describedby="d4e"><span class="error" id="d4e">{{ ui.icon('error') }}需介於 0 與 1 之間</span></div>
+      <div class="field"><label for="d5">停用的欄位</label><input id="d5" type="text" value="離線示範不可修改" disabled></div>
+    </div>
+    <div class="cluster">
+      <label class="check"><input type="checkbox" checked>允許部分排名</label>
+      <label class="check"><input type="checkbox" disabled>連線增量更新</label>
+    </div>
+    <div class="field"><label for="d6">筆記</label><textarea id="d6" placeholder="最多 600 字，只保存在本機"></textarea></div>
+    <div class="form-actions"><button class="btn-primary">排入研究佇列</button><button>取消</button><span class="muted small">送出後可在總覽查看進度。</span></div>
+  </div></div>
+</section>
+
+<section class="stack-sm">
+  <h2>卡片與表格</h2>
+  <div class="card">
+    <div class="card-header"><div><h3>候選股排名</h3><p>分析日 2026-09-29 · 3 檔</p></div><a class="btn btn-sm" href="#">{{ ui.icon('download') }}CSV</a></div>
+    <div class="table-wrap"><table class="table table-sticky">
+      <thead><tr><th>股票</th><th>條件</th><th class="num">收盤</th><th class="num">總分</th><th class="num">動能</th><th class="num">月增率</th><th class="num">年增率</th></tr></thead>
+      <tbody>
+        <tr><td><a class="cell-main" href="#">9001 示範股 A（合成）</a><span class="cell-sub">示範產業甲</span></td><td>{{ ui.status('eligible') }}</td><td class="num">{{ '92.9' | num }}</td><td class="num">{{ '66.66666666666666666666666667' | num }}</td><td class="num">{{ ui.change('0.043820224719101') }}</td><td class="num">{{ ui.change('0.009009009009009') }}</td><td class="num">{{ ui.change('0.12') }}</td></tr>
+        <tr><td><a class="cell-main" href="#">9002 示範股 B（合成）</a><span class="cell-sub">示範產業乙</span></td><td>{{ ui.status('filtered') }}</td><td class="num">{{ '133.0' | num }}</td><td class="num">{{ '50.0' | num }}</td><td class="num">{{ ui.change('-0.0125') }}</td><td class="num">{{ ui.change('0.00763358778625954') }}</td><td class="num">{{ ui.change('0.1') }}</td></tr>
+        <tr><td><a class="cell-main" href="#">9003 示範股 C（合成）</a><span class="cell-sub">示範產業丙</span></td><td>{{ ui.status('unavailable') }}</td><td class="num">{{ '1173.1' | num }}</td><td class="num">{{ none | num }}</td><td class="num">{{ ui.change(none) }}</td><td class="num">{{ ui.change('0') }}</td><td class="num">{{ ui.change(none) }}</td></tr>
+      </tbody>
+    </table></div>
+    <div class="card-footer">分數是本次股票池內的相對排序，不是上漲機率。</div>
+  </div>
+</section>
+
+<section class="stack-sm">
+  <h2>分頁</h2>
+  <div data-tabs>
+    <div class="tabs" role="tablist" aria-label="示例分頁">
+      <button role="tab" id="t1" aria-controls="p1" aria-selected="true">走勢與指標</button>
+      <button role="tab" id="t2" aria-controls="p2" aria-selected="false">策略條件</button>
+      <button role="tab" id="t3" aria-controls="p3" aria-selected="false">營收與法人</button>
+    </div>
+    <div role="tabpanel" id="p1" aria-labelledby="t1"><p>第一個分頁的內容。目前分頁會記在網址的 # 之後。</p></div>
+    <div role="tabpanel" id="p2" aria-labelledby="t2" hidden><p>第二個分頁的內容。</p></div>
+    <div role="tabpanel" id="p3" aria-labelledby="t3" hidden><p>第三個分頁的內容。</p></div>
+  </div>
+</section>
+
+<section class="stack-sm">
+  <h2>提示訊息</h2>
+  {% call ui.alert('info', '只讀本機資料') %}未勾選更新時不會連網，所有股票使用同一個分析日期。{% endcall %}
+  {% call ui.alert('ok', '已排入佇列') %}研究工作已建立，完成後會出現在報表清單。{% endcall %}
+  {% call ui.alert('warn', '資料不足') %}法人 20 日累計只有 17 筆，不提供完整累計。{% endcall %}
+  {% call ui.alert('err', '無法建立工作') %}合成示例環境不提供連網更新。{% endcall %}
+</section>
+
+<section class="stack-sm">
+  <h2>空狀態與載入中</h2>
+  <div class="grid-2">
+    <div class="card">{{ ui.empty('還沒有任何報表', '建立第一個研究工作後，結果會出現在這裡。', '建立研究', '#', 'report') }}</div>
+    <div class="card"><div class="card-body stack-sm">
+      {{ ui.loading('正在讀取行情…') }}
+      <div class="skeleton" style="width:60%"></div><div class="skeleton"></div><div class="skeleton" style="width:80%"></div>
+    </div></div>
+  </div>
+</section>
+
+<section class="stack-sm">
+  <h2>起步步驟、收合區塊與名稱數值清單</h2>
+  <ol class="steps">
+    <li><h3>查看自選清單</h3><p>確認要研究的股票與目前的資料狀態。</p><a class="btn btn-sm" href="#">前往自選</a></li>
+    <li><h3>建立研究</h3><p>選擇策略與分析日期，產生候選排名。</p><a class="btn btn-sm" href="#">建立研究</a></li>
+    <li><h3>開啟報表</h3><p>查看排名、條件與資料限制。</p><a class="btn btn-sm" href="#">查看報表</a></li>
+  </ol>
+  <details class="disclosure"><summary>進階設定：資金、配置與滑價</summary><div class="disclosure-body">
+    <dl class="kv"><dt>初始資金</dt><dd class="num">{{ '1000000' | int }} 元</dd><dt>手續費率</dt><dd class="num">{{ '0.001425' | pct(4) }}</dd><dt>賣出交易稅</dt><dd class="num">{{ '0.003' | pct }}</dd><dt>建立時間</dt><dd class="num">{{ '2026-10-14T02:41:38.905766+00:00' | dt }}</dd></dl>
+  </div></details>
+</section>
 </div>
 {% endblock %}

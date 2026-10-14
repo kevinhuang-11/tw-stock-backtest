@@ -356,6 +356,9 @@ def create_app(workbench, dev=False):
     app.jinja_env.filters['score_text'] = score_text
     app.jinja_env.filters['percent_input'] = ratio_percent
     app.jinja_env.filters['pretty'] = lambda value: json.dumps(value, ensure_ascii=False, indent=2)
+    # 顯示用格式化（千分位、百分比、狀態中文）；不影響保存與匯出的數值。
+    from tw_stock_backtest.web_format import FILTERS
+    app.jinja_env.filters.update(FILTERS)
 
     @app.before_request
     def guard():

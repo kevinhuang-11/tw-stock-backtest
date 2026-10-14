@@ -1,0 +1,55 @@
+{# 共用元件巨集。用法：{% import '_components.html' as ui %}，再呼叫 ui.badge(...) 等。 #}
+
+{% macro icon(name, label=None) -%}
+<svg class="icon"{% if label %} role="img" aria-label="{{ label }}"{% else %} aria-hidden="true"{% endif %}><use href="/static/icons.svg#{{ name }}"/></svg>
+{%- endmacro %}
+
+{# 標籤：kind 為 ok／warn／err／info／neutral／up／down #}
+{% macro badge(text, kind='neutral', icon_name=None) -%}
+<span class="badge badge-{{ kind }}">{% if icon_name %}{{ icon(icon_name) }}{% endif %}{{ text }}</span>
+{%- endmacro %}
+
+{# 內部狀態代碼（success、eligible…）轉成中文標籤與對應樣式 #}
+{% macro status(code) -%}
+{{ badge(code | status_label, code | status_kind) }}
+{%- endmacro %}
+
+{# 漲跌數值：正數紅、負數綠；value 為比率時用 percent=True #}
+{% macro change(value, percent=True, digits=2) -%}
+<span class="num {{ value | trend }}">{{ (value | pct(digits, True)) if percent else (value | signed(digits)) }}</span>
+{%- endmacro %}
+
+{# 重點數字卡。trend_value 有值時顯示漲跌色的次要數字 #}
+{% macro stat(label, value, sub=None, trend_value=None, hint=None) -%}
+<div class="stat">
+  <div class="stat-label">{{ label }}</div>
+  <div class="stat-value num">{{ value }}</div>
+  {% if trend_value is not none %}<div class="stat-sub">{{ change(trend_value) }}{% if sub %} <span class="muted">{{ sub }}</span>{% endif %}</div>
+  {% elif sub %}<div class="stat-sub muted">{{ sub }}</div>{% endif %}
+  {% if hint %}<div class="stat-hint">{{ hint }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{# 空狀態：說明目前沒有內容，並給出下一步 #}
+{% macro empty(title, text=None, action_label=None, action_href=None, icon_name='empty') -%}
+<div class="empty">
+  <div class="empty-icon">{{ icon(icon_name) }}</div>
+  <h3>{{ title }}</h3>
+  {% if text %}<p>{{ text }}</p>{% endif %}
+  {% if action_label %}<a class="btn btn-primary" href="{{ action_href }}">{{ action_label }}</a>{% endif %}
+</div>
+{%- endmacro %}
+
+{# 提示訊息：kind 為 info／ok／warn／err。內容用 call 區塊傳入 #}
+{% macro alert(kind='info', title=None) -%}
+{% set icons = {'info': 'info', 'ok': 'check-circle', 'warn': 'warning', 'err': 'error'} %}
+<div class="alert alert-{{ kind }}" role="{{ 'alert' if kind == 'err' else 'status' }}">
+  {{ icon(icons[kind]) }}
+  <div>{% if title %}<strong>{{ title }}</strong>{% endif %}{{ caller() }}</div>
+</div>
+{%- endmacro %}
+
+{# 載入中 #}
+{% macro loading(text='載入中…') -%}
+<div class="loading" role="status"><span class="spinner" aria-hidden="true"></span>{{ text }}</div>
+{%- endmacro %}
