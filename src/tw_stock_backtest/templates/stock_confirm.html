@@ -1,1 +1,34 @@
-<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/stock.css"><title>回測設定確認</title><link rel="stylesheet" href="/static/forms.css"><script src="/static/forms.js" defer></script><a href="/stocks/{{ sid }}">返回個股</a><h1>{{ '單檔條件與交易模擬' if single else '組合排名回測' }}</h1><p>單檔相對評分沒有跨股票選股辨識力，不代表已驗證選股能力。下一行情日成交、成本與配置仍由既有引擎處理。</p><section><h2>即將使用的設定</h2><dl><dt>股票池</dt><dd>{{ form.stocks }}</dd><dt>期間</dt><dd>{{ form.start }} ～ {{ form.end }}</dd><dt>策略</dt><dd>{{ strategy.definition.name }}</dd><dt>初始資金</dt><dd>{{ execution.initial_cash }} 元</dd><dt>股數／持股上限</dt><dd>{{ execution.quantity }} 股／{{ execution.max_positions }} 檔</dd><dt>配置</dt><dd>{{ '固定股數' if execution.sizing_mode=='fixed_quantity' else '固定預算' }}</dd><dt>單邊滑價</dt><dd>{{ execution.slippage_rate|percent_input }}%</dd><dt>佣金率／交易稅率</dt><dd>{{ costs.commission_rate|percent_input }}%／{{ costs.sell_tax_rate|percent_input }}%</dd><dt>最低佣金／折扣倍率</dt><dd>{{ costs.minimum_commission }} 元／{{ costs.commission_discount }} 倍</dd></dl><details><summary>進階：設定預覽</summary><pre>{{ form|pretty }}</pre><pre>{{ strategy|pretty }}</pre><pre>{{ execution|pretty }}</pre><pre>{{ costs|pretty }}</pre></details><form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="confirm" value="yes"><input type="hidden" name="strategy_hash" value="{{ strategy.sha256 }}">{% for key,value in form.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}<button>確認並排入既有回測佇列</button></form></section></html>
+{% extends 'base.html' %}
+{% import '_components.html' as ui %}
+{% block title %}回測設定確認 · 台股研究工作台{% endblock %}
+{% block scripts %}<script src="/static/forms.js" defer></script>{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="eyebrow"><a href="/stocks/{{ sid }}">{{ sid }}</a>{{ ui.icon('chevron-right') }}回測設定確認</div>
+    <h1>{{ '單檔條件與交易模擬' if single else '組合排名回測' }}</h1>
+    <p>確認下列設定後才會排入佇列。成交在訊號後的下一個行情日開盤，成本與配置由既有引擎處理。</p>
+  </div>
+</div>
+<div class="stack">
+{% if single %}{% call ui.alert('warn', '單檔回測的限制') %}單檔相對評分沒有跨股票選股辨識力，不代表已驗證選股能力。{% endcall %}{% endif %}
+<section class="card">
+  <div class="card-header"><h2>即將使用的設定</h2></div>
+  <div class="card-body stack">
+    <dl class="kv">
+      <dt>股票池</dt><dd>{{ form.stocks }}</dd>
+      <dt>期間</dt><dd>{{ form.start }} ～ {{ form.end }}</dd>
+      <dt>策略</dt><dd>{{ strategy.definition.name }} <span class="subtle">（{{ strategy.sha256[:12] }}…）</span></dd>
+      <dt>初始資金</dt><dd class="num">{{ execution.initial_cash | int }} 元</dd>
+      <dt>股數／持股上限</dt><dd>{{ execution.quantity }} 股／{{ execution.max_positions }} 檔</dd>
+      <dt>配置</dt><dd>{{ '固定股數' if execution.sizing_mode=='fixed_quantity' else '固定預算' }}</dd>
+      <dt>單邊滑價</dt><dd>{{ execution.slippage_rate|percent_input }}%</dd>
+      <dt>佣金率／交易稅率</dt><dd>{{ costs.commission_rate|percent_input }}%／{{ costs.sell_tax_rate|percent_input }}%</dd>
+      <dt>最低佣金／折扣倍率</dt><dd>{{ costs.minimum_commission }} 元／{{ costs.commission_discount }} 倍</dd>
+    </dl>
+    <details class="disclosure"><summary>進階：設定預覽</summary><div class="disclosure-body"><pre>{{ form|pretty }}</pre><pre>{{ strategy|pretty }}</pre><pre>{{ execution|pretty }}</pre><pre>{{ costs|pretty }}</pre></div></details>
+    <form method="post" class="form-actions"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="confirm" value="yes"><input type="hidden" name="strategy_hash" value="{{ strategy.sha256 }}">{% for key,value in form.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}<button class="btn-primary">{{ ui.icon('check') }}確認並排入既有回測佇列</button><a class="btn btn-ghost" href="/stocks/{{ sid }}#backtest-panel">返回修改</a></form>
+  </div>
+</section>
+</div>
+{% endblock %}

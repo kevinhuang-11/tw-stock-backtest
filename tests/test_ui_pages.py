@@ -394,6 +394,38 @@ class WatchlistPageTests(PageCase):
         self.assertIn('id="watch-query"', text)
 
 
+class StockPageTests(PageCase):
+    TABS = ("chart-panel", "conditions-panel", "supplemental-research", "history-panel",
+            "backtest-panel", "note-panel")
+
+    def test_page_and_fragment_share_the_tabbed_panel(self):
+        page = self.client.get("/stocks/2330").text
+        fragment = self.client.get("/stocks/2330?fragment=1").text
+        self.assertNotIn("<html", fragment)
+        for text in (page, fragment):
+            self.assertIn("data-tabs", text)
+            for panel in self.TABS:
+                self.assertIn(f'role="tabpanel" id="{panel}"', text)
+            # 原有的區塊標題保留給螢幕閱讀器與既有檢查。
+            for title in ("價格、成交量與指標", "策略條件與指標原始值", "研究與排名歷史",
+                          "使用既有引擎回測", "私人自選與筆記", "目前取得的月營收與法人資料"):
+                self.assertIn(title, text)
+        self.assertIn('href="/new/research?stocks=2330"', page)
+        self.assert_navigation_works(page)
+
+    def test_forms_keep_their_actions_and_fields(self):
+        text = self.client.get("/stocks/2330").text
+        backtest = text[text.index('action="/stocks/2330/backtest"'):].split("</form>")[0]
+        for name in ("csrf", "stocks", "strategy_id", "start", "end", "cash", "quantity",
+                     "max_positions", "sizing", "slippage_percent"):
+            self.assertIn(f'name="{name}"', backtest)
+        note = text[text.index('action="/watchlist/2330"'):].split("</form>")[0]
+        for name in ("csrf", "revision", "note", "action"):
+            self.assertIn(f'name="{name}"', note)
+        self.assertIn('id="query-form"', text)
+        self.assertIn('action="/supplemental/update"', text)
+
+
 class ReportDescriptionTests(unittest.TestCase):
     def describe(self, details, name="20260929T010000_000000Z_aaaaaaaa"):
         with TemporaryDirectory() as directory:

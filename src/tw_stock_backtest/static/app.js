@@ -3,7 +3,11 @@
 
 // 分頁：<div data-tabs> 內含 role=tablist 的按鈕與 role=tabpanel 的區塊。
 // 目前分頁記在網址的 #，重新整理或分享連結時會回到同一個分頁。
-for (const root of document.querySelectorAll('[data-tabs]')) {
+// 重新載入的區塊（例如個股頁的查詢結果）可呼叫 WorkbenchApp.enhance 重新啟用分頁。
+function enhanceTabs(scope) {
+for (const root of scope.querySelectorAll('[data-tabs]')) {
+  if (root.dataset.ready) continue;
+  root.dataset.ready = '1';
   const tabs = [...root.querySelectorAll('[role=tab]')];
   const select = (tab, focus) => {
     for (const item of tabs) {
@@ -31,6 +35,9 @@ for (const root of document.querySelectorAll('[data-tabs]')) {
   select(fromHash() || tabs.find(tab => tab.getAttribute('aria-selected') === 'true') || tabs[0], false);
   window.addEventListener('hashchange', () => { const tab = fromHash(); if (tab) select(tab, false); });
 }
+}
+enhanceTabs(document);
+window.WorkbenchApp = {enhance: enhanceTabs};
 
 // 一般表單送出後，按鈕顯示處理中並避免重複送出。
 // 由其他腳本以 fetch 送出的表單不加 data-loading，維持各自的處理方式。

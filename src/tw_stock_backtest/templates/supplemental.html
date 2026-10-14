@@ -1,2 +1,14 @@
-<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ supp.sid }} 營收與法人研究</title><link rel="stylesheet" href="/static/stock.css"><link rel="stylesheet" href="/static/forms.css"><script src="/static/forms.js" defer></script><script src="/static/supplemental.js" defer></script><nav><a href="/stocks/{{ supp.sid }}">個股研究</a><a href="/">工作進度</a><a href="/watchlist">自選清單</a></nav>
-<h1>{{ supp.sid }} 營收與法人研究</h1>{% include "supplemental_panel.html" %}</html>
+{% extends 'base.html' %}
+{% import '_components.html' as ui %}
+{% block title %}{{ supp.sid }} 營收與法人 · 台股研究工作台{% endblock %}
+{% block scripts %}<script src="/static/forms.js" defer></script><script src="/static/supplemental.js" defer></script>{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="eyebrow"><a href="/stocks/{{ supp.sid }}">{{ supp.sid }}</a>{{ ui.icon('chevron-right') }}營收與法人</div>
+    <h1>{{ supp.sid }} 營收與法人研究</h1>
+  </div>
+  <div class="page-actions"><a class="btn" href="/stocks/{{ supp.sid }}">{{ ui.icon('stock') }}回到個股頁</a></div>
+</div>
+{% include "supplemental_panel.html" %}
+{% endblock %}

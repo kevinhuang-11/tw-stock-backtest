@@ -1,1 +1,9 @@
-<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>個股研究工作台</title><link rel="stylesheet" href="/static/stock.css"><link rel="stylesheet" href="/static/forms.css"><link rel="stylesheet" href="/static/stock-picker.css"><script src="/static/stock-picker.js" defer></script><script src="/static/forms.js" defer></script><script src="/static/supplemental.js" defer></script><script src="/static/stock.js" defer></script><nav><a href="/">研究工作台</a><a href="/stocks">個股搜尋</a><a href="/watchlist">自選與筆記</a></nav><p id="loading" role="status"></p><main id="stock-panel">{% include 'stock_panel.html' %}</main></html>
+{% extends 'base.html' %}
+{% import '_form_assets.html' as assets %}
+{% block title %}{{ stock.stock_id }} {{ stock.metadata.get('name') or '' }} · 台股研究工作台{% endblock %}
+{% block head %}{{ assets.styles() }}{% endblock %}
+{% block scripts %}{{ assets.scripts() }}<script src="/static/supplemental.js" defer></script><script src="/static/stock.js" defer></script>{% endblock %}
+{% block content %}
+<p id="loading" class="loading-line" role="status"></p>
+<div id="stock-panel">{% include 'stock_panel.html' %}</div>
+{% endblock %}
