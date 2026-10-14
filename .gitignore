@@ -12,3 +12,28 @@ dist/
 /docs/REHEARSAL.md
 /docs/demo-assets/ranking.txt
 /docs/demo-assets/factors.txt
+
+# 私人自選與筆記（即使自訂工作台目錄）
+watchlist.sqlite3*
+
+# Local databases and outputs, including custom workbench locations
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.eml
+*.preview/
+*.incomplete/
+*.log
+watchlist-reports/
+private/
+/local/
+/tmp/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.DS_Store
