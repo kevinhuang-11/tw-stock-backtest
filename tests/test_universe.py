@@ -7,7 +7,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from tw_stock_backtest.data.universe import (
+    TWSE_UNIVERSE_URL,
     load_universe,
+    save_synthetic_universe,
     save_universe,
 )
 
@@ -190,6 +192,105 @@ class TestListedStocks(unittest.TestCase):
         with TemporaryDirectory() as directory:
             path = Path(directory) / "listed_stocks.json"
             path.write_text("{broken", encoding="utf-8")
+
+            with self.assertRaises(ValueError):
+                load_universe(path)
+
+    def test_synthetic_universe_round_trip(self):
+        stocks = [
+            {
+                "stock_id": "9001",
+                "name": "示範股 A（合成）",
+                "industry": "示範產業甲",
+                "market": "合成示例",
+            }
+        ]
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "listed_stocks.json"
+
+            saved = save_synthetic_universe(
+                stocks,
+                path,
+                source_url="synthetic://offline-example",
+            )
+            loaded = load_universe(path)
+
+            self.assertEqual(loaded, saved)
+            self.assertEqual(loaded["scope"], "synthetic_example")
+            self.assertEqual(
+                loaded["source_url"],
+                "synthetic://offline-example",
+            )
+            self.assertEqual(loaded["stocks"], stocks)
+
+    def test_synthetic_universe_cannot_claim_official_origin(self):
+        stock = {
+            "stock_id": "9001",
+            "name": "示範股 A（合成）",
+            "industry": "示範產業甲",
+            "market": "合成示例",
+        }
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "listed_stocks.json"
+
+            # 合成名單不可使用官方網址，也不可帶上市欄位。
+            invalid_saves = [
+                ([stock], "https://isin.twse.com.tw/isin/C_public.jsp"),
+                ([stock], "synthetic://"),
+                ([{**stock, "market": "上市"}], "synthetic://x"),
+                ([{**stock, "cfi_code": "ESVUFR"}], "synthetic://x"),
+                ([{**stock, "listed_date": "2026-07-01"}], "synthetic://x"),
+            ]
+
+            for stocks, source_url in invalid_saves:
+                with self.subTest(source_url=source_url, stocks=stocks):
+                    with self.assertRaises(ValueError):
+                        save_synthetic_universe(
+                            stocks,
+                            path,
+                            source_url=source_url,
+                        )
+
+            self.assertFalse(path.exists())
+
+            # 範圍與來源互相掉換的檔案在讀取時被拒絕。
+            snapshot = save_synthetic_universe(
+                [stock],
+                path,
+                source_url="synthetic://offline-example",
+            )
+
+            for changes in (
+                {"source_url": TWSE_UNIVERSE_URL},
+                {"scope": "current_twse_common_stocks"},
+                {"scope": "unknown"},
+            ):
+                with self.subTest(changes=changes):
+                    path.write_text(
+                        json.dumps(
+                            {**snapshot, **changes},
+                            ensure_ascii=False,
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    with self.assertRaises(ValueError):
+                        load_universe(path)
+
+    def test_official_universe_cannot_use_synthetic_source(self):
+        stocks = self.parse([self.row])
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "listed_stocks.json"
+            snapshot = save_universe(stocks, path)
+            snapshot["source_url"] = "synthetic://offline-example"
+
+            path.write_text(
+                json.dumps(snapshot, ensure_ascii=False),
+                encoding="utf-8",
+            )
 
             with self.assertRaises(ValueError):
                 load_universe(path)

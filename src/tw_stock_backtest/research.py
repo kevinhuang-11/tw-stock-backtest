@@ -14,6 +14,7 @@ from tw_stock_backtest.cli.screen_factors import collect_factor_rows
 from tw_stock_backtest.analysis.factors import rank_factor_candidates
 from tw_stock_backtest.data.database import load_records, save_records
 from tw_stock_backtest.data.stock_data import normalize_row
+from tw_stock_backtest.data.universe import ensure_network_allowed
 from tw_stock_backtest.date_range import month_starts, filter_records
 from tw_stock_backtest.reporting import _json_default
 
@@ -116,6 +117,8 @@ def load_research_progress(path, job):
 def update_stocks(stocks, settings, end, *, start=None, initial_days=90,
                   on_progress=None, plans=None, previous_results=()):
     db = settings["storage"]["database_path"]
+    # 最底層再檢查一次，避免新的呼叫入口漏掉合成示例的限制。
+    ensure_network_allowed(db)
     plans = plans if plans is not None else build_update_plans(
         stocks, settings, end, start=start, initial_days=initial_days)
     previous = {r["stock_id"]: r for r in previous_results}

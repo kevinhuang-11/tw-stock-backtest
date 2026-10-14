@@ -7,6 +7,7 @@ from datetime import date
 from pathlib import Path
 from flask import request, render_template, redirect
 from tw_stock_backtest.data.supplemental import Store, cumulative, GROUPS
+from tw_stock_backtest.data.universe import NetworkDisabled
 
 
 def panel_context(wb, sid, cutoff, month_start=None, month_end=None):
@@ -98,5 +99,7 @@ def register(app, wb, csrf):
                            'revenue_end':request.form.get('revenue_end',''),
                            'revenue_source':request.form.get('revenue_source','latest')})
             return redirect('/#job-'+job,303)
+        except NetworkDisabled as error:
+            return {'errors':{'_form':str(error)+'；未建立工作。'}},400
         except (ValueError,OSError):
             return {'errors':{'_form':'更新未建立：請檢查股票、日期；自選需 1～10 檔，日期範圍不超過 90 日'}},400

@@ -23,6 +23,7 @@ from tw_stock_backtest.notifications import preview_message
 from tw_stock_backtest.strategy_comparison import validate_periods
 from tw_stock_backtest.research import program_version
 from tw_stock_backtest.research_digest import load_digest, render_digest, load_bundle, differences, score_text
+from tw_stock_backtest.data.universe import NetworkDisabled, ensure_network_allowed, offline_reason
 
 
 def now():
@@ -174,6 +175,8 @@ class Workbench:
                 args += ['--as-of', date.fromisoformat(as_of).isoformat()]
             if form.get('download') != 'yes':
                 args += ['--skip-download']
+            else:
+                ensure_network_allowed(self.settings['storage']['database_path'])
             if form.get('partial') == 'yes':
                 args += ['--allow-partial']
             args += ['--initial-days', '90']
@@ -359,6 +362,11 @@ def create_app(workbench):
         if request.method == 'POST' and not secrets.compare_digest(request.form.get('csrf', ''), token):
             abort(403)
 
+    @app.context_processor
+    def offline():
+        # 合成示例環境：模板據此停用會連網的按鈕並顯示原因。
+        return {'offline_reason': offline_reason(workbench.settings['storage']['database_path'])}
+
     @app.after_request
     def headers(response):
         response.headers['Cache-Control'] = 'no-store'
@@ -423,6 +431,8 @@ def create_app(workbench):
             workbench.submit(job_form(request.form))
         except FormErrors as error:
             return {'errors':error.errors},400
+        except NetworkDisabled as error:
+            return {'errors':{'_form':str(error)+'；未建立工作。'}},400
         except (ValueError, OSError) as error:
             return {'errors':{'_form':'工作參數或檔案無法使用；未執行。請核對日期與策略。'}},400
         return redirect(url_for('index'))

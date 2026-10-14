@@ -8,6 +8,7 @@ from tw_stock_backtest.research import update_stocks, taipei_today
 from tw_stock_backtest.cli.update_supplemental import update
 from tw_stock_backtest.cli.download_universe import save_progress
 from tw_stock_backtest.data.supplemental import timestamp, listed_scope, institution_plan, Store, validate_month_range
+from tw_stock_backtest.data.universe import NetworkDisabled
 
 
 def run(settings, stocks, output, *, kind='all', end=None, start=None,
@@ -64,8 +65,11 @@ def main(argv=None):
     p.add_argument('--revenue-source',choices=['history','latest'],default='history')
     p.add_argument('--revenue-start');p.add_argument('--revenue-end')
     args=p.parse_args(argv);settings=load_config(args.config)
-    result,path=run(settings,args.stocks or settings['universe']['stocks'],args.output_dir,kind=args.kind,
-        end=args.end,start=args.start,revenue_source=args.revenue_source,revenue_start=args.revenue_start,revenue_end=args.revenue_end)
+    try:
+        result,path=run(settings,args.stocks or settings['universe']['stocks'],args.output_dir,kind=args.kind,
+            end=args.end,start=args.start,revenue_source=args.revenue_source,revenue_start=args.revenue_start,revenue_end=args.revenue_end)
+    except NetworkDisabled as error:
+        print('更新無法開始：'+str(error));return 1
     print('更新摘要：',path,'；狀態：',result['status'])
     return result['exit_code']
 

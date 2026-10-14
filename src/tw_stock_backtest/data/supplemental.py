@@ -22,7 +22,9 @@ GROUPS = {'foreign': '外陸資（不含外資自營商）', 'foreign_dealer': '
 
 
 def listed_scope(settings, stocks):
-    from tw_stock_backtest.data.universe import load_universe
+    from tw_stock_backtest.data.universe import load_universe, ensure_network_allowed
+    # 更新流程都先經過這裡；合成示例名單在發出任何請求前就拒絕。
+    ensure_network_allowed(settings['storage']['database_path'])
     path = Path(settings['storage']['database_path']).with_name('listed_stocks.json')
     if not path.is_file():
         raise ValueError('缺少上市普通股名單；請先用 update_universe 建立 listed_stocks.json，不下載全市場行情')

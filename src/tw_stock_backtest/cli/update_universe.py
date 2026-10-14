@@ -4,8 +4,10 @@ from urllib.error import URLError
 
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH
 from tw_stock_backtest.data.universe import (
+    NetworkDisabled,
     fetch_listed_stocks,
     save_universe,
+    synthetic_file_reason,
 )
 
 
@@ -34,6 +36,13 @@ def main():
     output_path = args.output.resolve()
 
     try:
+        # 不連網，也不以官方名單覆寫合成示例名單。
+        if synthetic_file_reason(output_path) is not None:
+            raise NetworkDisabled(
+                "目標檔案是合成示例名單；不連網也不覆寫，"
+                "請改用其他 --output"
+            )
+
         stocks = fetch_listed_stocks()
         snapshot = save_universe(stocks, output_path)
 

@@ -6,7 +6,7 @@ from pathlib import Path
 import sqlite3
 
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config, apply_overrides
-from tw_stock_backtest.data.universe import load_universe
+from tw_stock_backtest.data.universe import load_universe, is_synthetic, ensure_network_allowed, NetworkDisabled
 from tw_stock_backtest.reporting import ResearchReport
 from tw_stock_backtest.research import (
     taipei_today, program_version, update_stocks, evaluate_research,
@@ -75,6 +75,11 @@ def main(argv=None):
             if args.top is not None:
                 strategy['factors']['top_n'] = strategy['screening']['top_n'] = args.top
         snapshot = load_universe(args.universe) if args.universe else None
+        if not args.skip_download:
+            # 合成示例（行情庫旁或指定的名單）不連網；在建立報表目錄前就停止。
+            if snapshot and is_synthetic(snapshot):
+                raise NetworkDisabled('指定的名單是合成示例，不提供連網更新；請加 --skip-download')
+            ensure_network_allowed(settings["storage"]["database_path"])
         stocks = sorted(snapshot["stocks"], key=lambda s: s["stock_id"]) if snapshot else [
             {"stock_id": sid, "name": "", "industry": ""} for sid in settings["universe"]["stocks"]]
         stocks = [{k: s[k] for k in ("stock_id", "name", "industry", "listed_date") if k in s}
@@ -105,7 +110,7 @@ def main(argv=None):
         })
         # 名單採白名單欄位，避免將來源檔的任意額外欄位寫入 artifacts。
         report.write_json("universe.json", {
-            "source": "universe_file" if snapshot else "stocks" if args.stocks else "config",
+            "source": (snapshot["source_url"] if is_synthetic(snapshot) else "universe_file") if snapshot else "stocks" if args.stocks else "config",
             "downloaded_at": snapshot["downloaded_at"] if snapshot else None,
             "stocks": [{k: s[k] for k in ("stock_id", "name", "industry", "listed_date") if k in s}
                        for s in stocks],
@@ -145,6 +150,9 @@ def main(argv=None):
             print(f"{row['rank']}. {row['stock_id']} {row['score']:.2f}")
         print(f"報表：{output}")
         return result["exit_code"]
+    except NetworkDisabled as error:
+        print(f"研究流程未開始：{error}")
+        return 1
     except (ValueError, OSError, sqlite3.Error, TypeError, KeyError) as error:
         # 不輸出任意設定內容或來源回應；進度留在 incomplete 目錄供診斷。
         print(f"研究流程失敗 ({type(error).__name__})")

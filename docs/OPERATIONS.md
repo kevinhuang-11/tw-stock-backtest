@@ -36,6 +36,18 @@ done
 
 下載普通股名單不是下載全市場行情。逐檔確認資料範圍；來源無法取得時保留失敗，不補造數值。固定歷史示例的資料可用性仍取決於官方來源。
 
+### 合成示例名單
+
+行情庫旁的 `listed_stocks.json` 有兩種範圍：`current_twse_common_stocks`（由 `update_universe` 下載的官方名單）與 `synthetic_example`（離線示例用的合成名單）。合成名單的來源網址以 `synthetic://` 開頭，每檔只有代號、名稱與產業，不含上市日與 CFI 代碼；範圍與來源不一致的檔案會被拒絕讀取。
+
+名單是合成示例時，所有會連網的操作都停用：
+
+- 工作台的「更新自選股資料」「建立更新工作」與研究工作的連線更新，按鈕停用並顯示原因；直接送出請求也會被後端拒絕。
+- CLI 的 `update_supplemental`、`update_watchlist`、`fetch_stock`、`download_universe`，以及未加 `--skip-download` 的 `run_research`，會印出原因並以退出碼 1 結束，不發出任何請求。
+- `update_universe` 不會以官方名單覆寫合成名單，需要另外指定 `--output`。
+
+只讀本機資料的操作不受影響，例如 `run_research --skip-download`、回測、篩選與保存快照。
+
 ## 研究排名與更新
 
 ```bash

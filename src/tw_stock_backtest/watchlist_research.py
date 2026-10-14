@@ -13,6 +13,7 @@ from uuid import uuid4
 from tw_stock_backtest.cli.download_universe import save_progress
 from tw_stock_backtest.data.database import load_records
 from tw_stock_backtest.data.supplemental import timestamp
+from tw_stock_backtest.data.universe import NetworkDisabled
 from tw_stock_backtest.research import program_version
 from tw_stock_backtest.research_digest import render_digest, load_digest
 from tw_stock_backtest.security import public_data
@@ -240,5 +241,7 @@ def register(app, wb, notes, token):
                   'revenue_end':request.form.get('revenue_end','')}
             job=wb.submit(form)
             return {'job_id':job,'summary_url':'/jobs/'+job+'/summary'},202
+        except NetworkDisabled as error:
+            return {'errors':{'_form':str(error)+'；未建立工作。'}},400
         except (ValueError,OSError):
             return {'errors':{'_form':'更新未建立：需 1～10 檔自選股、有效日期（最多 90 日）與種類。'}},400

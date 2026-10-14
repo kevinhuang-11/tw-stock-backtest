@@ -14,6 +14,7 @@ from tw_stock_backtest.date_range import (
     parse_date_range,
 )
 from tw_stock_backtest.data.stock_data import normalize_row
+from tw_stock_backtest.data.universe import ensure_network_allowed
 
 
 class NoMarketData(ValueError):
@@ -166,6 +167,9 @@ def main():
             "request_interval_seconds"
         ]
         db_path = settings["storage"]["database_path"]
+
+        # 合成示例環境不下載；在第一個請求之前就停止。
+        ensure_network_allowed(db_path)
 
         all_records = []
 

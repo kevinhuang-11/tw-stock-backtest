@@ -9,7 +9,12 @@ import os
 from tempfile import NamedTemporaryFile
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config
 from tw_stock_backtest.date_range import parse_date_range
-from tw_stock_backtest.data.universe import load_universe
+from tw_stock_backtest.data.universe import (
+    NetworkDisabled,
+    ensure_network_allowed,
+    is_synthetic,
+    load_universe,
+)
 from tw_stock_backtest.cli.update_universe import DEFAULT_UNIVERSE_PATH
 
 
@@ -283,6 +288,14 @@ def main():
         start, end = parse_date_range(args.start, args.end)
         settings = load_config(args.config)
         snapshot = load_universe(args.universe)
+
+        # 合成示例名單沒有可下載的官方行情。
+        if is_synthetic(snapshot):
+            raise NetworkDisabled(
+                "指定的名單是合成示例，不提供連網下載"
+            )
+
+        ensure_network_allowed(settings["storage"]["database_path"])
 
         all_stocks = sorted(
             snapshot["stocks"],
