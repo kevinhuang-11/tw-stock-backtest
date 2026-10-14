@@ -65,7 +65,7 @@ class CredentialBoundaries(unittest.TestCase):
                 # No job list needed here; render controlled blank index for the token.
                 (directory / 'job.json').write_text(json.dumps({'run_id': job_id, 'kind': 'research',
                     'status': 'failed', 'notification': 'none'}))
-                token = re.search(r'name="csrf" value="([^"]+)"', client.get('/').text)[1]
+                token = re.search(r'name="csrf" value="([^"]+)"', client.get('/new/research').text)[1]
                 with patch.object(wb, 'submit', side_effect=OSError(SENTINEL)):
                     response = client.post('/jobs', data={'csrf': token})
                 self.assertEqual(response.status_code, 400)

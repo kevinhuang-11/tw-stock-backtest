@@ -26,7 +26,7 @@ class StockResearchTests(unittest.TestCase):
         self.strategy=from_settings(self.wb.settings);self.wb.library.save(self.strategy)
         self.rows=records(count=90);save_records(self.rows,db_path=self.wb.settings['storage']['database_path'])
         self.app=create_app(self.wb);self.app.testing=True;self.client=self.app.test_client()
-        self.token=re.search('name="csrf" value="([^"]+)"',self.client.get('/').text)[1]
+        self.token=re.search('name="csrf" value="([^"]+)"',self.client.get('/new/research').text)[1]
 
     def test_stock_query_cutoff_partial_and_empty(self):
         result=current_stock(self.wb,'2330',{'as_of':'2026-09-29','display':'60'})

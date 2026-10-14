@@ -229,6 +229,52 @@ class NewBacktestPageTests(PageCase):
         self.assertIn("策略庫至少要有兩份策略才能比較", text)
 
 
+class HomePageTests(PageCase):
+    def test_first_visit_shows_where_to_start(self):
+        page = self.client.get("/")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("從這裡開始", page.text)
+        for href in ("/watchlist", "/new/research", "/reports"):
+            self.assertIn(f'href="{href}"', page.text)
+        self.assertIn("還沒有工作", page.text)
+        self.assertIn("還沒有任何報表", page.text)
+        # 表單都移到各自的頁面，首頁不再是四張長表單。
+        self.assertNotIn('action="/jobs"', page.text)
+        self.assert_navigation_works(page.text)
+
+    def test_recent_reports_and_jobs_replace_the_getting_started_steps(self):
+        from unittest.mock import Mock
+        self.add_research()
+        self.add_backtest()
+        self.workbench.runner = Mock(return_value=Mock(returncode=0))
+        token = re.search('name="csrf" value="([^"]+)"', self.client.get("/new/research").text)[1]
+        self.client.post("/jobs", data={"csrf": token, "kind": "research", "stocks": "2330"})
+        self.workbench.pool.shutdown(wait=True)
+
+        text = self.client.get("/").text
+        self.assertNotIn("從這裡開始", text)
+        self.assertIn("研究排名 · 基準示例", text)
+        self.assertIn('<span class="num up">+10.76%</span>', text)
+        self.assertIn("最近研究的分析日", text)
+        self.assertIn(">2026-09-29<", text)
+        # 工作以中文類型與狀態標籤顯示，保留摘要、紀錄連結。
+        self.assertIn("<strong>研究排名</strong>", text)
+        job = self.workbench.jobs()[0]
+        self.assertIn(f'href="/jobs/{job["run_id"]}/summary"', text)
+        self.assertIn(f'href="/jobs/{job["run_id"]}/output.log"', text)
+
+    def test_running_jobs_can_still_be_cancelled_from_the_home_page(self):
+        directory = self.workbench.state / ("a" * 32)
+        directory.mkdir(parents=True)
+        (directory / "job.json").write_text(json.dumps({
+            "run_id": "a" * 32, "kind": "backtest", "status": "running", "stocks": ["2330"],
+            "notification": "pending", "started_at": "2026-10-14T02:00:00+00:00"}), encoding="utf-8")
+        text = self.client.get("/").text
+        self.assertIn(f'action="/jobs/{"a" * 32}/cancel"', text)
+        self.assertIn('name="csrf"', text)
+        self.assertIn('<span class="badge badge-info">執行中</span>', text)
+
+
 class ReportDescriptionTests(unittest.TestCase):
     def describe(self, details, name="20260929T010000_000000Z_aaaaaaaa"):
         with TemporaryDirectory() as directory:

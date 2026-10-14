@@ -401,8 +401,21 @@ def create_app(workbench, dev=False):
             root = workbench.state / job['run_id'] / 'reports'
             job['report_links'] = [{'key': key, 'name': entry['path'].name}
                                    for key, entry in catalog.items() if entry['path'].is_relative_to(root)]
-        return render_template('workbench.html', catalog=catalog, jobs=jobs,
-                               csrf=token, strategies=workbench.library.list(), execution=workbench.settings['backtest'], stocks=' '.join(workbench.settings['universe']['stocks']))
+        from tw_stock_backtest.stock_research import Watchlist
+        from tw_stock_backtest.web_views import report_list
+        reports = report_list(catalog)
+        research = [r for r in report_list(catalog, 'research') if r['status'] in ('success', 'partial')]
+        try:
+            watchlist_count = len(Watchlist(workbench.state / 'private' / 'watchlist.sqlite3').items())
+        except (OSError, ValueError):
+            watchlist_count = 0
+        latest = max((entry['details'].get('analysis_date') or '' for entry in catalog.values()
+                      if entry['details'].get('kind') == 'research'), default='')
+        return render_template('home.html', jobs=jobs, reports=reports, csrf=token,
+                               report_count=len(reports), watchlist_count=watchlist_count,
+                               active_count=sum(job['status'] in ('queued', 'running') for job in jobs),
+                               latest_research=latest or None, research_reports=research,
+                               first_visit=not jobs and not research)
 
     def prefilled_stocks():
         # 其他頁面可用 ?stocks= 帶入股票；格式不符就退回設定檔的股票池。

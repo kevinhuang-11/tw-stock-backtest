@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% import '_components.html' as ui %}
+{% block title %}總覽 · 台股研究工作台{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>台股研究工作台</h1>
+    <p>以本機保存的官方行情做選股排名、歷史回測與自選股追蹤。每份結果都固定保存當時的設定與資料。</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-primary" href="/new/research">{{ ui.icon('research') }}建立研究</a>
+    <a class="btn" href="/new/backtest">{{ ui.icon('backtest') }}建立回測</a>
+  </div>
+</div>
+
+<div class="stack">
+{% if offline_reason %}
+  {% call ui.alert('warn', '目前是離線示範') %}資料是合成的，不代表真實行情。除了連網更新之外，所有功能都可以操作。{% endcall %}
+{% endif %}
+
+{% if first_visit %}
+<section class="stack-sm" aria-labelledby="start-title">
+  <h2 id="start-title">從這裡開始</h2>
+  <ol class="steps">
+    <li><h3>查看自選股</h3><p>確認要追蹤的股票、最新行情與策略條件是否通過。</p><a class="btn btn-sm" href="/watchlist">前往自選</a></li>
+    <li><h3>建立研究</h3><p>選一份策略與分析日期，產生這組股票的候選排名。</p><a class="btn btn-sm btn-primary" href="/new/research">建立研究</a></li>
+    <li><h3>開啟報表</h3><p>研究完成後，查看每檔的分數、條件與資料限制。</p><a class="btn btn-sm" href="/reports">查看報表</a></li>
+  </ol>
+</section>
+{% endif %}
+
+<div class="stat-grid">
+  {{ ui.stat('自選股', watchlist_count ~ ' 檔', '可在自選頁查詢與保存快照') }}
+  {{ ui.stat('報表', report_count ~ ' 份', '研究、回測、比較與快照') }}
+  {{ ui.stat('進行中的工作', active_count ~ ' 件', '依序在背景執行') }}
+  {{ ui.stat('最近研究的分析日', latest_research or '—', '尚未建立研究' if not latest_research else '最新一份研究排名') }}
+</div>
+
+<div class="grid-2">
+  <section class="card">
+    <div class="card-header">
+      <div><h2>最近的工作</h2><p>重新整理頁面可查看最新狀態。</p></div>
+    </div>
+    {% if jobs %}
+    <ul class="item-list">
+      {% for job in jobs[:6] %}
+      <li id="job-{{ job.run_id }}">
+        <div class="item-main">
+          <div class="cluster"><strong>{{ job.kind | kind_label }}</strong>{{ ui.status(job.status) }}</div>
+          <div class="item-meta">{{ (job.finished_at or job.started_at or job.queued_at) | dt }} · {{ job.stocks | join('、') }}</div>
+          <div class="item-links">
+            {% for link in job.get('report_links', []) %}<a href="/reports/{{ link.key }}">{{ ui.icon('report') }}開啟結果</a>{% endfor %}
+            <a href="/jobs/{{ job.run_id }}/summary">工作摘要</a>
+            <a href="/jobs/{{ job.run_id }}/output.log">執行紀錄</a>
+            {% if job.notification == 'dry-run' %}<a href="/jobs/{{ job.run_id }}/notification.eml">郵件預覽</a>{% endif %}
+          </div>
+        </div>
+        {% if job.status in ('queued', 'running') %}
+        <form method="post" action="/jobs/{{ job.run_id }}/cancel"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn-sm btn-danger">取消</button></form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+      {{ ui.empty('還沒有工作', '建立研究或回測後，進度會顯示在這裡。', '建立研究', '/new/research', 'clock') }}
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <div class="card-header">
+      <div><h2>最近的報表</h2><p>依建立時間排序。</p></div>
+      {% if reports %}<a class="btn btn-sm btn-ghost" href="/reports">全部報表{{ ui.icon('arrow-right') }}</a>{% endif %}
+    </div>
+    {% if reports %}
+    <ul class="item-list">
+      {% for report in reports[:6] %}
+      <li>
+        <div class="item-main">
+          <a class="item-title" href="/reports/{{ report.key }}">{{ report.title }}</a>
+          <div class="item-meta">{{ report.subtitle or report.kind_label }}</div>
+        </div>
+        <div class="item-side">
+          {% if report.metric %}<span class="num {{ report.metric.value | trend }}">{{ report.metric.text }}</span>{% else %}{{ ui.status(report.status) }}{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+      {{ ui.empty('還沒有任何報表', '研究或回測完成後，結果會出現在這裡。', '查看自選股', '/watchlist', 'report') }}
+    {% endif %}
+  </section>
+</div>
+</div>
+{% endblock %}

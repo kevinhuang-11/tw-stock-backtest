@@ -141,7 +141,7 @@ def start_server(root, port, extra):
 
 def submit_research_job(page, base):
     """排入一個離線研究工作，讓工作列表與工作摘要頁有內容。"""
-    page.goto(base + "/")
+    page.goto(base + "/new/research")
     button = page.get_by_role("button", name="排入研究佇列")
     if button.count() == 0:
         return None

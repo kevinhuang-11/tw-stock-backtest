@@ -207,9 +207,10 @@ class OfflineDemoTests(unittest.TestCase):
                 self.assertIn("<button disabled>" + label, text)
                 self.assertIn(OFFLINE_REASON, text)
 
+        # 首頁不再有研究表單；下載選項只在建立研究頁，並同樣停用。首頁說明目前是離線示範。
         home = client.get("/").text
-        self.assertIn('name="download" value="yes" disabled', home)
-        self.assertIn(OFFLINE_REASON, home)
+        self.assertNotIn('name="download"', home)
+        self.assertIn("目前是離線示範", home)
 
         research = client.get("/new/research").text
         self.assertIn('name="download" value="yes" disabled', research)

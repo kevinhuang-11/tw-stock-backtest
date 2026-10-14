@@ -30,7 +30,7 @@ class WorkbenchTests(unittest.TestCase):
         self.client = create_app(self.wb).test_client()
 
     def token(self):
-        return re.search(r'name="csrf" value="([^"]+)"', self.client.get('/').text)[1]
+        return re.search(r'name="csrf" value="([^"]+)"', self.client.get('/new/research').text)[1]
 
     def test_local_web_protection_and_input(self):
         self.assertEqual(self.client.get('/', headers={'Host': 'evil.example'}).status_code, 400)

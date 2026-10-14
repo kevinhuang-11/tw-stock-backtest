@@ -90,8 +90,11 @@ class FormTests(unittest.TestCase):
             self.assertEqual(passed['strategies'],'baseline other');self.assertEqual(json.loads(passed['periods']),periods)
         bad=copy.deepcopy(periods);bad[0]['unknown']=True
         with self.assertRaises(FormErrors):job_form({**data.to_dict(),'strategies':'baseline other','periods':json.dumps(bad)})
-        page=self.client.get('/').text
-        self.assertIn('name="strategies" multiple',page);self.assertIn('data-period-editor',page)
+        # 比較表單移到 /new/backtest，策略多選由多選清單改為同名勾選框（送出的欄位相同）。
+        for sid in ('baseline','other'):self.wb.library.save({**self.value,'id':sid,'name':sid})
+        page=self.client.get('/new/backtest').text
+        for sid in ('baseline','other'):self.assertIn(f'<input type="checkbox" name="strategies" value="{sid}">',page)
+        self.assertIn('data-period-editor',page)
         self.assertNotIn('placeholder="baseline rsi_range',page)
 
     def test_percent_backtest_form_reaches_exported_settings(self):

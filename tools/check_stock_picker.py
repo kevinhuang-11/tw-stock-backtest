@@ -86,7 +86,7 @@ def main():
                 picker.locator(".sp-remove").first.click()
                 expect(value().split()[0], "9002", "按 ✕ 移除")
 
-                page.goto(base + "/")
+                page.goto(base + "/new/research")
                 page.wait_for_load_state("networkidle")
                 with page.expect_request(lambda request: request.method == "POST") as posted:
                     page.get_by_role("button", name="排入研究佇列").click()
@@ -110,7 +110,7 @@ def main():
                 expect(small.locator("input[name=stocks]").input_value(), "9001", "手機點一下加入")
 
                 plain = browser.new_context(java_script_enabled=False).new_page()
-                plain.goto(base + "/")
+                plain.goto(base + "/new/research")
                 field = plain.locator("input[name=stocks]").first
                 expect(field.is_visible(), True, "沒有 JavaScript 時是可輸入的文字欄位")
                 field.fill("9001 9002")

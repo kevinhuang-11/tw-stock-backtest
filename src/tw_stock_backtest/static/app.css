@@ -233,7 +233,7 @@ hr { border: 0; border-top: 1px solid var(--c-border); margin: var(--s-5) 0; }
 .stack-sm > * + * { margin-top: var(--s-3); }
 .cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); }
 .split { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-3); }
-.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-5); }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-5); align-items: start; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-5); }
 .sidebar-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: var(--s-5); align-items: start; }
 
@@ -633,3 +633,19 @@ details.disclosure-flat { margin-top: var(--s-3); border: 0; background: transpa
 details.disclosure-flat > summary { padding-left: 0; color: var(--c-text-2); }
 details.disclosure-flat > .disclosure-body { padding: 0; }
 fieldset > .field-error, form > .field-error { margin-top: var(--s-2); }
+
+/* ---------- 清單列（總覽的工作與報表） ---------- */
+.item-list { margin: 0; padding: 0; list-style: none; }
+.item-list > li {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-4);
+  padding: var(--s-3) var(--s-5);
+  border-bottom: 1px solid var(--c-border);
+}
+.item-list > li:last-child { border-bottom: 0; }
+.item-main { display: grid; gap: 2px; min-width: 0; }
+.item-title { font-weight: 600; }
+.item-meta { font-size: var(--text-xs); color: var(--c-text-2); overflow-wrap: anywhere; }
+.item-links { display: flex; flex-wrap: wrap; gap: 2px var(--s-3); font-size: var(--text-sm); }
+.item-links a { display: inline-flex; align-items: center; gap: 4px; }
+.item-side { flex: none; font-size: var(--text-sm); font-weight: 600; }
+@media (max-width: 640px) { .item-list > li { padding: var(--s-3) var(--s-4); } }

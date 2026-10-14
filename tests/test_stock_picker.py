@@ -34,7 +34,7 @@ class StockPickerTests(unittest.TestCase):
                 self.assertTrue(PACKAGE.joinpath(name).is_file())
 
     def test_pages_with_stock_fields_load_the_picker_before_forms(self):
-        for url in ("/", "/stocks/2330"):
+        for url in ("/new/research", "/new/backtest", "/stocks/2330"):
             with self.subTest(url=url):
                 text = self.client.get(url).text
                 self.assertIn('href="/static/stock-picker.css"', text)
@@ -44,7 +44,7 @@ class StockPickerTests(unittest.TestCase):
 
     def test_server_html_keeps_a_plain_text_field_as_fallback(self):
         # 沒有 JavaScript 時直接用這個欄位輸入或貼上代號；元件只是在其上加強。
-        text = self.client.get("/").text
+        text = self.client.get("/new/research").text + self.client.get("/new/backtest").text
         fields = re.findall(r'<input name="stocks"[^>]*>', text)
         self.assertTrue(fields)
         for field in fields:

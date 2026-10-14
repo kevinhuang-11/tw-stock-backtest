@@ -41,7 +41,7 @@ class WatchResearchTests(unittest.TestCase):
                        'listed_date':'2000-01-01','cfi_code':'ESVUFR'} for sid in ('2330','2317')],Path(self.settings['storage']['database_path']).with_name('listed_stocks.json'))
         self.wb.library.save(from_settings(self.settings))
         self.app=create_app(self.wb);self.app.testing=True;self.client=self.app.test_client()
-        self.token=re.search('name="csrf" value="([^"]+)"',self.client.get('/').text)[1]
+        self.token=re.search('name="csrf" value="([^"]+)"',self.client.get('/new/research').text)[1]
         self.notes=Watchlist(self.wb.state/'private/watchlist.sqlite3')
         self.notes.save('2330','PRIVATE_NOTE_ONLY',0)
 

@@ -109,7 +109,7 @@ class PeriodTests(unittest.TestCase):
         wb = Workbench(self.config, self.root / 'reports', self.root / 'jobs')
         self.addCleanup(wb.close)
         app = create_app(wb); client = app.test_client()
-        home = client.get('/').get_data(as_text=True)
+        home = client.get('/new/backtest').get_data(as_text=True)
         token = re.search(r'name="csrf" value="([^"]+)"', home).group(1)
         form = dict(kind='period_comparison', stocks='2330', strategies='baseline other', periods=json.dumps([period()]))
         self.assertEqual(client.post('/jobs', data=form).status_code, 403)
