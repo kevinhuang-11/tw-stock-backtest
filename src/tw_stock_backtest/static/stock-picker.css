@@ -1,0 +1,81 @@
+/* 股票選擇器。變數附上預設值，尚未套用新版型的頁面也能正常顯示。 */
+.stock-picker { display: grid; scroll-margin-top: 80px; gap: 6px; max-width: 640px; min-width: 0; font-size: .875rem; }
+.sp-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 12px; }
+.sp-label { font-weight: 600; color: var(--c-text, #1b2230); }
+.sp-count { font-size: .75rem; color: var(--c-text-2, #566072); font-variant-numeric: tabular-nums; }
+.sp-count.is-full { color: var(--c-warn, #a56200); font-weight: 600; }
+
+.sp-control {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  min-height: 44px; padding: 5px 8px;
+  border: 1px solid var(--c-border-strong, #c2c8d2); border-radius: var(--radius-1, 6px);
+  background: var(--c-surface, #fff);
+  cursor: text;
+}
+.sp-control:focus-within { border-color: var(--c-primary, #3a4ac6); outline: 2px solid var(--c-focus, #7c89e8); }
+.sp-tags { display: contents; margin: 0; padding: 0; list-style: none; }
+.sp-tag {
+  display: inline-flex; align-items: center; max-width: 100%;
+  border-radius: 999px;
+  background: var(--c-primary-soft, #eceefb); color: var(--c-primary, #3a4ac6);
+  font-weight: 600; line-height: 1.3;
+}
+.sp-tag-text { padding: 5px 2px 5px 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stock-picker .sp-remove {
+  display: grid; place-items: center;
+  width: 30px; height: 30px; min-height: 0; padding: 0; margin: 0;
+  border: 0; border-radius: 50%;
+  background: transparent; color: inherit;
+  font: inherit; font-size: .8em; line-height: 1; cursor: pointer;
+}
+.stock-picker .sp-remove:hover { background: var(--c-primary, #3a4ac6); color: var(--c-on-primary, #fff); }
+.stock-picker .sp-input {
+  flex: 1 1 12em; width: auto; min-width: 8em; min-height: 32px;
+  margin: 0; padding: 2px 4px;
+  border: 0; outline: 0; box-shadow: none; background: transparent;
+  color: var(--c-text, #1b2230); font: inherit;
+}
+.stock-picker .sp-input::placeholder { color: var(--c-text-3, #8490a1); }
+
+.sp-field { position: relative; min-width: 0; }
+.sp-list {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 15;
+  margin: 4px 0 0; padding: 4px; list-style: none;
+  max-height: 320px; overflow-y: auto;
+  border: 1px solid var(--c-border, #dde1e8); border-radius: var(--radius-2, 10px);
+  background: var(--c-surface, #fff);
+  box-shadow: var(--shadow-2, 0 4px 16px rgba(27, 34, 48, .12));
+}
+.sp-list[hidden] { display: none; }
+.sp-option {
+  display: flex; align-items: baseline; gap: 10px;
+  min-height: 44px; padding: 10px 12px;
+  border-radius: var(--radius-1, 6px);
+  cursor: pointer;
+}
+.sp-option:hover, .sp-option[aria-selected="true"] { background: var(--c-primary-soft, #eceefb); }
+.sp-option-code { font-weight: 650; font-variant-numeric: tabular-nums; color: var(--c-text, #1b2230); }
+.sp-option-name { color: var(--c-text, #1b2230); }
+.sp-option-industry { margin-left: auto; font-size: .75rem; color: var(--c-text-3, #8490a1); white-space: nowrap; }
+.sp-empty { padding: 10px 12px; color: var(--c-text-2, #566072); }
+
+.sp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; margin-left: auto; }
+.stock-picker .sp-action {
+  min-height: 32px; padding: 0 4px; margin: 0;
+  border: 0; border-radius: var(--radius-1, 6px);
+  background: transparent; color: var(--c-primary, #3a4ac6);
+  font: inherit; font-size: .8125rem; font-weight: 600; cursor: pointer;
+}
+.stock-picker .sp-action:hover { text-decoration: underline; background: transparent; color: var(--c-primary-hover, #2e3ca4); }
+.stock-picker .sp-action:disabled { color: var(--c-text-3, #8490a1); cursor: progress; text-decoration: none; }
+.stock-picker .sp-action[hidden] { display: none; }
+
+.sp-message { min-height: 1.5em; margin: 0; font-size: .75rem; line-height: 1.5; color: var(--c-text-2, #566072); }
+.sp-message.is-error { color: var(--c-err, #a3241c); font-weight: 600; }
+
+@media (max-width: 640px) {
+  .sp-tag-text { padding-top: 7px; padding-bottom: 7px; }
+  .stock-picker .sp-remove { width: 34px; height: 34px; }
+  .stock-picker .sp-input { flex-basis: 100%; min-height: 38px; font-size: 1rem; }
+  .stock-picker .sp-action { min-height: 40px; }
+}

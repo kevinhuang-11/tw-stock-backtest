@@ -73,7 +73,8 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+/* 固定的導覽列會蓋住捲動目標，預留它的高度 */
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 80px; }
 
 body {
   margin: 0;

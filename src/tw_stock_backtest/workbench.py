@@ -572,5 +572,5 @@ def create_app(workbench, dev=False):
         # 開發用的元件展示頁；正式啟動時不註冊，也不出現在導覽列。
         @app.get('/dev/components')
         def dev_components():
-            return render_template('dev_components.html')
+            return render_template('dev_components.html', demo_stocks=' '.join(workbench.settings['universe']['stocks']))
     return app

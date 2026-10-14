@@ -280,6 +280,14 @@ def register_stock_routes(app, wb, token):
             history = [r for r in history if r['date']==chosen]
         return clean(data), history, notes.get(sid)
 
+    @app.get('/api/watchlist-options')
+    def watchlist_options():
+        # 只回傳代號供股票選擇器使用；私人筆記不離開自選頁。
+        try:
+            return {'stocks':[r['stock_id'] for r in notes.items()]}
+        except (OSError,sqlite3.Error):
+            return {'error':'自選清單無法讀取'},503
+
     @app.get('/stocks')
     def stock_search():
         query = request.args.get('q','').strip()
