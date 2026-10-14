@@ -22,7 +22,8 @@ def rows(sid, days):
              "trade_count": 10} for day in days]
 
 
-class DataStatusTests(unittest.TestCase):
+class StatusCase(unittest.TestCase):
+    """共用的資料：2330 到 10/14，1101 停在 10/12。"""
     def setUp(self):
         self.tmp = TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -36,6 +37,8 @@ class DataStatusTests(unittest.TestCase):
         save_records(rows("1101", DAYS[:2]), db_path=self.db)
         self.client = create_app(self.workbench).test_client()
 
+
+class DataStatusTests(StatusCase):
     def test_lag_counts_later_local_trading_days(self):
         dates, latest = price_summary(self.db)
         self.assertEqual(dates, DAYS)
@@ -87,6 +90,30 @@ class DataStatusTests(unittest.TestCase):
                 text = self.client.get(url).text
                 self.assertIn("本機行情最新到 2026-10-14", text)
                 self.assertIn("有 1 檔停在較舊日期（最早 2026-10-12）", text)
+
+
+class SingleStockUpdateTests(StatusCase):
+    def test_stock_page_links_to_a_prefilled_research_with_download(self):
+        text = self.client.get("/stocks/1101").text
+        self.assertIn('href="/new/research?stocks=1101&download=yes"', text)
+        form = self.client.get("/new/research?stocks=1101&download=yes").text
+        self.assertIn('<input name="stocks" value="1101" required', form)
+        self.assertIn('<input type="checkbox" name="download" value="yes" checked>', form)
+        self.assertIn("更新後研究", form)
+        plain = self.client.get("/new/research").text
+        self.assertIn('<input type="checkbox" name="download" value="yes">', plain)
+
+    def test_submitting_the_prefilled_form_requests_a_download(self):
+        from unittest.mock import Mock
+        self.workbench.runner = Mock(return_value=Mock(returncode=0))
+        token = re.search('name="csrf" value="([^"]+)"', self.client.get("/new/research").text)[1]
+        response = self.client.post("/jobs", data={"csrf": token, "kind": "research",
+                                                   "stocks": "1101", "download": "yes"})
+        self.assertEqual(response.status_code, 302)
+        self.workbench.pool.shutdown(wait=True)
+        arguments = self.workbench.jobs()[0]["arguments"]
+        self.assertNotIn("--skip-download", arguments)
+        self.assertEqual(arguments[arguments.index("--stocks") + 1], "1101")
 
 
 if __name__ == "__main__":

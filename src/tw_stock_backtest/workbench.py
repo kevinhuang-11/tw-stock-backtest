@@ -442,7 +442,8 @@ def create_app(workbench, dev=False):
         from tw_stock_backtest.data_status import data_status
         return render_template('new_research.html', csrf=token, strategies=workbench.library.list(),
                                status=data_status(workbench.settings['storage']['database_path']),
-                               stocks=prefilled_stocks(), selected_strategy=request.args.get('strategy_id', ''))
+                               stocks=prefilled_stocks(), selected_strategy=request.args.get('strategy_id', ''),
+                               prefill_download=request.args.get('download') == 'yes')
 
     @app.get('/new/backtest')
     def new_backtest():

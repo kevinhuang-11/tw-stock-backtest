@@ -28,6 +28,10 @@
 
       <input name="stocks" value="{{ stocks }}" required placeholder="以空白分隔代號，例如 2330 2317" aria-label="股票代號">
 
+      {% if prefill_download and not offline_reason %}
+      {% call ui.alert('info', '更新後研究') %}已帶入股票並勾選「先連線更新行情」。送出後會先增量更新這些股票的行情（每檔約 2 次請求），再以最新行情日建立研究。{% endcall %}
+      {% endif %}
+
       <div class="field field-narrow">
         <label for="research-as-of">分析日期</label>
         <input id="research-as-of" type="date" name="as_of">
@@ -39,7 +43,7 @@
         <div class="stack-sm">
           <label class="check"><input type="checkbox" name="partial" value="yes">允許部分排名</label>
           <p class="hint-block">有股票無法評估時，預設不產生排名。勾選後會排除它們，只排名其餘股票。</p>
-          <label class="check"><input type="checkbox" name="download" value="yes"{% if offline_reason %} disabled{% endif %}>先連線更新行情</label>
+          <label class="check"><input type="checkbox" name="download" value="yes"{% if offline_reason %} disabled{% elif prefill_download %} checked{% endif %}>先連線更新行情</label>
           {% if offline_reason %}<p class="hint-block offline-note">連線更新已停用：{{ offline_reason }}。</p>
           {% else %}<p class="hint-block">未勾選時只讀本機資料。勾選後會向官方來源增量更新；沒有資料時初始化最近 90 天。</p>{% endif %}
         </div>

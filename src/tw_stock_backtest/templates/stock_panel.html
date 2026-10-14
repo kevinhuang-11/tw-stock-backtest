@@ -7,7 +7,10 @@
     <div class="eyebrow"><a href="/stocks">個股</a>{{ ui.icon('chevron-right') }}{{ stock.stock_id }}</div>
     <h1>{{ stock.stock_id }} {{ stock.metadata.get('name') or '名稱未提供' }}</h1>
     <p>{{ stock.metadata.get('industry') or '產業未提供' }} · {{ stock.source }}</p>
-    <div class="cluster freshness-line">{{ ui.freshness(stock.latest) }}</div>
+    <div class="cluster freshness-line">{{ ui.freshness(stock.latest) }}
+      {% if offline_reason %}<span class="btn btn-sm" aria-disabled="true" title="{{ offline_reason }}">{{ ui.icon('refresh') }}更新這檔行情</span>
+      {% else %}<a class="btn btn-sm" href="/new/research?stocks={{ stock.stock_id }}&download=yes" title="帶入這檔並勾選先連線更新；送出後會建立一份只含這檔的研究">{{ ui.icon('refresh') }}更新這檔行情</a>{% endif %}
+    </div>
   </div>
   <div class="page-actions">
     {% if note.active %}{{ ui.badge('已在自選', 'info', 'watchlist') }}{% endif %}

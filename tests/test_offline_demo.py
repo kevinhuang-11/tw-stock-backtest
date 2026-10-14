@@ -212,6 +212,12 @@ class OfflineDemoTests(unittest.TestCase):
         self.assertNotIn('name="download"', home)
         self.assertIn("目前是離線示範", home)
 
+        # 個股頁的單檔更新入口在離線示範中不可點；即使帶入參數也不會勾選下載。
+        stock = client.get("/stocks/9001").text
+        self.assertIn('<span class="btn btn-sm" aria-disabled="true"', stock)
+        self.assertNotIn("download=yes", stock)
+        self.assertIn('name="download" value="yes" disabled>', client.get("/new/research?stocks=9001&download=yes").text)
+
         research = client.get("/new/research").text
         self.assertIn('name="download" value="yes" disabled', research)
         self.assertIn(OFFLINE_REASON, research)
