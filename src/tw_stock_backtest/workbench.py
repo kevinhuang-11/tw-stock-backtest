@@ -404,6 +404,18 @@ def create_app(workbench, dev=False):
         return render_template('workbench.html', catalog=catalog, jobs=jobs,
                                csrf=token, strategies=workbench.library.list(), execution=workbench.settings['backtest'], stocks=' '.join(workbench.settings['universe']['stocks']))
 
+    def prefilled_stocks():
+        # 其他頁面可用 ?stocks= 帶入股票；格式不符就退回設定檔的股票池。
+        codes = request.args.get('stocks', '').split()
+        if 1 <= len(codes) <= 10 and len(set(codes)) == len(codes) and all(re.fullmatch(r'[0-9]{4}', c) for c in codes):
+            return ' '.join(codes)
+        return ' '.join(workbench.settings['universe']['stocks'])
+
+    @app.get('/new/research')
+    def new_research():
+        return render_template('new_research.html', csrf=token, strategies=workbench.library.list(),
+                               stocks=prefilled_stocks(), selected_strategy=request.args.get('strategy_id', ''))
+
     @app.get('/strategies')
     def strategies():
         selected = request.args.get('id')

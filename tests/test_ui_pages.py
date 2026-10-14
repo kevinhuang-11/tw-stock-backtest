@@ -128,6 +128,47 @@ class ReportListTests(PageCase):
         self.assertIn('<span class="subtle">—</span>', text)
 
 
+class NewResearchPageTests(PageCase):
+    def test_form_posts_the_same_fields_to_the_same_endpoint(self):
+        page = self.client.get("/new/research")
+        self.assertEqual(page.status_code, 200)
+        text = page.text
+        form = text[text.index('<form class="card" method="post" action="/jobs">'):text.index("</form>")]
+        self.assertIn('name="kind" value="research"', form)
+        for name in ("csrf", "strategy_id", "stocks", "as_of", "partial", "download"):
+            with self.subTest(field=name):
+                self.assertIn(f'name="{name}"', form)
+        # 沒有 JavaScript 時的退路：一般文字欄位，預設帶入設定檔的股票池。
+        self.assertRegex(form, r'<input name="stocks" value="2330" required')
+        self.assert_navigation_works(text)
+
+    def test_submitting_the_form_creates_a_research_job(self):
+        from unittest.mock import Mock
+        self.workbench.runner = Mock(return_value=Mock(returncode=0))
+        text = self.client.get("/new/research").text
+        token = re.search('name="csrf" value="([^"]+)"', text)[1]
+        response = self.client.post("/jobs", data={"csrf": token, "kind": "research", "stocks": "2330"})
+        self.assertEqual(response.status_code, 302)
+        self.workbench.pool.shutdown(wait=True)
+        jobs = self.workbench.jobs()
+        self.assertEqual([job["kind"] for job in jobs], ["research"])
+        self.assertIn("--skip-download", jobs[0]["arguments"])
+
+    def test_stocks_and_strategy_can_be_prefilled_from_the_query(self):
+        text = self.client.get("/new/research?stocks=2317+2454").text
+        self.assertIn('<input name="stocks" value="2317 2454"', text)
+        for bad in ("abc", "2330 2330", "1 2 3", '"><script>'):
+            with self.subTest(stocks=bad):
+                fallback = self.client.get("/new/research", query_string={"stocks": bad}).text
+                self.assertIn('<input name="stocks" value="2330"', fallback)
+                self.assertNotIn("<script>alert", fallback)
+
+    def test_download_option_is_enabled_with_an_official_universe(self):
+        text = self.client.get("/new/research").text
+        self.assertIn('<input type="checkbox" name="download" value="yes">', text)
+        self.assertNotIn("連線更新已停用", text)
+
+
 class ReportDescriptionTests(unittest.TestCase):
     def describe(self, details, name="20260929T010000_000000Z_aaaaaaaa"):
         with TemporaryDirectory() as directory:

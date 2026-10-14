@@ -599,3 +599,17 @@ details.disclosure > .disclosure-body { padding: 0 var(--s-4) var(--s-4); }
 
 /* 由 forms.js 動態加入的提交狀態 */
 .form-status { margin: var(--s-2) 0 0; font-size: var(--text-sm); color: var(--c-text-2); white-space: pre-wrap; }
+
+/* ---------- 表單頁 ---------- */
+.sidebar-layout.sidebar-right { grid-template-columns: minmax(0, 1fr) 320px; }
+.field-narrow { max-width: 280px; }
+.hint-block { margin: 0 0 0 calc(16px + var(--s-2)); font-size: var(--text-xs); color: var(--c-text-2); line-height: 1.6; }
+.offline-note { color: var(--c-warn); font-weight: 600; }
+.plain-list { margin: 0; padding-left: 1.2em; font-size: var(--text-sm); color: var(--c-text-2); }
+.plain-list li + li { margin-top: var(--s-2); }
+/* forms.js 產生的列（期間編輯、條件編輯） */
+.form-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-3); padding: var(--s-3) 0; border-bottom: 1px solid var(--c-border); }
+.form-row > label { display: grid; gap: var(--s-1); flex: 1 1 150px; min-width: 0; font-size: var(--text-sm); font-weight: 600; }
+.form-row > label:has(input[type=checkbox]) { display: inline-flex; align-items: center; gap: var(--s-2); flex: 0 1 auto; min-height: 38px; }
+.form-row > .form-row { flex: 1 1 100%; padding: 0; border: 0; }
+@media (max-width: 960px) { .sidebar-layout.sidebar-right { grid-template-columns: minmax(0, 1fr); } }

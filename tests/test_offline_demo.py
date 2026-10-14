@@ -211,6 +211,10 @@ class OfflineDemoTests(unittest.TestCase):
         self.assertIn('name="download" value="yes" disabled', home)
         self.assertIn(OFFLINE_REASON, home)
 
+        research = client.get("/new/research").text
+        self.assertIn('name="download" value="yes" disabled', research)
+        self.assertIn(OFFLINE_REASON, research)
+
     def test_offline_research_job_is_still_accepted(self):
         wb, client, token = self.workbench()
 

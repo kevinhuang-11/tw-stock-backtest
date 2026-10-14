@@ -1,0 +1,3 @@
+{# 表單頁共用的樣式與腳本：股票選擇器要在 forms.js 之前載入。 #}
+{% macro styles() %}<link rel="stylesheet" href="/static/stock-picker.css">{% endmacro %}
+{% macro scripts() %}<script src="/static/stock-picker.js" defer></script><script src="/static/forms.js" defer></script>{% endmacro %}

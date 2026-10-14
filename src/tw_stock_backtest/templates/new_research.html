@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% import '_components.html' as ui %}
+{% import '_form_assets.html' as assets %}
+{% block title %}建立研究 · 台股研究工作台{% endblock %}
+{% block head %}{{ assets.styles() }}{% endblock %}
+{% block scripts %}{{ assets.scripts() }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>建立研究</h1>
+    <p>選擇策略與股票，以同一個分析日期產生候選排名。完成後可在報表中查看每檔的條件與資料限制。</p>
+  </div>
+</div>
+
+<div class="sidebar-layout sidebar-right">
+  <form class="card" method="post" action="/jobs">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="kind" value="research">
+    <div class="card-body stack">
+      <div class="field">
+        <label for="research-strategy">策略</label>
+        <select id="research-strategy" name="strategy_id">
+          <option value="">沿用設定檔（多因子）</option>
+          {% for item in strategies %}<option value="{{ item.id }}"{% if item.id == selected_strategy %} selected{% endif %}>{{ item.name }}</option>{% endfor %}
+        </select>
+        <span class="hint">策略只包含選股邏輯。<a href="/strategies">管理策略庫</a></span>
+      </div>
+
+      <input name="stocks" value="{{ stocks }}" required placeholder="以空白分隔代號，例如 2330 2317" aria-label="股票代號">
+
+      <div class="field field-narrow">
+        <label for="research-as-of">分析日期</label>
+        <input id="research-as-of" type="date" name="as_of">
+        <span class="hint">空白時採用所選股票的最新行情日。所有股票使用同一個日期。</span>
+      </div>
+
+      <fieldset>
+        <legend>選項</legend>
+        <div class="stack-sm">
+          <label class="check"><input type="checkbox" name="partial" value="yes">允許部分排名</label>
+          <p class="hint-block">有股票無法評估時，預設不產生排名。勾選後會排除它們，只排名其餘股票。</p>
+          <label class="check"><input type="checkbox" name="download" value="yes"{% if offline_reason %} disabled{% endif %}>先連線更新行情</label>
+          {% if offline_reason %}<p class="hint-block offline-note">連線更新已停用：{{ offline_reason }}。</p>
+          {% else %}<p class="hint-block">未勾選時只讀本機資料。勾選後會向官方來源增量更新；沒有資料時初始化最近 90 天。</p>{% endif %}
+        </div>
+      </fieldset>
+
+      <div class="form-actions">
+        <button class="btn-primary">{{ ui.icon('research') }}排入研究佇列</button>
+        <a class="btn btn-ghost" href="/">取消</a>
+      </div>
+    </div>
+  </form>
+
+  <aside class="stack-sm">
+    {% call ui.alert('info', '送出後會發生什麼') %}工作會排入佇列並在背景依序執行。回到總覽可以看到進度，完成後結果出現在報表中。{% endcall %}
+    <div class="card"><div class="card-body stack-sm">
+      <h3>怎麼解讀結果</h3>
+      <ul class="plain-list">
+        <li>分數是這次股票池內的相對排序，不是上漲機率，也不是買進建議。</li>
+        <li>舊的行情日不代表今天的行情；報表會標示分析日與今天的差距。</li>
+        <li>條件未通過與資料不足是兩回事，報表會分開列出。</li>
+      </ul>
+    </div></div>
+  </aside>
+</div>
+{% endblock %}

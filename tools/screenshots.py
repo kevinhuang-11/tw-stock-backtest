@@ -37,6 +37,7 @@ STATIC_PAGES = {
     "stock-supplemental": "/stocks/9001/supplemental",
     "watchlist": "/watchlist",
     "reports": "/reports",
+    "new-research": "/new/research",
 }
 
 
