@@ -275,6 +275,46 @@ class HomePageTests(PageCase):
         self.assertIn('<span class="badge badge-info">執行中</span>', text)
 
 
+class ResearchReportPageTests(PageCase):
+    def key(self):
+        return next(iter(self.workbench.catalog()))
+
+    def test_candidates_are_a_readable_table(self):
+        self.add_research()
+        key = self.key()
+        text = self.client.get(f"/reports/{key}").text
+        self.assertIn("候選股總覽", text)
+        self.assertIn(f'<a class="cell-main" href="/stocks/2330?report={key}">2330 測試甲</a>', text)
+        self.assertIn('<td class="num">66.67</td>', text)
+        self.assertNotIn("66.66666666666666666666666667", text.split("原始資料")[0])
+        for href in (f"/reports/{key}/preview?top=10", f"/reports/{key}/csv",
+                     "/new/research?stocks=2317+2330&strategy_id=baseline"):
+            self.assertIn(f'href="{href}"', text)
+        self.assertIn('aria-current="page"', text.split("</nav>")[0].split("報表</a>")[0][-200:])
+        self.assert_navigation_works(text)
+
+    def test_top_search_and_sort_still_work(self):
+        self.add_research()
+        key = self.key()
+        self.assertEqual(self.client.get(f"/reports/{key}?top=1").text.count('class="cell-main"'), 1)
+        self.assertEqual(self.client.get(f"/reports/{key}?top=99").status_code, 400)
+        full = self.client.get(f"/reports/{key}?q=2317").text.split('id="rankings"')[1]
+        self.assertIn('href="/stocks/2317', full)
+        self.assertNotIn('href="/stocks/2330', full)
+        ordered = self.client.get(f"/reports/{key}?sort=stock_id").text.split('id="rankings"')[1]
+        self.assertLess(ordered.index("2317"), ordered.index("2330"))
+
+    def test_failed_research_explains_instead_of_an_empty_table(self):
+        folder = self.add_research()
+        summary = json.loads((folder / "summary.json").read_text(encoding="utf-8"))
+        summary.update(status="failed")
+        (folder / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
+        (folder / "rankings.json").write_text("[]", encoding="utf-8")
+        text = self.client.get(f"/reports/{self.key()}").text
+        self.assertIn("候選股總覽", text)
+        self.assertIn("本次沒有可呈現的候選股", text)
+
+
 class ReportDescriptionTests(unittest.TestCase):
     def describe(self, details, name="20260929T010000_000000Z_aaaaaaaa"):
         with TemporaryDirectory() as directory:

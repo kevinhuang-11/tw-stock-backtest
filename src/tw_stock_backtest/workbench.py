@@ -520,7 +520,10 @@ def create_app(workbench, dev=False):
         elif ordering == 'score':
             from decimal import Decimal
             visible.sort(key=lambda r: (-Decimal(str(r['score'])), r['stock_id']))
-        return render_template('workbench.html', digest=digest, visible_rankings=visible, detail=entry['details'], report_key=key,
+        if entry['details'].get('kind') == 'research':
+            return render_template('report_research.html', digest=digest, visible_rankings=visible,
+                                   detail=entry['details'], report_key=key)
+        return render_template('workbench.html', visible_rankings=visible, detail=entry['details'], report_key=key,
                                image=any((entry['path'] / name).is_file() for name in ('performance.png','comparison.png')))
 
     @app.get('/reports/<key>/csv')

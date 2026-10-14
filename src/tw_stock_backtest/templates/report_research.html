@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% import '_components.html' as ui %}
+{% set strategy = (digest.strategy_snapshot or {}).get('definition', {}) if digest else {} %}
+{% block title %}研究排名{% if digest %} {{ digest.analysis_date }}{% endif %} · 台股研究工作台{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="eyebrow"><a href="/reports">報表</a>{{ ui.icon('chevron-right') }}研究排名</div>
+    <h1>研究排名{% if strategy.name %} · {{ strategy.name }}{% endif %}</h1>
+    {% if digest %}<p>{{ digest.title }}</p>{% endif %}
+  </div>
+  {% if digest %}
+  <div class="page-actions">
+    <a class="btn" href="/reports/{{ report_key }}/preview?top={{ digest.top }}">{{ ui.icon('mail') }}郵件預覽</a>
+    <a class="btn" href="/reports/{{ report_key }}/csv">{{ ui.icon('download') }}完整排名 CSV</a>
+    {% if digest.specified_pool %}<a class="btn btn-primary" href="/new/research?stocks={{ digest.specified_pool | join('+') }}{% if strategy.id %}&strategy_id={{ strategy.id }}{% endif %}">{{ ui.icon('refresh') }}以相同股票再研究</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="stack">
+{% if not digest %}
+  {% call ui.alert('warn', '這份研究沒有可顯示的排名') %}狀態：{{ detail.status | status_label }}。可在下方的完整摘要查看原因。{% endcall %}
+{% else %}
+  {% if digest.lag_calendar_days %}
+  {% call ui.alert('info', '這是歷史行情') %}分析日 {{ digest.analysis_date }} 距今 {{ digest.lag_calendar_days }} 個日曆日，不代表今日行情。{% endcall %}
+  {% endif %}
+
+  <div class="stat-grid">
+    {{ ui.stat('分析日', digest.analysis_date or '—', digest.status | status_label) }}
+    {{ ui.stat('成功評估', (digest.counts.get('evaluated', '—')) ~ ' / ' ~ (digest.counts.get('requested', '—')) ~ ' 檔', '指定股票池') }}
+    {{ ui.stat('排除', (digest.counts.get('excluded', 0)) ~ ' 檔', '資料不足或更新未完成') }}
+    {{ ui.stat('排名母體', (digest.ranking_population or []) | length ~ ' 檔', '分數只在這個母體內比較') }}
+  </div>
+
+  <section class="card">
+    <div class="card-header">
+      <div><h2>候選股總覽</h2><p>前 {{ digest.top }} 名。分數是本次股票池內的相對排序，不是上漲機率。</p></div>
+      <form class="cluster" aria-label="候選數">
+        <label class="small" for="top">候選數</label>
+        <input id="top" class="input-sm" type="number" name="top" min="1" max="50" value="{{ digest.top }}">
+        <button class="btn-sm">更新</button>
+      </form>
+    </div>
+    {% if digest.candidates %}
+    <div class="table-wrap"><table class="table table-sticky">
+      <thead><tr><th>股票</th><th class="num">名次</th><th class="num">總分</th><th class="num">名次變化</th><th class="num">訊號日收盤</th><th>最後行情日</th></tr></thead>
+      <tbody>
+      {% for c in digest.candidates %}
+        <tr>
+          <td><a class="cell-main" href="/stocks/{{ c.stock_id }}?report={{ report_key }}">{{ c.stock_id }} {{ c.name or '名稱未提供' }}</a><span class="cell-sub">{{ c.industry or '產業未提供' }}</span></td>
+          <td class="num">{{ c.rank }}</td>
+          <td class="num">{{ c.score | score_text }}</td>
+          <td class="num">{% if c.rank_change is not none %}{{ ui.change(c.rank_change, percent=False, digits=0) }}{% else %}<span class="subtle">—</span>{% endif %}</td>
+          <td class="num">{{ c.close | num }}<span class="cell-sub">{{ c.price_date or '日期未提供' }}</span></td>
+          <td class="nowrap">{{ c.latest_date or '—' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <div class="card-body stack-sm">
+      <h3 class="section-label">每檔的評分說明</h3>
+      {% for c in digest.candidates %}
+      <details class="disclosure">
+        <summary>{{ c.rank }}. {{ c.stock_id }} {{ c.name or '名稱未提供' }} <span class="subtle">· 總分 {{ c.score | score_text }}</span></summary>
+        <div class="disclosure-body stack-sm">
+          <ul class="plain-list">{% for line in c.explanations %}<li>{{ line }}</li>{% endfor %}</ul>
+          {% for hint in c.hints %}<p class="small">研究提示：{{ hint }}</p>{% endfor %}
+          {% if c.get('conditions') %}<details class="disclosure disclosure-flat"><summary>入選條件與實際指標值</summary><div class="disclosure-body"><pre>{{ c.conditions | pretty }}</pre></div></details>{% endif %}
+        </div>
+      </details>
+      {% endfor %}
+    </div>
+    {% else %}
+      {{ ui.empty('本次沒有可呈現的候選股', '可能是條件都未通過，或資料不足。下方的排除原因與研究提示會說明。', icon_name='empty') }}
+    {% endif %}
+  </section>
+
+  <div class="grid-2">
+    <section class="card">
+      <div class="card-header"><h2>歷史排名變化</h2></div>
+      <div class="card-body stack-sm small">
+        <p>{{ digest.comparison.message }}</p>
+        {% if digest.comparison.available %}
+        <dl class="kv"><dt>新進前 {{ digest.top }}</dt><dd>{{ digest.comparison.entered | join('、') or '無' }}</dd><dt>退出</dt><dd>{{ digest.comparison.exited | join('、') or '無' }}</dd></dl>
+        {% endif %}
+        {% for item in digest.comparison.limitations %}<p class="muted">{{ item }}</p>{% endfor %}
+        {% if digest.comparison.get('previously_unranked') %}<p>前次未排名（不稱為新進）：{{ digest.comparison.previously_unranked | join('、') }}</p>{% endif %}
+        {% if digest.comparison.get('currently_unranked') %}<p>本次未排名（不稱為下跌）：{{ digest.comparison.currently_unranked | join('、') }}</p>{% endif %}
+      </div>
+    </section>
+    <section class="card">
+      <div class="card-header"><h2>資料限制與研究提示</h2></div>
+      <div class="card-body"><ul class="plain-list">{% for hint in digest.hints %}<li>{{ hint }}</li>{% endfor %}</ul></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="card-header"><h2>研究設定</h2></div>
+    <div class="card-body stack-sm">
+      <dl class="kv">
+        <dt>策略</dt><dd>{{ strategy.name or '沿用設定檔' }}{% if strategy.id %} <span class="subtle">（{{ strategy.id }}）</span>{% endif %}</dd>
+        <dt>指定股票池</dt><dd>{{ digest.specified_pool | join('、') if digest.specified_pool is not none else '未提供' }}</dd>
+        <dt>名單來源</dt><dd>{{ digest.universe_source or '未提供' }}{% if digest.universe_downloaded_at %} · {{ digest.universe_downloaded_at | dt }}{% endif %}</dd>
+        <dt>執行時間</dt><dd>{{ digest.execution.started_at | dt }} 至 {{ digest.execution.finished_at | dt }}</dd>
+      </dl>
+      <details class="disclosure"><summary>排除原因（{{ digest.excluded | length }} 檔）</summary><div class="disclosure-body small">{% for item in digest.excluded %}<p>{{ item.stock_id }}：{{ item.reason }}</p>{% else %}<p class="muted">沒有排除任何股票。</p>{% endfor %}</div></details>
+      {% if digest.get('strategy_snapshot') %}<details class="disclosure"><summary>完整策略與內容雜湊</summary><div class="disclosure-body"><pre>{{ digest.strategy_snapshot | pretty }}</pre></div></details>{% endif %}
+      <details class="disclosure"><summary>因子設定</summary><div class="disclosure-body"><pre>{{ digest.factor_settings | pretty }}</pre></div></details>
+      <details class="disclosure"><summary>執行資訊</summary><div class="disclosure-body"><pre>{{ digest.execution | pretty }}</pre></div></details>
+    </div>
+  </section>
+{% endif %}
+
+{% if detail.get('rankings') %}
+  <section class="card" id="rankings">
+    <div class="card-header">
+      <div><h2>完整排名</h2><p>包含候選數以外的所有排名。</p></div>
+      <form class="cluster" action="#rankings">
+        <label class="visually-hidden" for="rank-q">搜尋股票代號</label>
+        <input id="rank-q" class="input-sm" type="search" name="q" value="{{ request.args.get('q','') }}" placeholder="搜尋代號">
+        <label class="visually-hidden" for="rank-sort">排序</label>
+        <select id="rank-sort" class="input-sm" name="sort">{% for value, text in [('rank','依名次'),('stock_id','依代號'),('score','依總分')] %}<option value="{{ value }}"{% if request.args.get('sort','rank') == value %} selected{% endif %}>{{ text }}</option>{% endfor %}</select>
+        <button class="btn-sm">套用</button>
+      </form>
+    </div>
+    {% if visible_rankings %}
+    <div class="table-wrap"><table class="table table-compact">
+      <thead><tr><th class="num">名次</th><th>股票</th><th class="num">總分</th><th>日期</th></tr></thead>
+      <tbody>{% for row in visible_rankings %}<tr><td class="num">{{ row.rank }}</td><td><a href="/stocks/{{ row.stock_id }}?report={{ report_key }}">{{ row.stock_id }}</a></td><td class="num">{{ row.score | score_text }}</td><td class="nowrap">{{ row.date }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}{{ ui.empty('沒有符合的股票', '換一個代號再搜尋。', icon_name='search') }}{% endif %}
+  </section>
+{% endif %}
+
+<details class="disclosure"><summary>完整摘要、設定與排除原因（原始資料）</summary><div class="disclosure-body"><pre>{{ detail | pretty }}</pre></div></details>
+</div>
+{% endblock %}

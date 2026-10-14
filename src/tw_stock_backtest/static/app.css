@@ -649,3 +649,6 @@ fieldset > .field-error, form > .field-error { margin-top: var(--s-2); }
 .item-links a { display: inline-flex; align-items: center; gap: 4px; }
 .item-side { flex: none; font-size: var(--text-sm); font-weight: 600; }
 @media (max-width: 640px) { .item-list > li { padding: var(--s-3) var(--s-4); } }
+
+.input-sm, select.input-sm, input.input-sm { min-height: 30px; width: auto; max-width: 9em; padding: 2px var(--s-2); font-size: var(--text-xs); }
+.section-label { font-size: var(--text-sm); color: var(--c-text-2); }
