@@ -15,24 +15,24 @@
 .venv/bin/python examples/prepare_demo.py
 ```
 
-這會建立 `reports/portfolio-demo/`，內容包含：
+這會建立 `reports/offline-demo/`，內容包含：
 
 - 一份獨立的設定檔與示例策略
 - 三檔合成股票（代號 9001／9002／9003）的行情、月營收與法人資料
 - 已加入這三檔的自選清單，以及第一份研究快照
 
-這三個代號只是樣本識別，沒有對應的公司名稱與產業。資料來源欄位會標示 `synthetic://portfolio-example`。
+這三個代號只是樣本識別，沒有對應的公司名稱與產業。資料來源欄位會標示 `synthetic://offline-example`。
 
-目錄已存在時指令會拒絕覆寫。想要另一份乾淨的示例，可以加上 `--output reports/portfolio-demo-2`，並把下一步指令中的路徑一起換掉。
+目錄已存在時指令會拒絕覆寫。想要另一份乾淨的示例，可以加上 `--output reports/offline-demo-2`，並把下一步指令中的路徑一起換掉。
 
 ## 2. 啟動工作台
 
 ```bash
 .venv/bin/python -m tw_stock_backtest.cli.serve_workbench \
-  --config reports/portfolio-demo/config.toml \
-  --reports-dir reports/portfolio-demo/reports \
-  --state-dir reports/portfolio-demo/workbench \
-  --strategy-dir reports/portfolio-demo/strategies \
+  --config reports/offline-demo/config.toml \
+  --reports-dir reports/offline-demo/reports \
+  --state-dir reports/offline-demo/workbench \
+  --strategy-dir reports/offline-demo/strategies \
   --port 9000
 ```
 

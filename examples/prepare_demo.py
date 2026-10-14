@@ -46,7 +46,7 @@ def prepare(output):
                 'previous_month':values.get(prior),'previous_year':values.get(year),
                 'mom':growth(value,values.get(prior)),'yoy':growth(value,values.get(year)),
                 'official_mom_percent':None,'official_yoy_percent':None,'source_generated_date':None,
-                'source':'synthetic://portfolio-example','basis':'合成示例；非官方營收',
+                'source':'synthetic://offline-example','basis':'合成示例；非官方營收',
                 'unit':'TWD thousand','published_at':None,'fetched_at':stamp,
                 'raw':{'synthetic':True,'value':value}})
         store.save('revenue_history',revenues)
@@ -55,7 +55,7 @@ def prepare(output):
             groups={key:{'buy':'1000','sell':'1200','net':'-200'} for key in ('foreign','trust','foreign_dealer','dealer_own','dealer_hedge')}
             groups['dealer']={'buy':'2000','sell':'2400','net':'-400'}
             flows.append({'stock_id':sid,'period':day,'groups':groups,'total':'-800',
-                'unit':'shares','source':'synthetic://portfolio-example','published_at':None,
+                'unit':'shares','source':'synthetic://offline-example','published_at':None,
                 'fetched_at':stamp,'raw':{'synthetic':True,'day':day},'notes':['合成示例，不是官方交易日曆']})
         store.save('institution',flows)
     library=StrategyLibrary(root/'strategies')
@@ -78,7 +78,7 @@ def prepare(output):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output',default='reports/portfolio-demo',help='必須是不存在的新目錄')
+    parser.add_argument('--output',default='reports/offline-demo',help='必須是不存在的新目錄')
     args=parser.parse_args()
     try:prepare(args.output)
     except FileExistsError:parser.exit(1,'展示目錄已存在；不覆寫，請沿用或指定新的 --output。\n')
