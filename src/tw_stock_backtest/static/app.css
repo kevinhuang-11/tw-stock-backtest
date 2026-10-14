@@ -319,7 +319,8 @@ hr { border: 0; border-top: 1px solid var(--c-border); margin: var(--s-5) 0; }
 /* ---------- 表單 ---------- */
 .field { display: grid; gap: var(--s-1); min-width: 0; align-content: start; }
 .field > label, .field-label { font-size: var(--text-sm); font-weight: 600; color: var(--c-text); }
-.field .hint { font-size: var(--text-xs); color: var(--c-text-2); line-height: 1.5; }
+.field .hint, .hint { font-size: var(--text-xs); color: var(--c-text-2); line-height: 1.5; }
+p.hint { margin: 0; }
 .field .error, .field-error {
   display: flex; gap: var(--s-1);
   font-size: var(--text-xs); font-weight: 600; color: var(--c-err); line-height: 1.5;
@@ -655,3 +656,21 @@ fieldset > .field-error, form > .field-error { margin-top: var(--s-2); }
 
 img.chart { display: block; width: 100%; height: auto; border-radius: var(--radius-1); }
 .table .row-muted td { color: var(--c-text-2); background: var(--c-surface-2); }
+
+/* ---------- 自選頁 ---------- */
+.inline-form { display: flex; flex-direction: column; align-items: flex-end; gap: var(--s-1); }
+.inline-form .form-status:empty { display: none; }
+.toolbar { padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-3); }
+.toolbar-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s-3); }
+.toolbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); }
+.watch-update button:not(:disabled) { background: var(--c-primary); border-color: var(--c-primary); color: var(--c-on-primary); }
+.cell-details { margin-top: var(--s-1); font-size: var(--text-xs); text-align: left; white-space: normal; }
+.cell-details summary { cursor: pointer; color: var(--c-primary); }
+.cell-details p { margin: var(--s-1) 0 0; max-width: 22em; color: var(--c-text-2); }
+.flow + .flow { margin-top: var(--s-2); }
+.flow-head { display: flex; align-items: center; gap: var(--s-1); white-space: nowrap; }
+.flow-values { display: block; white-space: nowrap; color: var(--c-text-2); }
+.note-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--s-4); }
+.note-card { display: grid; gap: var(--s-2); padding: var(--s-4); }
+.note-head { display: grid; }
+@media (max-width: 640px) { .inline-form { align-items: stretch; } .toolbar { padding: var(--s-4); } }

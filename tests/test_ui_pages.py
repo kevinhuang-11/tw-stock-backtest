@@ -361,6 +361,39 @@ class BacktestReportPageTests(PageCase):
         self.assertIn(f'href="/reports/{self.key()}/csv"', text)
 
 
+class WatchlistPageTests(PageCase):
+    def notes(self):
+        from tw_stock_backtest.stock_research import Watchlist
+        return Watchlist(self.workbench.state / "private" / "watchlist.sqlite3")
+
+    def test_empty_watchlist_points_to_stock_search(self):
+        text = self.client.get("/watchlist").text
+        self.assertIn("尚未加入自選股", text)
+        self.assertIn('href="/stocks"', text)
+        self.assertNotIn('action="/watchlist/snapshot"', text)
+        self.assertNotIn('action="/watchlist/update"', text)
+        self.assert_navigation_works(text)
+
+    def test_forms_keep_their_fields_and_notes_stay_out_of_the_table(self):
+        self.notes().save("2330", "PRIVATE_NOTE_ONLY", 0)
+        text = self.client.get("/watchlist").text
+        snapshot = text[text.index('action="/watchlist/snapshot"'):].split("</form>")[0]
+        for name in ("csrf", "strategy_id", "as_of"):
+            self.assertIn(f'name="{name}"', snapshot)
+        update = text[text.index('action="/watchlist/update"'):].split("</form>")[0]
+        for name in ("csrf", "update_kind", "start", "end", "revenue_start", "revenue_end"):
+            self.assertIn(f'name="{name}"', update)
+        note = text[text.index('action="/watchlist/2330"'):].split("</form>")[0]
+        for name in ("csrf", "revision", "note", "action"):
+            self.assertIn(f'name="{name}"', note)
+        table = text[text.index('<table'):text.index('</table>')]
+        self.assertIn("2330", table)
+        self.assertNotIn("PRIVATE_NOTE_ONLY", table)
+        self.assertIn("PRIVATE_NOTE_ONLY</textarea>", text)
+        self.assertIn('id="watch-overview"', text)
+        self.assertIn('id="watch-query"', text)
+
+
 class ReportDescriptionTests(unittest.TestCase):
     def describe(self, details, name="20260929T010000_000000Z_aaaaaaaa"):
         with TemporaryDirectory() as directory:

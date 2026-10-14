@@ -1,20 +1,118 @@
-<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/stock.css"><script src="/static/forms.js" defer></script><script src="/static/stock.js" defer></script><title>私人自選清單</title><nav><a href="/">工作台</a><a href="/stocks">搜尋並加入</a></nav><h1>自選與研究筆記</h1><script src="/static/watchlist.js" defer></script>
-<section id="watch-overview"><h2>研究總覽</h2><p>各欄各自標示期間；只讀本機資料，不自動下載。條件採各股最近行情日（或指定日），不建立自選股相對排名。</p>
-<form method="get" id="watch-query"><label>策略<select name="strategy_id"><option value="">設定檔預設策略</option>{% for s in strategies %}<option value="{{ s.id }}" {% if request.args.get('strategy_id')==s.id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}</select></label>
-<label>條件分析截止日（空白採各股最新行情）<input type="date" name="as_of" value="{{ request.args.get('as_of','') }}"></label>
-<label>搜尋代號／名稱<input name="q" maxlength="40" value="{{ request.args.get('q','') }}"></label>
-<label>狀態<select name="status">{% for key,label in [('', '全部'),('eligible','通過'),('filtered','未通過'),('unavailable','無法評估'),('incomplete','數值不足'),('update_failed','更新有問題')] %}<option value="{{ key }}" {% if request.args.get('status','')==key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-<label>排序<select name="sort">{% for key,label in [('stock_id','代號'),('close','收盤'),('rank','研究名次'),('score','研究分數'),('mom','月增率'),('yoy','年增率')] %}<option value="{{ key }}" {% if request.args.get('sort','stock_id')==key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-<label>方向<select name="direction"><option value="asc">小到大</option><option value="desc" {% if request.args.get('direction')=='desc' %}selected{% endif %}>大到小</option></select></label><button>查詢（不保存、不下載）</button></form><p>數值使用精確數字排序，缺值一律放最後。通過 {{ data.counts.eligible }}／{{ data.counts.requested }} 檔；數值完整 {{ data.counts.complete }} 檔，不代表已更新至今日。</p>
-<div class="scroll"><table><thead><tr><th>股票／產業</th><th>收盤／行情日</th><th>策略條件</th><th>保存研究</th><th>營收</th><th>法人累計（股）</th><th>限制／更新</th></tr></thead><tbody>{% for r in rows %}<tr>
-<td><a href="/stocks/{{ r.stock_id }}">{{ r.stock_id }} {{ r.name or '名稱未提供' }}</a><br>{{ r.industry or '產業未提供' }}</td>
-<td>{{ r.close if r.close is not none else '未提供' }}<br>{{ r.price_date or '未提供' }}</td>
-<td>{{ {'eligible':'通過','filtered':'未通過','unavailable':'無法評估'}.get(r.status,'無法評估') }}<br>{{ r.condition_date }}<details><summary>條件數值</summary>{% for c in (r.diagnostic or {}).get('conditions',[]) %}<p>{{ c }}</p>{% endfor %}{{ (r.diagnostic or {}).get('reason','') }}</details></td>
-<td>{% if r.research %}<a href="/stocks/{{ r.stock_id }}?report={{ r.research.report_key }}">{{ r.research.date }} 保存結果</a><br>名次 {{ r.rank if r.rank is not none else '未提供' }}／分數 {{ r.score if r.score is not none else '未提供' }}<details><summary>母體與來源</summary><p>指定 {{ r.research.pool|join('、') }}；有效母體 {{ r.research.population|length if r.research.population is not none else '未提供' }}；策略 {{ r.research.strategy_sha256 }}</p></details>{% else %}未提供相符策略研究{% endif %}</td>
-<td>{% if r.revenue %}{{ r.revenue.period }}<br>{{ r.revenue.revenue if r.revenue.revenue is not none else '未提供' }} 千元<br>月增 {{ r.revenue.mom.value if r.revenue.mom.value is not none else '資料不足' }}／年增 {{ r.revenue.yoy.value if r.revenue.yoy.value is not none else '資料不足' }}（倍率）<br>{{ r.revenue_source }}{% else %}未提供{% endif %}</td>
-<td>最新資料 {{ r.institution.period if r.institution else '未提供' }}{% for c in r.sums %}<p>{{ c.window }} 日：{{ c.count }} 筆／{{ '完整' if c.complete else '資料不足' }}<br>外資 {{ c.totals.foreign if c.totals.foreign is not none else '未提供' }}／投信 {{ c.totals.trust if c.totals.trust is not none else '未提供' }}／自營商 {{ c.totals.dealer if c.totals.dealer is not none else '未提供' }}<br>基準 {{ c.expected_dates[0] if c.expected_dates else '無' }}～{{ c.expected_dates[-1] if c.expected_dates else '無' }}</p>{% endfor %}</td>
-<td>{% for w in r.warnings %}<p>{{ w }}</p>{% endfor %}{% for kind,u in r.updates.items() %}<p>{{ kind }}：{{ u.finished_at }} {{ u.counts }}</p>{% endfor %}</td></tr>{% else %}<tr><td colspan="7">沒有符合查詢條件的自選股。</td></tr>{% endfor %}</tbody></table></div></section>
-{% if items %}<section><h2>保存研究摘要</h2><form method="post" action="/watchlist/snapshot" class="watch-snapshot"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="strategy_id" value="{{ request.args.get('strategy_id','') }}"><input type="hidden" name="as_of" value="{{ request.args.get('as_of','') }}"><button>保存目前策略的完整自選快照與郵件預覽</button><p role="status"></p></form><p>保存整份自選清單，搜尋／篩選只影響畫面，不改變摘要股票池。筆記不包含於摘要。</p>
-<h2>更新自選資料</h2><form method="post" action="/watchlist/update" class="watch-update"><input type="hidden" name="csrf" value="{{ csrf }}"><label>種類<select name="update_kind"><option value="all">行情＋歷史營收＋法人</option><option value="prices">行情</option><option value="revenue">歷史營收</option><option value="institution">法人</option></select></label><label>行情／法人起日（空白增量）<input type="date" name="start"></label><label>截止日（空白為今日）<input type="date" name="end"></label><label>營收起月（兩欄同填）<input type="month" name="revenue_start"></label><label>營收迄月<input type="month" name="revenue_end"></label><button{% if offline_reason %} disabled{% endif %}>更新自選股資料（最多 10 檔）</button><p role="status"></p></form>{% if offline_reason %}<p class="offline-note">已停用：{{ offline_reason }}。</p>{% endif %}<p>首次行情有限 90 日、法人 35 日；原有近期回抓規則不變。更新後按查詢刷新；不會清除本頁表單。</p></section>{% endif %}
-<section><h2>已保存快照</h2>{% for snap in snapshots %}<p>{{ snap.generated_at }} · {{ snap.strategy_snapshot.definition.name }} · {{ snap.counts.requested }} 檔<a href="/reports/{{ snap.report_key }}">查看摘要／郵件預覽</a></p>{% else %}<p>尚無快照，保存後才有前次紀錄可比較。</p>{% endfor %}</section>
-{% for item in items %}<section><h2><a href="/stocks/{{ item.stock_id }}">{{ item.stock_id }} {{ item.metadata.get('name') or '名稱未提供' }}</a></h2><p>最近行情 {{ item.latest or '未提供' }} · 最近研究 {{ item.research_date or '尚無保存此股票的研究' }}</p><form class="watch-form" method="post" action="/watchlist/{{ item.stock_id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="revision" value="{{ item.revision }}"><textarea name="note" maxlength="600" rows="4">{{ item.note }}</textarea><button name="action" value="save">保存</button><button name="action" value="remove">移除</button><p class="watch-status" role="status">加入 {{ item.added_at }} · 更新 {{ item.updated_at }}</p></form></section>{% else %}<p>尚未加入自選股。加入不要求已有排名，也不會下載或寄信。</p>{% endfor %}</html>
+{% extends 'base.html' %}
+{% import '_components.html' as ui %}
+{% block title %}自選股 · 台股研究工作台{% endblock %}
+{% block scripts %}<script src="/static/forms.js" defer></script><script src="/static/stock.js" defer></script><script src="/static/watchlist.js" defer></script>{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>自選股</h1>
+    <p>追蹤自選股的最新行情、策略條件、保存的研究名次與營收法人。只讀本機資料，查詢不會下載或寄信。</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn" href="/stocks">{{ ui.icon('plus') }}加入股票</a>
+    {% if items %}
+    <form method="post" action="/watchlist/snapshot" class="watch-snapshot inline-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="strategy_id" value="{{ request.args.get('strategy_id','') }}">
+      <input type="hidden" name="as_of" value="{{ request.args.get('as_of','') }}">
+      <button class="btn-primary" title="保存整份自選清單；搜尋與篩選只影響畫面。筆記不包含在摘要中。">{{ ui.icon('report') }}保存目前策略的完整自選快照與郵件預覽</button>
+      <p role="status" class="form-status"></p>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="stack">
+<section id="watch-overview" class="stack-sm">
+  <form method="get" id="watch-query" class="card toolbar">
+    <div class="toolbar-fields">
+      <div class="field"><label for="wq-strategy">策略</label><select id="wq-strategy" name="strategy_id"><option value="">設定檔預設策略</option>{% for s in strategies %}<option value="{{ s.id }}" {% if request.args.get('strategy_id')==s.id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="wq-as-of">條件分析截止日</label><input id="wq-as-of" type="date" name="as_of" value="{{ request.args.get('as_of','') }}"></div>
+      <div class="field"><label for="wq-q">搜尋代號／名稱</label><input id="wq-q" name="q" maxlength="40" value="{{ request.args.get('q','') }}" placeholder="例如 2330"></div>
+      <div class="field"><label for="wq-status">狀態</label><select id="wq-status" name="status">{% for key,label in [('', '全部'),('eligible','通過'),('filtered','未通過'),('unavailable','無法評估'),('incomplete','數值不足'),('update_failed','更新有問題')] %}<option value="{{ key }}" {% if request.args.get('status','')==key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="wq-sort">排序</label><select id="wq-sort" name="sort">{% for key,label in [('stock_id','代號'),('close','收盤'),('rank','研究名次'),('score','研究分數'),('mom','月增率'),('yoy','年增率')] %}<option value="{{ key }}" {% if request.args.get('sort','stock_id')==key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="wq-direction">方向</label><select id="wq-direction" name="direction"><option value="asc">小到大</option><option value="desc" {% if request.args.get('direction')=='desc' %}selected{% endif %}>大到小</option></select></div>
+    </div>
+    <div class="toolbar-actions"><button class="btn-primary">查詢（不保存、不下載）</button><span class="hint">空白截止日採各股最新行情日。缺值排序時一律在最後。</span></div>
+  </form>
+
+  <div class="cluster small">
+    {{ ui.badge('通過 ' ~ data.counts.eligible ~ ' / ' ~ data.counts.requested ~ ' 檔', 'ok') }}
+    {{ ui.badge('數值完整 ' ~ data.counts.complete ~ ' 檔', 'neutral') }}
+    {% if data.counts.unavailable %}{{ ui.badge('無法評估 ' ~ data.counts.unavailable ~ ' 檔', 'warn') }}{% endif %}
+    <span class="muted">數值完整不代表已更新至今日；各欄標示自己的資料日期。</span>
+  </div>
+
+  <div class="card">
+  {% if rows %}
+    <div class="table-wrap"><table class="table table-sticky watch-table">
+      <thead><tr><th>股票</th><th class="num">收盤</th><th>策略條件</th><th class="num">保存的研究</th><th class="num">營收月增／年增</th><th>法人累計（股）</th><th>提醒</th></tr></thead>
+      <tbody>{% for r in rows %}<tr>
+        <td><a class="cell-main" href="/stocks/{{ r.stock_id }}">{{ r.stock_id }} {{ r.name or '名稱未提供' }}</a><span class="cell-sub">{{ r.industry or '產業未提供' }}</span></td>
+        <td class="num">{{ r.close | num }}<span class="cell-sub">{{ r.price_date or '未提供' }}</span></td>
+        <td>{{ ui.status(r.status if r.status in ('eligible','filtered') else 'unavailable') }}<span class="cell-sub">{{ r.condition_date or '—' }}</span>
+          {% if (r.diagnostic or {}).get('conditions') or (r.diagnostic or {}).get('reason') %}<details class="cell-details"><summary>條件數值</summary>{% for c in (r.diagnostic or {}).get('conditions',[]) %}<p>{{ c.get('type') }}：{{ c.get('status') | status_label }}{% if c.get('reason') %} · {{ c.reason }}{% endif %}</p>{% endfor %}{% if (r.diagnostic or {}).get('reason') %}<p>{{ r.diagnostic.reason }}</p>{% endif %}</details>{% endif %}</td>
+        <td class="num">{% if r.research %}<a href="/stocks/{{ r.stock_id }}?report={{ r.research.report_key }}">第 {{ r.rank if r.rank is not none else '—' }} 名</a><span class="cell-sub">分數 {{ r.score | num }} · {{ r.research.date }}</span>
+          <details class="cell-details"><summary>母體與來源</summary><p>指定 {{ r.research.pool|join('、') }}；有效母體 {{ r.research.population|length if r.research.population is not none else '未提供' }} 檔</p><p class="subtle">策略雜湊 {{ r.research.strategy_sha256[:12] }}…</p></details>
+          {% else %}<span class="subtle">無相符策略的研究</span>{% endif %}</td>
+        <td class="num">{% if r.revenue %}{{ ui.change(r.revenue.mom.value) }} ／ {{ ui.change(r.revenue.yoy.value) }}<span class="cell-sub">{{ r.revenue.period }} · {{ r.revenue.revenue | int }} 千元</span>{% else %}<span class="subtle">未提供</span>{% endif %}</td>
+        <td class="small">{% for c in r.sums %}<div class="flow"><span class="flow-head">{{ c.window }} 日 {{ ui.badge('完整', 'ok') if c.complete else ui.badge(c.count ~ ' 筆，不足', 'warn') }}</span>{% if c.complete %}<span class="flow-values">外資 <span class="{{ c.totals.foreign | trend }}">{{ c.totals.foreign | signed(0) }}</span> · 投信 <span class="{{ c.totals.trust | trend }}">{{ c.totals.trust | signed(0) }}</span> · 自營 <span class="{{ c.totals.dealer | trend }}">{{ c.totals.dealer | signed(0) }}</span></span>{% endif %}</div>{% else %}<span class="subtle">未提供</span>{% endfor %}</td>
+        <td>{% if r.warnings or r.updates %}<details class="cell-details"><summary>{{ r.warnings | length }} 則</summary>{% for w in r.warnings %}<p>{{ w }}</p>{% endfor %}{% for kind,u in r.updates.items() %}<p>{{ {'revenue':'月營收','institution':'法人','prices':'行情'}.get(kind, kind) }}：{{ u.finished_at | dt }} {{ u.counts }}</p>{% endfor %}</details>{% else %}<span class="subtle">—</span>{% endif %}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  {% elif items %}
+    {{ ui.empty('沒有符合查詢條件的自選股', '調整搜尋或狀態篩選再試一次。', icon_name='search') }}
+  {% else %}
+    {{ ui.empty('尚未加入自選股', '到個股頁搜尋並加入。加入不需要已有排名，也不會下載資料。', '搜尋股票', '/stocks', 'watchlist') }}
+  {% endif %}
+  </div>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <div class="card-header"><div><h2>已保存的快照</h2><p>保存後才有前次紀錄可比較。</p></div></div>
+    {% if snapshots %}
+    <ul class="item-list">{% for snap in snapshots %}<li><div class="item-main"><a class="item-title" href="/reports/{{ snap.report_key }}">{{ snap.strategy_snapshot.definition.name }}</a><div class="item-meta">{{ snap.generated_at | dt }} · {{ snap.counts.requested }} 檔</div></div><div class="item-side"><a class="btn btn-sm btn-ghost" href="/reports/{{ snap.report_key }}">查看摘要／郵件預覽</a></div></li>{% endfor %}</ul>
+    {% else %}{{ ui.empty('尚無快照', '按右上角的保存按鈕，固定目前的條件、數值與來源。', icon_name='report') }}{% endif %}
+  </section>
+
+  {% if items %}
+  <section class="card">
+    <div class="card-header"><div><h2>更新自選資料</h2><p>向官方來源更新行情、歷史營收與法人；最多 10 檔。</p></div></div>
+    <form method="post" action="/watchlist/update" class="watch-update card-body stack-sm">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="form-grid">
+        <div class="field"><label for="wu-kind">種類</label><select id="wu-kind" name="update_kind"><option value="all">行情＋歷史營收＋法人</option><option value="prices">行情</option><option value="revenue">歷史營收</option><option value="institution">法人</option></select></div>
+        <div class="field"><label for="wu-start">行情／法人起日</label><input id="wu-start" type="date" name="start"><span class="hint">空白時增量更新。</span></div>
+        <div class="field"><label for="wu-end">截止日</label><input id="wu-end" type="date" name="end"><span class="hint">空白為今日。</span></div>
+        <div class="field"><label for="wu-rs">營收起月</label><input id="wu-rs" type="month" name="revenue_start"><span class="hint">起迄兩欄同填。</span></div>
+        <div class="field"><label for="wu-re">營收迄月</label><input id="wu-re" type="month" name="revenue_end"></div>
+      </div>
+      <div class="form-actions"><button{% if offline_reason %} disabled{% endif %}>更新自選股資料（最多 10 檔）</button><p role="status" class="form-status"></p></div>
+      {% if offline_reason %}<p class="offline-note small">已停用：{{ offline_reason }}。</p>{% endif %}
+      <p class="hint">首次行情最多 90 日、法人 35 日。更新後重新查詢即可看到新資料；不會清除本頁表單。</p>
+    </form>
+  </section>
+  {% endif %}
+</div>
+
+{% if items %}
+<section class="stack-sm">
+  <h2>私人筆記</h2>
+  <p class="muted small">筆記只保存在本機，不會出現在快照、郵件或 CSV 中。</p>
+  <div class="note-grid">
+  {% for item in items %}
+    <form class="watch-form card note-card" method="post" action="/watchlist/{{ item.stock_id }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="revision" value="{{ item.revision }}">
+      <div class="note-head"><a class="item-title" href="/stocks/{{ item.stock_id }}">{{ item.stock_id }} {{ item.metadata.get('name') or '名稱未提供' }}</a><span class="item-meta">行情 {{ item.latest or '未提供' }} · 研究 {{ item.research_date or '尚無' }}</span></div>
+      <label class="visually-hidden" for="note-{{ item.stock_id }}">{{ item.stock_id }} 的筆記</label>
+      <textarea id="note-{{ item.stock_id }}" name="note" maxlength="600" rows="3" placeholder="最多 600 字">{{ item.note }}</textarea>
+      <div class="cluster"><button class="btn-sm" name="action" value="save">保存</button><button class="btn-sm btn-danger" name="action" value="remove">移除</button></div>
+      <p class="watch-status item-meta" role="status">加入 {{ item.added_at | dt }} · 更新 {{ item.updated_at | dt }}</p>
+    </form>
+  {% endfor %}
+  </div>
+</section>
+{% endif %}
+</div>
+{% endblock %}
