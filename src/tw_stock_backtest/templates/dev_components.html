@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}元件展示 · 台股研究工作台{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="eyebrow">開發用頁面</div>
+    <h1>設計系統</h1>
+    <p>共用的設計變數、排版與元件。只有以 <code>--dev</code> 啟動時才會提供這一頁，不在導覽列中。</p>
+  </div>
+</div>
+
+<div class="stack">
+<section class="stack-sm">
+  <h2>色彩</h2>
+  <div class="dev-swatches">
+    {% for name, label in [('--c-primary','主色'),('--c-primary-soft','主色淺'),('--c-text','文字'),('--c-text-2','次要文字'),('--c-text-3','輔助文字'),('--c-bg','背景'),('--c-surface-2','次表面'),('--c-border','邊框'),('--c-up','上漲'),('--c-down','下跌'),('--c-ok','成功'),('--c-warn','警告'),('--c-err','錯誤'),('--c-neutral','中性')] %}
+    <div class="dev-swatch"><span style="background:var({{ name }})"></span><b>{{ label }}</b><code>{{ name }}</code></div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="stack-sm">
+  <h2>排版</h2>
+  <h1>一級標題：自選股研究總覽</h1>
+  <h2>二級標題：策略條件與指標</h2>
+  <h3>三級標題：資料限制</h3>
+  <div class="prose">
+    <p>內文以 16px、行高 1.7 排版，每行約 38 個中文字。價格未調整除權息與拆股，2026-09-29 收盤 1,234.50 元，月增率 +3.21%，回測期間共 31 個行情日。</p>
+    <p class="muted small">次要說明使用較淺的文字色與較小的字級，例如資料來源、更新時間與限制。</p>
+  </div>
+  <p>數字一律等寬對齊：<span class="num up">+12.34%</span>　<span class="num down">−5.67%</span>　<span class="num flat">0.00%</span></p>
+</section>
+{% block components %}{% endblock %}
+</div>
+{% endblock %}

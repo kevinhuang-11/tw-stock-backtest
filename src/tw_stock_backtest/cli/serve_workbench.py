@@ -11,10 +11,11 @@ def main(argv=None):
     parser.add_argument('--state-dir', default='reports/workbench')
     parser.add_argument('--strategy-dir', default='strategies')
     parser.add_argument('--port', type=int, default=9000)
+    parser.add_argument('--dev', action='store_true', help='開發用：提供元件展示頁 /dev/components')
     args = parser.parse_args(argv)
     workbench = Workbench(args.config, args.reports_dir, args.state_dir, strategy_root=args.strategy_dir)
     try:
-        create_app(workbench).run(host='127.0.0.1', port=args.port, debug=False, use_reloader=False)
+        create_app(workbench, dev=args.dev).run(host='127.0.0.1', port=args.port, debug=False, use_reloader=False)
     finally:
         workbench.close()
 

@@ -349,7 +349,7 @@ class Workbench:
                     self.pending -= 1
 
 
-def create_app(workbench):
+def create_app(workbench, dev=False):
     app = Flask(__name__)
     app.config.update(MAX_CONTENT_LENGTH=8192, TRUSTED_HOSTS=['127.0.0.1', 'localhost'])
     token = secrets.token_urlsafe(32)
@@ -365,7 +365,20 @@ def create_app(workbench):
     @app.context_processor
     def offline():
         # 合成示例環境：模板據此停用會連網的按鈕並顯示原因。
-        return {'offline_reason': offline_reason(workbench.settings['storage']['database_path'])}
+        return {'offline_reason': offline_reason(workbench.settings['storage']['database_path']),
+                'nav_items': navigation(request.path)}
+
+    # 導覽列：(圖示, 標籤, 連結, 視為同一區域的路徑開頭)。只列出已註冊路由的項目，不會連到不存在的頁面。
+    NAVIGATION = [('home', '總覽', '/', ()), ('research', '研究', '/new/research', ('/new/research',)),
+                  ('backtest', '回測', '/new/backtest', ('/new/backtest',)), ('watchlist', '自選', '/watchlist', ('/watchlist',)),
+                  ('stock', '個股', '/stocks', ('/stocks',)), ('strategy', '策略', '/strategies', ('/strategies',)),
+                  ('report', '報表', '/reports', ('/reports', '/compare', '/jobs'))]
+
+    def navigation(path):
+        registered = {rule.rule for rule in app.url_map.iter_rules()}
+        return [{'icon': icon, 'label': label, 'href': href,
+                 'active': path == href or any(path.startswith(prefix) for prefix in prefixes)}
+                for icon, label, href, prefixes in NAVIGATION if href in registered]
 
     @app.after_request
     def headers(response):
@@ -551,4 +564,10 @@ def create_app(workbench):
 
     from tw_stock_backtest.stock_research import register_stock_routes
     register_stock_routes(app, workbench, token)
+
+    if dev:
+        # 開發用的元件展示頁；正式啟動時不註冊，也不出現在導覽列。
+        @app.get('/dev/components')
+        def dev_components():
+            return render_template('dev_components.html')
     return app

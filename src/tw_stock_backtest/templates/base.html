@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}台股研究工作台{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css">
+{% block head %}{% endblock %}
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要內容</a>
+{# 導覽項目由 workbench.py 的 navigation() 提供：只含已存在的頁面，並標示目前所在區域。 #}
+<header class="site-header">
+  <div class="site-header-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#logo"/></svg></span>
+      <span>台股研究工作台</span>
+    </a>
+    <nav class="site-nav" aria-label="主要導覽">
+      {% for item in nav_items %}
+      <a href="{{ item.href }}"{% if item.active %} aria-current="page"{% endif %}><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#{{ item.icon }}"/></svg>{{ item.label }}</a>
+      {% endfor %}
+    </nav>
+    <div class="site-meta">
+      {% if offline_reason %}<span class="badge badge-warn" title="{{ offline_reason }}"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#offline"/></svg>離線示範</span>{% endif %}
+    </div>
+  </div>
+</header>
+<main class="site-main" id="main">
+{% block content %}{% endblock %}
+</main>
+<footer class="site-footer">
+  本機研究工具。測試驗證的是軟體行為，不代表策略已證明能獲利；價格未調整除權息。
+</footer>
+<script src="/static/app.js" defer></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
