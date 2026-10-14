@@ -329,6 +329,39 @@ class TestResearchResume(ResearchCase):
 
 
 class TestResearchMetadata(ResearchCase):
+    def test_stock_names_come_from_local_universe_when_pool_is_given_by_code(self):
+        # 重現：工作台以 --stocks 建立研究時，報表顯示「名稱未提供」，即使行情庫旁的名單有名稱。
+        from tw_stock_backtest.data.universe import save_universe
+        from tw_stock_backtest.research_digest import load_digest
+        save_universe([{'stock_id':sid,'name':name,'market':'上市','industry':'測試產業',
+                        'listed_date':'2000-01-01','cfi_code':'ESVUFR'} for sid,name in [('2330','測試甲'),('2317','測試乙')]],
+                      self.db.with_name('listed_stocks.json'))
+        for sid in ['2330','2317']: self.seed(sid,days=25)
+        with redirect_stdout(io.StringIO()):
+            code=run_research.main(['--config',str(self.config),'--stocks','2330','2317','--skip-download',
+                '--as-of','2026-09-25','--output-dir',str(self.root/'out')])
+        self.assertEqual(code,0)
+        run=next((self.root/'out').iterdir())
+        universe=json.loads((run/'universe.json').read_text())
+        self.assertEqual(universe['source'],'stocks')
+        self.assertEqual({s['stock_id']:(s['name'],s['industry']) for s in universe['stocks']},
+                         {'2330':('測試甲','測試產業'),'2317':('測試乙','測試產業')})
+        digest=load_digest(run/'summary.json')
+        self.assertEqual({c['stock_id']:c['name'] for c in digest['candidates']},{'2330':'測試甲','2317':'測試乙'})
+
+    def test_missing_or_unreadable_local_universe_keeps_names_empty(self):
+        self.seed('2330',days=25)
+        for index,content in enumerate([None,'{broken']):
+            listed=self.db.with_name('listed_stocks.json')
+            if content is not None: listed.write_text(content,encoding='utf-8')
+            with redirect_stdout(io.StringIO()):
+                code=run_research.main(['--config',str(self.config),'--stocks','2330','--skip-download',
+                    '--as-of','2026-09-25','--output-dir',str(self.root/f'out{index}')])
+            self.assertEqual(code,0)
+            run=next((self.root/f'out{index}').iterdir())
+            self.assertEqual(json.loads((run/'universe.json').read_text())['stocks'],
+                             [{'stock_id':'2330','name':'','industry':''}])
+
     def test_universe_snapshot_and_full_rankings_ignore_display_limit(self):
         from tw_stock_backtest.data.universe import save_universe
         universe=self.root/'universe.json'

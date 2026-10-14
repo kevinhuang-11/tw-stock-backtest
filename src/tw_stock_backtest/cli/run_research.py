@@ -6,7 +6,7 @@ from pathlib import Path
 import sqlite3
 
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config, apply_overrides
-from tw_stock_backtest.data.universe import load_universe, is_synthetic, ensure_network_allowed, NetworkDisabled
+from tw_stock_backtest.data.universe import load_universe, is_synthetic, ensure_network_allowed, NetworkDisabled, universe_path_for
 from tw_stock_backtest.reporting import ResearchReport
 from tw_stock_backtest.research import (
     taipei_today, program_version, update_stocks, evaluate_research,
@@ -108,12 +108,28 @@ def main(argv=None):
             "settings": settings, "parameters": vars(args), "version": version, "run_id": report.run_id,
             "started_at": started, "taipei_today": today,
         })
+        # 以代號或設定檔指定股票池時沒有名稱；從行情庫旁的名單補上，只供報表顯示。
+        # 不放進 job，避免改變 resume 的工作識別；名單不存在或無法讀取時維持空白。
+        listed_names = {}
+        if snapshot is None:
+            listed = universe_path_for(settings["storage"]["database_path"])
+            try:
+                if listed.is_file():
+                    listed_names = {s["stock_id"]: s for s in load_universe(listed)["stocks"]}
+            except (ValueError, OSError):
+                listed_names = {}
+        def described(stock):
+            row = {k: stock[k] for k in ("stock_id", "name", "industry", "listed_date") if k in stock}
+            known = listed_names.get(stock["stock_id"], {})
+            for key in ("name", "industry"):
+                if not row.get(key) and known.get(key):
+                    row[key] = known[key]
+            return row
         # 名單採白名單欄位，避免將來源檔的任意額外欄位寫入 artifacts。
         report.write_json("universe.json", {
             "source": (snapshot["source_url"] if is_synthetic(snapshot) else "universe_file") if snapshot else "stocks" if args.stocks else "config",
             "downloaded_at": snapshot["downloaded_at"] if snapshot else None,
-            "stocks": [{k: s[k] for k in ("stock_id", "name", "industry", "listed_date") if k in s}
-                       for s in stocks],
+            "stocks": [described(s) for s in stocks],
         })
         def progress(rows, status="running"):
             report.write_json("progress.json", {
