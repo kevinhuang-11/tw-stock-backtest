@@ -105,10 +105,17 @@ python3.12 -m venv .venv
 ## Testing
 
 ```bash
+# 完整測試；結尾的 "Ran N tests" 會顯示實際執行的項數
 .venv/bin/python -m unittest discover -s tests -v
+
+# 只跑一個測試檔
+.venv/bin/python -m unittest discover -s tests -p 'test_portfolio_backtest.py' -v
+
+# 只跑名稱符合的測試
+.venv/bin/python -m unittest discover -s tests -k future -v
 ```
 
-共 372 項測試，全部離線執行，不需要網路或任何憑證。涵蓋範圍包含未來資料隔離、策略與交易成本、資料修訂、快照比較與安全邊界。
+測試全部離線執行，不需要網路或任何憑證。涵蓋範圍包含未來資料隔離、策略與交易成本、資料修訂、快照比較與安全邊界。
 
 CI 會在乾淨的 runner 上安裝套件，再執行同一組測試。另有一個研究 workflow 會取得行情並產出排名，它的定時執行預設關閉。
 
