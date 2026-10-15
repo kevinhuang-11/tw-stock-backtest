@@ -70,8 +70,18 @@ done
 | `run_research --universe data/listed_stocks.json --allow-partial` | 整份上市名單 | 行情增量，接著排名 |
 | `download_universe` | 整份名單，可分批 | 指定區間內逐月重抓（不是增量） |
 | `fetch_stock` | 單檔，指定區間 | 區間內逐月重抓 |
+| `fetch_corporate_actions` | 股票池（或指定股票），指定區間 | 除權息、減資、變更面額；每個日曆年 3 次列表請求，加上含配股的除權息與每筆減資各 1 次詳細資料 |
 
 增量以月為單位：重抓每檔最新紀錄所在的月份及之後的月份，停在上個月底附近的股票約需 2 次請求。請求間隔與重試依 `[download]` 設定（預設間隔 3 秒），整份上市名單約 2,100 次請求、約 2 小時。總覽的「資料狀態」會列出行情最新日、停在較舊日期的股票數，以及名單、營收與法人的更新日期；「落後幾個行情日」是依本機行情庫推算，不是交易日曆。
+
+公司行動（除權息、減資、變更面額）來自證交所的除權除息計算結果表、股票減資恢復買賣參考價格與變更股票面額恢復買賣參考價格，存在行情庫的 `corporate_actions` 表。只抓股票池需要的期間；先用 `--plan` 看要送的請求，總請求數（含重試）超過 `--max-requests`（預設 50）時整批放棄、不寫入。解析時會用官方公式反推參考價，對不上或來源含糊的列會標為「待人工確認」並列出原因，不自行推定。目前指標、回測與報表都還沒有使用這些資料。
+
+```bash
+.venv/bin/python -m tw_stock_backtest.cli.fetch_corporate_actions \
+  --config config.toml --start 2026-01-01 --end 2026-10-15 --plan
+.venv/bin/python -m tw_stock_backtest.cli.fetch_corporate_actions \
+  --config config.toml --start 2026-01-01 --end 2026-10-15
+```
 
 ```bash
 # 只讀本機行情；保存完整排名，螢幕只顯示前 N 名

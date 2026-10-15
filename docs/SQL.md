@@ -78,6 +78,7 @@ CREATE INDEX IF NOT EXISTS idx_stock_prices_missing_close
 MIGRATIONS = (
     (1, (TABLE,)),      # 行情表；舊版程式建立的資料庫已有此表，這一步不會改動它
     (2, INDEXES),       # 日期索引與缺價部分索引
+    (3, CORPORATE_ACTIONS),  # 公司行動表（見下一節）
 )
 ```
 
@@ -108,6 +109,17 @@ MIGRATIONS = (
 | 再執行一次 | 版本 2 → 2，0.26 ms，資料不變 |
 
 測試涵蓋：依舊版寫法建立的資料庫升級後資料不變、重複執行、寫入時自動升級、新資料庫直接是最新版本、某一步失敗時整個版本回滾、較新版本被拒絕、只查版本不會建立檔案，以及 CLI 的 `--check` 不修改資料庫。
+
+## 公司行動表
+
+第 3 版新增 `corporate_actions`，保存股票池的除權息、減資與變更面額（[data/corporate_actions.py](../src/tw_stock_backtest/data/corporate_actions.py)）：
+
+- 主鍵 `(stock_id, effective_date, kind)`；`kind` 以 CHECK 限定為 `dividend`、`capital_reduction`、`par_change`。生效日是除權息日，減資與變更面額則是恢復買賣日。
+- 官方公告的前收與參考價、每股現金股利、每千股配股或換發股數、退還股款都以字串保存 Decimal，和行情一致；SQL 只用來篩選與排序。
+- `needs_review`、`review_notes` 記錄解析時發現的疑點，例如依公告數值反推的參考價對不上、減資表注意事項中無法對應到特定一次減資的併案股利。待確認的列只占少數，用部分索引 `idx_corporate_actions_review` 查詢。
+- `sources`（https 網址）與 `raw`（原始回應列）讓每一筆都能回溯到官方資料。
+
+目前只保存資料，指標、回測與報表都還沒有使用這張表。
 
 ## 在資料庫端完成的資料品質檢查
 
