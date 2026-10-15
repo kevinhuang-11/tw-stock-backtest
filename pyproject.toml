@@ -23,4 +23,4 @@ where = ["src"]
 include = ["tw_stock_backtest*"]
 
 [tool.setuptools.package-data]
-tw_stock_backtest = ["templates/*.html", "static/*.js", "static/*.css", "static/*.svg"]
+tw_stock_backtest = ["templates/*.html", "static/*.js", "static/*.css", "static/*.svg", "data/*.json"]

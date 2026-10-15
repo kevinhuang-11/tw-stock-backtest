@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "description": "已人工核實、附公開來源的停止買賣或暫停交易事件。start 與 end 為含頭尾的日曆日區間，只有區間內實際出現的行情日會被當成停牌日。未列入的缺價或缺漏一律不認定為停牌。",
+  "halts": [
+    {
+      "stock_id": "2317",
+      "start": "2025-07-30",
+      "end": "2025-07-30",
+      "reason": "重大訊息待公布，暫停交易",
+      "sources": [
+        "https://investoredu.twse.com.tw/Mobile_Pages/..%2FFileSystem%2FFileUpload%2Fcb744523-2d37-495f-9738-345b882924e7.pdf"
+      ]
+    }
+  ]
+}

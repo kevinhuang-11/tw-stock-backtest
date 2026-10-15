@@ -1,19 +1,61 @@
-from datetime import date
+import json
+import re
+from datetime import date, timedelta
 from decimal import Decimal
+from importlib import resources
 
 
-# 第一版先保存已人工核實的事件。
+MAX_HALT_DAYS = 400
+
+
+def load_confirmed_halts(path=None):
+    """讀取已確認停牌清單，展開成 {(股票, 日期): {"reason", "source", "sources"}}。
+
+    資料檔（預設為套件內的 confirmed_halts.json）每筆是一段含頭尾的日曆日區間，
+    必須附上至少一個 https 來源。區間內的週末或休市日也會展開，但只有實際出現的
+    行情日會被查到，不影響結果。格式不符時直接失敗，不略過任何一筆。
+    """
+    if path is None:
+        text = resources.files(__package__).joinpath("confirmed_halts.json").read_text(encoding="utf-8")
+    else:
+        text = open(path, encoding="utf-8").read()
+
+    document = json.loads(text)
+    if document.get("schema_version") != 1 or not isinstance(document.get("halts"), list):
+        raise ValueError("已確認停牌清單格式或 schema_version 無效")
+
+    halts = {}
+    for entry in document["halts"]:
+        stock_id = entry.get("stock_id")
+        reason = entry.get("reason")
+        sources = entry.get("sources")
+        if not isinstance(stock_id, str) or not re.fullmatch(r"\d{4}", stock_id):
+            raise ValueError(f"已確認停牌的股票代號無效：{stock_id!r}")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError(f"{stock_id} 的停牌原因不可為空")
+        if (not isinstance(sources, list) or not sources
+                or not all(isinstance(url, str) and url.startswith("https://") for url in sources)):
+            raise ValueError(f"{stock_id} 的停牌必須附上 https 來源")
+
+        start = date.fromisoformat(entry.get("start", ""))
+        end = date.fromisoformat(entry.get("end", ""))
+        if not start <= end or (end - start).days >= MAX_HALT_DAYS:
+            raise ValueError(f"{stock_id} 的停牌區間無效：{start} ～ {end}")
+
+        event = {"reason": reason, "source": sources[0], "sources": list(sources)}
+        current = start
+        while current <= end:
+            key = (stock_id, current.isoformat())
+            if key in halts:
+                raise ValueError(f"{stock_id} 的停牌區間重疊：{key[1]}")
+            halts[key] = event
+            current += timedelta(days=1)
+
+    return halts
+
+
 # 未列入清單的缺價紀錄不認定為停牌，只標示為無成交價（原因未確認）。
-CONFIRMED_HALTS = {
-    ("2317", "2025-07-30"): {
-        "reason": "重大訊息待公布，暫停交易",
-        "source": (
-            "https://investoredu.twse.com.tw/"
-            "Mobile_Pages/..%2FFileSystem%2FFileUpload%2F"
-            "cb744523-2d37-495f-9738-345b882924e7.pdf"
-        ),
-    },
-}
+CONFIRMED_HALTS = load_confirmed_halts()
 
 
 PRICE_FIELDS = ("open", "high", "low", "close")
