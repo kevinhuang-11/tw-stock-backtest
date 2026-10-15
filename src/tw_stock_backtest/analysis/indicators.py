@@ -1,6 +1,47 @@
 from decimal import Decimal
 
 
+def is_valid_price(value):
+    """價格是否為有限且大於 0 的 Decimal；None（缺價）與其他型別都不是。"""
+    return isinstance(value, Decimal) and value.is_finite() and value > 0
+
+
+def restart_index(prices):
+    """最後一筆無效價格的下一個位置；全部有效時為 0。
+
+    遞迴指標（EMA、RSI、MACD）的每個值都由前一個值推算，缺價那天之後的值無法定義。
+    因此只用最後一次缺價之後的連續有效價格重新暖機：不補值、不刪列，
+    起點只由分析日以前的資料決定。
+    """
+    for index in range(len(prices) - 1, -1, -1):
+        if not is_valid_price(prices[index]):
+            return index + 1
+    return 0
+
+
+def valid_segments(prices):
+    """把序列切成連續有效價格的區段，回傳 [(起點, 終點)]，終點不含。"""
+    segments, start = [], None
+    for index, price in enumerate(prices):
+        if is_valid_price(price):
+            if start is None:
+                start = index
+        elif start is not None:
+            segments.append((start, index))
+            start = None
+    if start is not None:
+        segments.append((start, len(prices)))
+    return segments
+
+
+def segmented(calculate, prices, empty=None):
+    """在每個有效區段內各自計算遞迴指標；缺價位置與暖機不足處為 empty。"""
+    result = [empty] * len(prices)
+    for start, end in valid_segments(prices):
+        result[start:end] = calculate(prices[start:end])
+    return result
+
+
 def simple_moving_average(prices, period):
     """計算 SMA；輸出與輸入等長，資料不足的位置填 None。"""
     if isinstance(period, bool) or not isinstance(period, int):

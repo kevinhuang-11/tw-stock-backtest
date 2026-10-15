@@ -118,8 +118,8 @@ class StrategyTests(unittest.TestCase):
         self.assertTrue((output/'comparison.png').is_file())
         with self.assertRaises(ValueError):compare_strategies(s,[self.strategy,self.strategy],'2026-08-25','2026-09-09',self.root/'bad')
 
-    def test_confirmed_halt_is_not_removed_for_recursive_indicators(self):
-        rows=records();halt=rows[5]
+    def test_confirmed_halt_restarts_recursive_indicators_without_removing_rows(self):
+        rows=records();halt=rows[20]
         for field in ('open','high','low','close'):halt[field]=None
         for field in ('volume','turnover','trade_count'):halt[field]=0
         strategy=copy.deepcopy(self.strategy)
@@ -129,8 +129,16 @@ class StrategyTests(unittest.TestCase):
             screening_settings=s['screening'],factor_settings=s['factors'],strategy=strategy,
             initial_cash=b['initial_cash'],quantity=b['quantity'],max_positions=b['max_positions'],
             cost_settings=CostSettings(**s['costs']),confirmed_halts={('2330',halt['date']):{'reason':'test'}})
-        self.assertTrue(all('2330' in d['errors'] for d in result['strategy_diagnostics']))
-        self.assertEqual(result['trades'],[])
+        # 停牌在 08-21；RSI 14 需要 15 筆，自 08-22 起重新暖機，09-05 才可評估。
+        for day in result['strategy_diagnostics']:
+            rsi=day['diagnostics']['2330']['conditions'][0]
+            self.assertEqual(rsi['restarted_after'],'2026-08-21')
+            self.assertEqual(rsi['input_range']['start'],'2026-08-22')
+            if day['date']<'2026-09-05':
+                self.assertEqual(rsi['status'],'unavailable')
+                self.assertIn('重新暖機',rsi['reason'])
+            else:
+                self.assertIn(rsi['status'],('passed','filtered'))
 
     def test_rules_baseline_and_cli_override_precedence(self):
         s=self.settings;b=s['backtest'];strategy=from_settings(s,'rules')

@@ -76,10 +76,12 @@ class PeriodTests(unittest.TestCase):
                       {'type':'macd','fast':2,'slow':3,'signal':2},
                       {'type':'trend','short_window':2,'long_window':3}]
         result = evaluate_conditions(rows, rows[-1]['date'], conditions)
+        # 第一筆缺價後，遞迴指標從第二筆重新暖機，不補值也不刪列。
         for r in result[:2]:
-            self.assertEqual(r['status'], 'unavailable')
-            self.assertEqual(r['invalid_inputs'], [{'date':'2026-08-01','position':1,'field':'close'}])
-            self.assertEqual(r['input_range']['rows'],40)
+            self.assertIn(r['status'], ('passed','filtered'))
+            self.assertEqual(r['restarted_after'], '2026-08-01')
+            self.assertEqual(r['input_range']['start'], '2026-08-02')
+            self.assertEqual(r['input_range']['rows'],39)
         self.assertEqual(result[-1]['status'], 'passed')
         future = dict(rows[-1], date='2027-01-01', close=None)
         self.assertEqual(result, evaluate_conditions(rows+[future], rows[-1]['date'], conditions))

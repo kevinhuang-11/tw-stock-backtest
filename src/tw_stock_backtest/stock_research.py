@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 
 from tw_stock_backtest.analysis.indicators import (
     simple_moving_average, exponential_moving_average, relative_strength_index,
-    moving_average_convergence_divergence,
+    moving_average_convergence_divergence, is_valid_price, segmented,
 )
 from tw_stock_backtest.data.database import load_records
 from tw_stock_backtest.data.universe import load_universe
@@ -180,7 +180,7 @@ def stock_history(bundles, sid):
 
 
 def chart_data(records, strategy, display=120):
-    """Display slicing happens AFTER calculation. A gap never resets recursive seeds."""
+    """Display slicing happens AFTER calculation. Recursive indicators restart after each missing close."""
     if display not in (60,120,240,600): raise ValueError('顯示範圍不支援')
     closes = [r['close'] for r in records]
     settings = strategy['factors'] if strategy['ranking_mode']=='factors' else strategy['screening']
@@ -188,19 +188,21 @@ def chart_data(records, strategy, display=120):
     conditions = {c['type']:c for c in strategy['conditions']}
     rsi_n = conditions.get('rsi', {}).get('period',14)
     macd = conditions.get('macd', {'fast':12,'slow':26,'signal':9})
-    first_bad = next((i for i,c in enumerate(closes) if not isinstance(c,Decimal) or not c.is_finite() or c<=0),len(closes))
-    prefix = closes[:first_bad]
     sma = []
     for i in range(len(closes)):
         try: sma.append(simple_moving_average(closes[max(0,i-n+1):i+1],n)[-1])
         except ValueError: sma.append(None)
-    ema = exponential_moving_average(prefix,n) + [None]*(len(closes)-first_bad)
-    rsi = relative_strength_index(prefix,rsi_n) + [None]*(len(closes)-first_bad)
-    values = moving_average_convergence_divergence(prefix,macd['fast'],macd['slow'],macd['signal'])
-    values += [{'macd':None,'signal':None,'histogram':None} for _ in range(len(closes)-first_bad)]
+    ema = segmented(lambda part: exponential_moving_average(part,n), closes)
+    rsi = segmented(lambda part: relative_strength_index(part,rsi_n), closes)
+    values = segmented(lambda part: moving_average_convergence_divergence(part,macd['fast'],macd['slow'],macd['signal']),
+                       closes, {'macd':None,'signal':None,'histogram':None})
     rows = [{**r,'sma':sma[i],'ema':ema[i],'rsi':rsi[i],**values[i]} for i,r in enumerate(records)]
     reasons = []
-    if first_bad<len(closes): reasons.append(f"{records[first_bad]['date']} 第 {first_bad+1} 筆收盤缺失或無效，此日起 EMA／RSI／MACD 不計算、不重置；SMA 僅檢查當期窗口。")
+    gaps = [i for i,c in enumerate(closes) if not is_valid_price(c)]
+    if gaps:
+        last = gaps[-1]
+        reasons.append(f"{len(gaps)} 筆收盤缺失或無效（最近一筆為 {records[last]['date']}，第 {last+1} 筆）；"
+                       "EMA／RSI／MACD 在每次缺價後重新暖機，不補值；SMA 只要窗口內有缺價就不計算。")
     if rows:
         for field in ('sma','ema','rsi','macd','signal'):
             if rows[-1][field] is None: reasons.append(f'{field} 在最後行情日缺值或暖機不足')

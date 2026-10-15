@@ -15,7 +15,7 @@ from tw_stock_backtest.analysis.factors import calculate_factor_row, rank_factor
 from tw_stock_backtest.analysis.screening import evaluate_stock
 from tw_stock_backtest.analysis.indicators import (
     relative_strength_index, moving_average_convergence_divergence,
-    previous_high_breakout, simple_moving_average,
+    previous_high_breakout, simple_moving_average, restart_index,
 )
 from tw_stock_backtest.cli.download_universe import save_progress
 
@@ -169,25 +169,29 @@ def evaluate_conditions(records, as_of, conditions):
             closes = [r['close'] for r in history]
             kind = c['type']
             if kind in ('rsi', 'macd'):
-                result['input_range'] = {'start': history[0]['date'], 'end': history[-1]['date'],
-                                         'rows': len(history), 'policy': 'entire_prefix_no_reset'}
-                invalid = [{'date': row['date'], 'position': i + 1, 'field': 'close'}
-                           for i, row in enumerate(history)
-                           if not isinstance(row.get('close'), Decimal)
-                           or not row['close'].is_finite() or row['close'] <= 0]
-                if invalid:
-                    result['invalid_inputs'] = invalid
-                    raise ValueError(f"遞迴指標歷史收盤價缺失或無效：{invalid[0]['date']}，第 {invalid[0]['position']} 筆；不補值或重置")
+                # 遞迴指標只用最後一次缺價之後的連續收盤價，缺價後重新暖機。
+                start = restart_index(closes)
+                segment = closes[start:]
+                result['input_range'] = {'start': history[start]['date'] if segment else None,
+                                         'end': history[-1]['date'], 'rows': len(segment),
+                                         'policy': 'restart_after_missing_close'}
+                if start:
+                    result['restarted_after'] = history[start - 1]['date']
+                if not segment:
+                    raise ValueError(f"{as_of} 收盤價缺失或無效")
+                needed = c['period'] + 1 if kind == 'rsi' else c['slow'] + c['signal'] - 1
+                if len(segment) < needed:
+                    label = 'RSI' if kind == 'rsi' else 'MACD 訊號線'
+                    if start:
+                        raise ValueError(f"{label} 重新暖機中：{history[start - 1]['date']} 收盤價缺失，"
+                                         f"自 {history[start]['date']} 起需 {needed} 筆，目前 {len(segment)} 筆")
+                    raise ValueError(f'{label} 暖機不足')
             if kind == 'rsi':
-                value = relative_strength_index(closes, c['period'])[-1]
-                if value is None:
-                    raise ValueError('RSI 暖機不足')
+                value = relative_strength_index(segment, c['period'])[-1]
                 result.update(value=value, minimum=c['minimum'], maximum=c['maximum'],
                               passed=Decimal(c['minimum']) <= value <= Decimal(c['maximum']))
             elif kind == 'macd':
-                values = moving_average_convergence_divergence(closes, c['fast'], c['slow'], c['signal'])[-1]
-                if values['signal'] is None:
-                    raise ValueError('MACD 訊號線暖機不足')
+                values = moving_average_convergence_divergence(segment, c['fast'], c['slow'], c['signal'])[-1]
                 result.update(values, passed=values['macd'] > values['signal'])
             elif kind == 'breakout':
                 result.update(previous_high_breakout(history, c['period']))

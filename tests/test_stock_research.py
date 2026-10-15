@@ -57,7 +57,12 @@ class StockResearchTests(unittest.TestCase):
     def test_gaps_warmup_and_three_condition_states(self):
         rows=copy.deepcopy(self.rows);rows[3]['close']=None
         chart=chart_data(rows,self.strategy,120)
-        self.assertIsNone(chart['rows'][3]['close']);self.assertIsNone(chart['rows'][-1]['rsi'])
+        self.assertIsNone(chart['rows'][3]['close']);self.assertIsNone(chart['rows'][3]['rsi'])
+        # 缺價後從第 5 筆重新暖機：RSI 14 在第 19 筆才有值，之後與只用缺價後資料計算的結果相同。
+        self.assertIsNone(chart['rows'][17]['rsi']);self.assertIsNotNone(chart['rows'][18]['rsi'])
+        prices=[r['close'] for r in rows[4:]]
+        self.assertEqual(D(chart['rows'][-1]['rsi']),relative_strength_index(prices,14)[-1])
+        self.assertEqual(D(chart['rows'][-1]['ema']),exponential_moving_average(prices,self.strategy['factors']['long_window'])[-1])
         self.assertIsNotNone(chart['rows'][-1]['sma'])
         self.assertTrue(any('第 4 筆' in r for r in chart['reasons']))
         warm=chart_data(rows[:2],self.strategy,60)
@@ -67,10 +72,15 @@ class StockResearchTests(unittest.TestCase):
             self.wb.library.save(s,replace=True)
             actual=current_stock(self.wb,'2330',{'as_of':'2026-09-29','strategy_id':'baseline'})
             self.assertEqual(actual['diagnostic']['status'],state)
+        # 早期缺價在重新暖機後不再影響；接近分析日的缺價仍讓 RSI 無法評估並說明日期。
         save_records([rows[3]],db_path=self.wb.settings['storage']['database_path'])
         actual=current_stock(self.wb,'2330',{'as_of':'2026-09-29','strategy_id':'baseline'})
+        self.assertEqual(actual['diagnostic']['status'],'filtered')
+        recent=dict(rows[50],open=None,high=None,low=None,close=None)
+        save_records([recent],db_path=self.wb.settings['storage']['database_path'])
+        actual=current_stock(self.wb,'2330',{'as_of':'2026-09-29','strategy_id':'baseline'})
         self.assertEqual(actual['diagnostic']['status'],'unavailable')
-        self.assertIn('2026-08-04',actual['diagnostic']['conditions'][0]['reason'])
+        self.assertIn(recent['date'],actual['diagnostic']['conditions'][0]['reason'])
         self.assertEqual(self.client.get('/stocks/2330?strategy_id=baseline&as_of=2026-09-29').status_code,200)
 
     def test_watchlist_persistence_conflict_escape_and_protection(self):
