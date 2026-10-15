@@ -244,8 +244,19 @@ def stock_history(bundles, sid):
     return list(reversed(result))
 
 
-def chart_data(records, strategy, display=120):
-    """Display slicing happens AFTER calculation. Recursive indicators restart after each missing close."""
+KIND_LABELS = {"dividend": "除權息", "capital_reduction": "減資", "par_change": "變更面額"}
+PRICE_BASIS = {
+    "raw": "原始價格（TWSE 行情，未調整除權息、減資與變更面額）",
+    "adjusted": "還原價（截至最後一筆行情已生效的公司行動；K 線、成交量與所有指標使用同一口徑）",
+}
+
+
+def chart_data(records, strategy, display=120, *, basis="raw", events=(), uncovered=()):
+    """Display slicing happens AFTER calculation. Recursive indicators restart after each missing close.
+
+    records 必須已是 basis 指定口徑的序列：K 線、均線與指標都由同一份序列計算，不混用口徑。
+    events 是期間內的公司行動，只用於標示；uncovered 是沒有下載公司行動資料的期間。
+    """
     if display not in (60, 120, 240, 600):
         raise ValueError("顯示範圍不支援")
     closes = [r["close"] for r in records]
@@ -290,8 +301,25 @@ def chart_data(records, strategy, display=120):
             "calculation_rows": len(records),
             "calculation_start": records[0]["date"] if records else None,
             "parameters": {"sma_ema": n, "rsi": rsi_n, "macd": macd},
-            "reasons": reasons,
-            "price_adjustment": "TWSE 原始行情，未做除權息／拆股調整",
+            "reasons": reasons
+            + [
+                f"{start} ～ {end} 沒有下載公司行動資料，這段期間無法還原"
+                for start, end in uncovered
+            ],
+            "price_basis": basis,
+            "price_adjustment": PRICE_BASIS[basis],
+            "events": [
+                {
+                    "date": action["effective_date"],
+                    "label": KIND_LABELS.get(action["kind"], action["kind"]),
+                    "previous_close": action["previous_close"],
+                    "reference_price": action["reference_price"],
+                    "needs_review": action["needs_review"],
+                }
+                for action in events
+                if rows
+                and rows[-display:][0]["date"] <= action["effective_date"] <= rows[-1]["date"]
+            ],
         }
     )
 
@@ -315,6 +343,18 @@ def current_stock(wb, sid, args):
         if args.get("strategy_id")
         else from_settings(wb.settings)
     )
+    # 圖表口徑由使用者切換，預設原始價格；與設定檔的價格模式無關。
+    basis = args.get("prices") or "raw"
+    if basis not in PRICE_BASIS:
+        raise ValueError("價格口徑只支援 raw 或 adjusted")
+    chart_prices = PriceSource({**wb.settings, "corporate_actions": {"mode": "adjusted"}})
+    chart_records = chart_prices.adjust(records, sid) if basis == "adjusted" else records
+    chart_gaps = (
+        [tuple(gap) for gap in chart_prices.describe()["uncovered"].get(sid, [])]
+        if basis == "adjusted"
+        else []
+    )
+
     # 條件與因子依價格模式計算（adjusted 為截至分析日的還原價）。
     prices = PriceSource(wb.settings)
     analysis = analyze_strategy({sid: prices.adjust(records, sid, target)}, target, strategy)
@@ -332,7 +372,14 @@ def current_stock(wb, sid, args):
         "diagnostic": analysis["diagnostics"].get(sid),
         "factors": scored[0].get("factors") if scored else None,
         "price_adjustment": prices.describe(),
-        "chart": chart_data(records, strategy, int(args.get("display", 120))),
+        "chart": chart_data(
+            chart_records,
+            strategy,
+            int(args.get("display", 120)),
+            basis=basis,
+            events=chart_prices.actions(sid, records[-1]["date"]) if records else (),
+            uncovered=chart_gaps,
+        ),
         "ranking": None,
         "pool": None,
         "report_key": None,

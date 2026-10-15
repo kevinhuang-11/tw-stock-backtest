@@ -17,7 +17,7 @@ from tw_stock_backtest.research import evaluate_research
 from tw_stock_backtest.stock_research import current_stock
 from tw_stock_backtest.strategies import from_settings
 from tw_stock_backtest.watchlist_research import observations
-from tw_stock_backtest.workbench import Workbench
+from tw_stock_backtest.workbench import Workbench, create_app
 
 
 def trading_days(count, first=date(2026, 1, 5)):
@@ -78,7 +78,9 @@ def reduction():
     }
 
 
-class AdjustedResearchTests(unittest.TestCase):
+class ReductionFixture(unittest.TestCase):
+    """兩檔股票，其中 2330 在 EVENT 減資；公司行動資料涵蓋整年。"""
+
     def setUp(self):
         temp = TemporaryDirectory()
         self.addCleanup(temp.cleanup)
@@ -101,6 +103,8 @@ class AdjustedResearchTests(unittest.TestCase):
         )
         self.as_of = DAYS[52]
 
+
+class AdjustedResearchTests(ReductionFixture):
     def with_mode(self, mode):
         return {**self.settings, "corporate_actions": {"mode": mode}}
 
@@ -175,3 +179,41 @@ class AdjustedResearchTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StockChartBasisTests(ReductionFixture):
+    def chart(self, **args):
+        return current_stock(self.wb, "2330", {"as_of": DAYS[-1], **args})["chart"]
+
+    def test_raw_is_the_default_and_lists_the_event(self):
+        chart = self.chart()
+        self.assertEqual(chart["price_basis"], "raw")
+        self.assertIn("原始價格", chart["price_adjustment"])
+        by_date = {r["date"]: r for r in chart["rows"]}
+        self.assertEqual(by_date[DAYS[49]]["close"], str(rows("2330")[49]["close"]))
+        self.assertEqual([(e["date"], e["label"]) for e in chart["events"]], [(EVENT, "減資")])
+
+    def test_adjusted_chart_uses_one_series_for_prices_and_indicators(self):
+        chart = self.chart(prices="adjusted")
+        self.assertEqual(chart["price_basis"], "adjusted")
+        closes = [D(r["close"]) for r in chart["rows"]]
+        by_date = {r["date"]: r for r in chart["rows"]}
+        # 生效日前的收盤已還原，跳空消失。
+        self.assertLess(
+            abs(D(by_date[EVENT]["close"]) / D(by_date[DAYS[49]]["close"]) - 1), D("0.02")
+        )
+        # 均線由同一份還原收盤計算。
+        window = self.settings["factors"]["long_window"]
+        index = len(closes) - 1
+        expected = sum(closes[index - window + 1 : index + 1], D(0)) / window
+        self.assertEqual(
+            D(by_date[DAYS[-1]]["sma"]).quantize(D("0.0001")), expected.quantize(D("0.0001"))
+        )
+
+    def test_page_offers_the_toggle_and_rejects_unknown_basis(self):
+        client = create_app(self.wb).test_client()
+        page = client.get(f"/stocks/2330?as_of={DAYS[-1]}&prices=adjusted")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn('<option value="adjusted" selected>還原價</option>', page.text)
+        self.assertIn("期間內的公司行動", page.text)
+        self.assertEqual(client.get(f"/stocks/2330?as_of={DAYS[-1]}&prices=split").status_code, 400)
