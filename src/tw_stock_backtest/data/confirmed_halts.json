@@ -10,6 +10,106 @@
       "sources": [
         "https://investoredu.twse.com.tw/Mobile_Pages/..%2FFileSystem%2FFileUpload%2Fcb744523-2d37-495f-9738-345b882924e7.pdf"
       ]
+    },
+    {
+      "stock_id": "6176",
+      "start": "2026-08-13",
+      "end": "2026-08-23",
+      "reason": "減資換發新股，舊股停止買賣（退還股款，每千股換發 750 股、每股退還 2.5 元）；2026-08-24 恢復買賣",
+      "sources": [
+        "https://www.twse.com.tw/zh/announcement/reduction/twtavu-detail.html?6176,20260812",
+        "https://www.twse.com.tw/rwd/zh/reducation/TWTAVUDetail?STK_NO=6176&FILE_DATE=20260812&response=json"
+      ]
+    },
+    {
+      "stock_id": "8105",
+      "start": "2026-08-19",
+      "end": "2026-08-26",
+      "reason": "未依法令期限公告申報 115 年第 2 季財務報告，依證交所營業細則第 50 條第 1 項第 1 款停止買賣；補行申報後 2026-08-27 恢復買賣",
+      "sources": [
+        "https://www.twse.com.tw/staticFiles/news/news/tsecnews/8a8216d69fc76da001a00f1e0ac8014b.pdf",
+        "https://www.twse.com.tw/staticFiles/news/news/tsecnews/8a8216d6a023cc7101a03877622c004a.pdf"
+      ]
+    },
+    {
+      "stock_id": "1563",
+      "start": "2026-08-27",
+      "end": "2026-09-06",
+      "reason": "減資換發新股，舊股停止買賣（退還股款，每千股換發 750 股、每股退還 2.5 元）；2026-09-07 恢復買賣",
+      "sources": [
+        "https://www.twse.com.tw/zh/announcement/reduction/twtavu-detail.html?1563,20260826",
+        "https://www.twse.com.tw/rwd/zh/reducation/TWTAVUDetail?STK_NO=1563&FILE_DATE=20260826&response=json"
+      ]
+    },
+    {
+      "stock_id": "2321",
+      "start": "2026-09-10",
+      "end": "2026-09-20",
+      "reason": "減資換發新股，舊股停止買賣（彌補虧損，每千股換發 546.87826 股）；2026-09-21 恢復買賣",
+      "sources": [
+        "https://www.twse.com.tw/zh/announcement/reduction/twtavu-detail.html?2321,20260909",
+        "https://www.twse.com.tw/rwd/zh/reducation/TWTAVUDetail?STK_NO=2321&FILE_DATE=20260909&response=json"
+      ]
+    },
+    {
+      "stock_id": "3356",
+      "start": "2026-09-10",
+      "end": "2026-09-20",
+      "reason": "減資換發新股，舊股停止買賣（退還股款，每千股換發 851.117444 股、每股退還 1.488825 元）；2026-09-21 恢復買賣",
+      "sources": [
+        "https://www.twse.com.tw/zh/announcement/reduction/twtavu-detail.html?3356,20260909",
+        "https://www.twse.com.tw/rwd/zh/reducation/TWTAVUDetail?STK_NO=3356&FILE_DATE=20260909&response=json"
+      ]
+    },
+    {
+      "stock_id": "3591",
+      "start": "2026-09-10",
+      "end": "2026-09-20",
+      "reason": "減資換發新股，舊股停止買賣（退還股款，每千股換發 896.826972 股、每股退還 1.03173 元）；2026-09-21 恢復買賣",
+      "sources": [
+        "https://www.twse.com.tw/zh/announcement/reduction/twtavu-detail.html?3591,20260909",
+        "https://www.twse.com.tw/rwd/zh/reducation/TWTAVUDetail?STK_NO=3591&FILE_DATE=20260909&response=json"
+      ]
+    },
+    {
+      "stock_id": "1441",
+      "start": "2026-09-17",
+      "end": "2026-09-28",
+      "reason": "減資換發新股，舊股停止買賣（彌補虧損，每千股換發 861 股）；2026-09-29 恢復買賣",
+      "sources": [
+        "https://www.twse.com.tw/zh/announcement/reduction/twtavu-detail.html?1441,20260916",
+        "https://www.twse.com.tw/rwd/zh/reducation/TWTAVUDetail?STK_NO=1441&FILE_DATE=20260916&response=json"
+      ]
+    },
+    {
+      "stock_id": "6550",
+      "start": "2026-09-17",
+      "end": "2026-09-28",
+      "reason": "減資換發新股，舊股停止買賣（彌補虧損，每千股換發 519.501724 股）；2026-09-29 恢復買賣",
+      "sources": [
+        "https://www.twse.com.tw/zh/announcement/reduction/twtavu-detail.html?6550,20260916",
+        "https://www.twse.com.tw/rwd/zh/reducation/TWTAVUDetail?STK_NO=6550&FILE_DATE=20260916&response=json"
+      ]
+    },
+    {
+      "stock_id": "2601",
+      "start": "2026-09-23",
+      "end": "2026-10-04",
+      "reason": "減資換發新股，舊股停止買賣（彌補虧損，每千股換發 837.050247 股）；2026-10-05 恢復買賣",
+      "sources": [
+        "https://www.twse.com.tw/zh/announcement/reduction/twtavu-detail.html?2601,20260922",
+        "https://www.twse.com.tw/rwd/zh/reducation/TWTAVUDetail?STK_NO=2601&FILE_DATE=20260922&response=json"
+      ]
+    },
+    {
+      "stock_id": "2323",
+      "start": "2026-10-01",
+      "end": "2026-10-11",
+      "reason": "減資換發新股，舊股停止買賣（退還股款，每千股換發 900 股、每股退還 1 元）；2026-10-12 恢復買賣",
+      "sources": [
+        "https://www.twse.com.tw/zh/announcement/reduction/twtavu-detail.html?2323,20260930",
+        "https://www.twse.com.tw/rwd/zh/reducation/TWTAVUDetail?STK_NO=2323&FILE_DATE=20260930&response=json"
+      ]
     }
   ]
 }
