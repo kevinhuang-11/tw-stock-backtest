@@ -8,13 +8,25 @@ v1 版本供單人在本機使用；測試驗證的是軟體行為，不代表�
 
 [操作導覽](docs/DEMO.md) · [操作與設計細節](docs/OPERATIONS.md)
 
-## 一行試用（離線示範）
+## 在自己的電腦上試用（離線示範）
+
+下面的指令會在你自己的電腦上下載專案並啟動工作台；**執行之後**才能用瀏覽器開啟 `http://127.0.0.1:9000`，這不是公開網站。
+
+Linux／macOS／WSL（需要 Python 3.12 與 git）：
 
 ```bash
-python3.12 -m venv .venv && .venv/bin/python -m pip install -e . && .venv/bin/python examples/prepare_demo.py --serve
+git clone https://github.com/kevinhuang-11/tw-stock-backtest.git
+cd tw-stock-backtest
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/python examples/prepare_demo.py --serve
 ```
 
-開啟 `http://127.0.0.1:9000`。示範使用三檔合成股票，不需要網路、不讀取任何個人資料；示範環境中連網更新的按鈕會停用並說明原因。
+Windows：目前不支援在 Windows 上直接執行（工作台使用只有 Linux／macOS 才有的檔案鎖定模組 `fcntl`），請在 [WSL](https://learn.microsoft.com/windows/wsl/install) 裡執行上面的指令。
+
+要停止時，在執行指令的終端機按 `Ctrl+C`。再次執行最後一行會沿用已建立的示範資料。
+
+示範使用三檔合成股票，不需要網路、不讀取任何個人資料；示範環境中連網更新的按鈕會停用並說明原因。
 
 ![總覽：資料狀態、最近的工作與報表](docs/images/overview.png)
 
@@ -27,7 +39,10 @@ python3.12 -m venv .venv && .venv/bin/python -m pip install -e . && .venv/bin/py
 - **離線示範與連網防護**：合成示範名單會讓所有下載入口在發出請求前拒絕執行，測試以攔截網路函式確認（[test_offline_demo.py](tests/test_offline_demo.py)）。
 - **不依賴前端框架與 CDN**：Flask＋Jinja＋原生 JS，自繪 SVG 圖示、系統字型；可鍵盤操作的股票選擇器；台股慣例紅漲綠跌，狀態標籤刻意不用綠色以免與下跌混淆。
 - **工程流程**：離線單元與整合測試、CI 以安裝後的套件從乾淨目錄執行測試；Playwright 只在開發依賴，用來截圖與檢查瀏覽器互動（[tools/](tools/)）。
-- **AI 協作的約束**：開發時與 AI 工具共用 [AGENTS.md](AGENTS.md) 與 [CLAUDE.md](CLAUDE.md) 的規則，例如不得使用分析日之後的資料、未經同意不檢視保留期間的績效、不自動下載全市場資料。
+
+## 開發方式
+
+本專案以 Codex 與 Claude Code 協作開發。[AGENTS.md](AGENTS.md) 與 [CLAUDE.md](CLAUDE.md) 記錄給 AI 工具的開發約定，例如不得使用分析日之後的資料、未經同意不檢視保留期間的績效、不自動下載全市場資料，以及修改後要跑的測試指令與專案架構說明。這些約定也適用於人工修改。
 
 ## 畫面
 
