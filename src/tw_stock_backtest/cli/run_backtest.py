@@ -9,7 +9,7 @@ from tw_stock_backtest.config import (
 )
 from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.data.database import load_records
-from tw_stock_backtest.analysis.indicators import simple_moving_average
+from tw_stock_backtest.analysis.indicators import windowed_moving_average
 from tw_stock_backtest.analysis.strategies import moving_average_crossover
 
 
@@ -137,11 +137,12 @@ def main():
 
         closes = [record["close"] for record in records]
 
-        short_ma = simple_moving_average(
+        # 窗口內有缺價的日子均線為空，不產生交叉訊號；與研究、回測同一套規則。
+        short_ma = windowed_moving_average(
             closes,
             short_window,
         )
-        long_ma = simple_moving_average(
+        long_ma = windowed_moving_average(
             closes,
             long_window,
         )
@@ -203,6 +204,14 @@ def main():
     print(f"累計手續費：{result['total_commission']:.2f}")
     print(f"累計交易稅：{result['total_tax']:.2f}")
     print(f"成交筆數：{len(result['trades'])}")
+
+    if result["market_events"]:
+        print(f"\n停牌與無成交價日：{len(result['market_events'])} 筆（當日不成交，持股沿用最近收盤估值）")
+        for event in result["market_events"]:
+            print(f"{event['date']} | {event['reason']}")
+
+    for order in result["skipped_orders"]:
+        print(f"未成交：訊號日 {order['signal_date']} → {order['date']}，{order['action']}，{order['reason']}")
 
     print("\n成交紀錄：")
 

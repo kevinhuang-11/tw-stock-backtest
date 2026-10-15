@@ -4,12 +4,23 @@
 - 已確認停牌：開高低收皆空，量、值、筆數為 0，且列在停牌事件中。
 - 有量無價：來源有該日，但開高低收為空（例如只有零星零股成交），未確認為停牌。
 """
+import contextlib
+import io
+import sys
 import unittest
 from datetime import date, timedelta
 from decimal import Decimal
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
+from test_end_to_end import TEST_CONFIG
+from tw_stock_backtest.analysis.indicators import simple_moving_average, windowed_moving_average
+from tw_stock_backtest.backtesting.backtest import run_backtest
 from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.backtesting.portfolio import run_portfolio_backtest
+from tw_stock_backtest.cli import analyze_stock, run_backtest as run_backtest_cli
+from tw_stock_backtest.data.database import save_records
 from tw_stock_backtest.strategies import evaluate_conditions
 
 RSI = {"type": "rsi", "period": 14, "minimum": "0", "maximum": "100"}
@@ -143,6 +154,62 @@ class TestBacktestWithMissingCloses(unittest.TestCase):
         result = self.backtest(records, days[60], days[-1], confirmed_halts=halts, strategy=strategy)
         last = result["strategy_diagnostics"][-1]["diagnostics"]["AAA"]
         self.assertNotEqual(last["status"], "unavailable", last.get("reason") or last["conditions"])
+
+
+class TestSingleStockWithMissingCloses(unittest.TestCase):
+    def test_windowed_average_skips_only_windows_that_contain_the_gap(self):
+        closes = [Decimal(n) for n in (10, 11, 12, 13, 14)] + [None] + [Decimal(n) for n in (16, 17, 18, 19)]
+        result = windowed_moving_average(closes, 3)
+        self.assertEqual(result[:2], [None, None])
+        self.assertEqual(result[4], Decimal(13))
+        self.assertEqual(result[5:8], [None, None, None])
+        self.assertEqual(result[8], simple_moving_average(closes[6:9], 3)[-1])
+        self.assertEqual(result[9], Decimal(18))
+
+    def test_engine_does_not_trade_on_a_no_price_day_and_says_why(self):
+        # 單檔引擎只在訊號隔日開盤成交；隔日無成交價時這筆訊號不成交，也不順延。
+        records = series("2330", 6, {2: (25, 2)})
+        result = run_backtest(records, ["NONE", "BUY", "NONE", "NONE", "NONE", "NONE"],
+                              Decimal("100000"), 10, confirmed_halts={})
+        self.assertEqual(result["trades"], [])
+        self.assertEqual(result["skipped_orders"], [{
+            "signal_date": records[1]["date"], "date": records[2]["date"], "action": "BUY",
+            "reason": "無成交價（原因未確認），當日不成交"}])
+        self.assertEqual(result["market_events"][0]["market_status"], "NO_PRICE")
+
+    def test_engine_values_a_held_position_at_the_last_close_on_a_no_price_day(self):
+        records = series("2330", 5, {3: (0, 0)})
+        result = run_backtest(records, ["BUY", "NONE", "NONE", "NONE", "NONE"],
+                              Decimal("100000"), 10, confirmed_halts={})
+        gap = result["equity_curve"][3]
+        self.assertEqual(gap["stale_price_date"], records[2]["date"])
+        self.assertEqual(gap["equity"], gap["cash"] + records[2]["close"] * 10)
+
+    def run_cli(self, module, *arguments):
+        with TemporaryDirectory() as folder:
+            config = Path(folder) / "config.toml"
+            config.write_text(TEST_CONFIG.replace("AAA", "2330"), encoding="utf-8")
+            save_records(series("2330", 30, {12: (25, 2)}), db_path=Path(folder) / "data" / "stocks.db")
+            days = trading_days(30)
+            argv = [module.__name__, "--config", str(config), "--stock", "2330",
+                    "--start", days[0], "--end", days[-1], *arguments]
+            output = io.StringIO()
+            with patch.object(sys, "argv", argv), contextlib.redirect_stdout(output):
+                code = module.main()
+            return code, output.getvalue(), days
+
+    def test_analyze_stock_cli_completes_and_blanks_only_the_affected_averages(self):
+        code, output, days = self.run_cli(analyze_stock)
+        self.assertEqual(code, 0, output)
+        gap_line = next(line for line in output.splitlines() if line.startswith(days[12]))
+        self.assertEqual(gap_line.split()[1:4], ["--", "--", "--"])
+        later = next(line for line in output.splitlines() if line.startswith(days[20]))
+        self.assertNotIn("--", later)
+
+    def test_run_backtest_cli_completes_and_lists_the_no_price_day(self):
+        code, output, days = self.run_cli(run_backtest_cli)
+        self.assertEqual(code, 0, output)
+        self.assertIn(f"{days[12]} | 無成交價（原因未確認，不認定為停牌）", output)
 
 
 if __name__ == "__main__":

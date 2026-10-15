@@ -7,7 +7,7 @@ from tw_stock_backtest.config import (
     load_config,
 )
 from tw_stock_backtest.data.database import load_records
-from tw_stock_backtest.analysis.indicators import simple_moving_average
+from tw_stock_backtest.analysis.indicators import windowed_moving_average
 from tw_stock_backtest.analysis.strategies import moving_average_crossover
 
 
@@ -97,11 +97,12 @@ def main():
 
         closes = [record["close"] for record in records]
 
-        short_ma = simple_moving_average(
+        # 窗口內有缺價的日子均線為空，不產生交叉訊號；與研究、回測同一套規則。
+        short_ma = windowed_moving_average(
             closes,
             short_window,
         )
-        long_ma = simple_moving_average(
+        long_ma = windowed_moving_average(
             closes,
             long_window,
         )

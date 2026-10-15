@@ -74,6 +74,21 @@ def simple_moving_average(prices, period):
 
     return averages
 
+def windowed_moving_average(prices, period):
+    """逐日 SMA；窗口內有任何缺價或無效價格時該日為 None，缺價離開窗口後恢復。
+
+    不補值、不刪列湊窗口。研究、回測、個股圖與單檔 CLI 共用這個規則。
+    """
+    _period(period)
+    result = []
+    for index in range(len(prices)):
+        window = prices[max(0, index - period + 1):index + 1]
+        if len(window) < period or not all(is_valid_price(price) for price in window):
+            result.append(None)
+        else:
+            result.append(simple_moving_average(window, period)[-1])
+    return result
+
 def _period(period):
     if isinstance(period, bool) or not isinstance(period, int) or period <= 0:
         raise ValueError('期間必須為正整數')

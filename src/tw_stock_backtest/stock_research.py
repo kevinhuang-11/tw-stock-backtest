@@ -10,7 +10,7 @@ import sqlite3
 from zoneinfo import ZoneInfo
 
 from tw_stock_backtest.analysis.indicators import (
-    simple_moving_average, exponential_moving_average, relative_strength_index,
+    exponential_moving_average, relative_strength_index, windowed_moving_average,
     moving_average_convergence_divergence, is_valid_price, segmented,
 )
 from tw_stock_backtest.data.database import load_records
@@ -188,10 +188,7 @@ def chart_data(records, strategy, display=120):
     conditions = {c['type']:c for c in strategy['conditions']}
     rsi_n = conditions.get('rsi', {}).get('period',14)
     macd = conditions.get('macd', {'fast':12,'slow':26,'signal':9})
-    sma = []
-    for i in range(len(closes)):
-        try: sma.append(simple_moving_average(closes[max(0,i-n+1):i+1],n)[-1])
-        except ValueError: sma.append(None)
+    sma = windowed_moving_average(closes, n)
     ema = segmented(lambda part: exponential_moving_average(part,n), closes)
     rsi = segmented(lambda part: relative_strength_index(part,rsi_n), closes)
     values = segmented(lambda part: moving_average_convergence_divergence(part,macd['fast'],macd['slow'],macd['signal']),

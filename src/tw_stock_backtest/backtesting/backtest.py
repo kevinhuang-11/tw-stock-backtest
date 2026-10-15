@@ -2,6 +2,12 @@ from datetime import date
 from decimal import Decimal
 
 from tw_stock_backtest.backtesting.costs import CostSettings, calculate_transaction
+from tw_stock_backtest.data.market_events import (
+    CONFIRMED_HALTS,
+    market_event,
+    not_tradable_reason,
+    prepare_market_records,
+)
 
 
 def run_backtest(
@@ -10,8 +16,13 @@ def run_backtest(
     initial_cash,
     quantity,
     cost_settings=None,
+    confirmed_halts=None,
 ):
-    """前日訊號、次筆開盤成交；可傳入交易成本設定。"""
+    """前日訊號、次筆開盤成交；可傳入交易成本設定。
+
+    停牌與無成交價日使用與多股票回測相同的檢查（prepare_market_records）：
+    當日不成交，持股沿用最近有效收盤估值，不補價格。
+    """
     # 沒有提供設定時，維持原本的零成本模式。
     # 讓舊測試繼續驗證原本的交易邏輯。
     if cost_settings is None:
@@ -50,20 +61,17 @@ def run_backtest(
         if record["stock_id"] != stock_id:
             raise ValueError("一次回測只能包含一支股票")
 
-        for key in ("open", "close"):
-            price = record[key]
-
-            if (
-                not isinstance(price, Decimal)
-                or not price.is_finite()
-                or price <= 0
-            ):
-                raise ValueError(f"{record['date']} 的 {key} 無效")
-
         if signal not in ("BUY", "SELL", "NONE"):
             raise ValueError(f"不支援的訊號：{signal}")
 
         previous_date = current_date
+
+    events = CONFIRMED_HALTS if confirmed_halts is None else confirmed_halts
+    records = prepare_market_records(
+        records,
+        confirmed_halts=events,
+        allow_unpriced_halt=True,
+    )
 
     cash = initial_cash
     shares = 0
@@ -71,6 +79,8 @@ def run_backtest(
     equity_curve = []
     total_commission = Decimal("0")
     total_tax = Decimal("0")
+    skipped_orders = []
+    market_events = []
 
     for index, record in enumerate(records):
         signal = signals[index - 1] if index > 0 else "NONE"
@@ -80,7 +90,20 @@ def run_backtest(
         executed_quantity = 0
         transaction = None
 
-        if signal == "BUY" and shares == 0:
+        if not record["tradable"]:
+            market_events.append(
+                {"stock_id": stock_id, "date": record["date"], **market_event(record, events)}
+            )
+
+            if (signal == "BUY" and shares == 0) or (signal == "SELL" and shares > 0):
+                skipped_orders.append({
+                    "signal_date": records[index - 1]["date"],
+                    "date": record["date"],
+                    "action": signal,
+                    "reason": f"{not_tradable_reason(record)}，當日不成交",
+                })
+
+        elif signal == "BUY" and shares == 0:
             proposed = calculate_transaction(
                 open_price,
                 quantity,
@@ -128,13 +151,19 @@ def run_backtest(
                 "cash_after": cash,
             })
 
-        equity = cash + record["close"] * shares
+        # 不可交易日沿用最近有效收盤；尚未持股時不需要估值價格。
+        equity = cash + (record["valuation_close"] * shares if shares else Decimal("0"))
 
         equity_curve.append({
             "date": record["date"],
             "cash": cash,
             "shares": shares,
             "equity": equity,
+            "stale_price_date": (
+                record["valuation_price_date"]
+                if shares and not record["tradable"]
+                else None
+            ),
         })
 
     final_equity = (
@@ -153,4 +182,6 @@ def run_backtest(
         "total_tax": total_tax,
         "trades": trades,
         "equity_curve": equity_curve,
+        "skipped_orders": skipped_orders,
+        "market_events": market_events,
     }
