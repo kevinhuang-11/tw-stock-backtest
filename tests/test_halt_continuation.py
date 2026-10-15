@@ -140,12 +140,13 @@ class TestHaltContinuation(unittest.TestCase):
 
         self.assertEqual(len(resumed_calls), 1)
 
-        # 計算歷史中沒有把停牌日當成新價格。
-        history_dates = [
-            row["date"]
+        # 停牌列保留在計算歷史中（不刪列），但不補價格；與研究排名同一套規則。
+        history = {
+            row["date"]: row
             for row in resumed_calls[0].args[0]
-        ]
-        self.assertNotIn("2026-01-03", history_dates)
+        }
+        self.assertIn("2026-01-03", history)
+        self.assertIsNone(history["2026-01-03"]["close"])
 
     def test_failed_sell_does_not_release_cash(self):
         result, _ = self.run_engine(

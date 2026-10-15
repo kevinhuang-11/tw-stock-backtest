@@ -7,6 +7,7 @@ from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.data.database import load_records
 from tw_stock_backtest.data.market_events import (
     CONFIRMED_HALTS,
+    not_tradable_reason,
     prepare_backtest_market,
 )
 from tw_stock_backtest.analysis.screening import evaluate_stock
@@ -102,19 +103,18 @@ def main():
             confirmed_halts=CONFIRMED_HALTS,
         )
 
-        # 保留停牌列，供後續評估判斷起訖日是否可交易。
+        # 保留停牌與無成交價的列，供後續評估判斷起訖日是否可交易。
         records_by_stock = {
             stock_id: list(prices.values())
             for stock_id, prices in market.items()
         }
 
-        # 排名指標的暖機資料，只使用開始日前可交易的紀錄。
+        # 排名指標的暖機資料保留不可交易的列，與研究排名使用同一套規則。
         histories = {
             stock_id: [
                 record
                 for record in records
                 if record["date"] < start.isoformat()
-                and record["tradable"]
             ]
             for stock_id, records in records_by_stock.items()
         }
@@ -145,12 +145,12 @@ def main():
             for stock_id in stocks:
                 record = market[stock_id][signal_date]
 
-                if not record["tradable"]:
-                    errors[stock_id] = "已確認停牌"
-                    continue
-
                 # 此時只加入訊號日當天及以前的資料。
                 histories[stock_id].append(record)
+
+                if not record["tradable"]:
+                    errors[stock_id] = not_tradable_reason(record)
+                    continue
 
                 try:
                     if args.ranking == "rules":

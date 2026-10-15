@@ -19,6 +19,8 @@ from tw_stock_backtest.analysis.factors import (
 )
 from tw_stock_backtest.data.market_events import (
     CONFIRMED_HALTS,
+    market_event,
+    not_tradable_reason,
     prepare_backtest_market,
 )
 
@@ -197,13 +199,13 @@ def run_portfolio_backtest(
         confirmed_halts=events,
     )
 
-    # 暖機資料只收錄實際有行情的日期。
+    # 暖機資料保留停牌與無成交價的列，與研究排名使用同一套規則：
+    # 窗口內有缺價就不計算，不刪列湊窗口。
     histories = {
         stock_id: [
             record
             for record_date, record in prices.items()
             if date.fromisoformat(record_date) < start
-            and record["tradable"]
         ]
         for stock_id, prices in market.items()
     }
@@ -240,7 +242,7 @@ def run_portfolio_backtest(
                     )
 
                     if not record["tradable"]:
-                        reason = "已確認停牌，當日不成交"
+                        reason = f"{not_tradable_reason(record)}，當日不成交"
 
                     elif (
                         action == "BUY"
@@ -328,7 +330,7 @@ def run_portfolio_backtest(
                         }
                     )
 
-        # 收盤：持有中的停牌股票使用最近有效收盤價估值。
+        # 收盤：持有中的停牌或無成交價股票使用最近有效收盤價估值，並標示價格日期。
         market_value = Decimal("0")
         stale_prices = {}
 
@@ -362,18 +364,18 @@ def run_portfolio_backtest(
         for stock_id, prices in market.items():
             record = prices[trading_date]
 
+            histories[stock_id].append(record)
+
             if not record["tradable"]:
-                errors[stock_id] = "已確認停牌，僅暫停本股票訊號更新"
+                errors[stock_id] = f"{not_tradable_reason(record)}，僅暫停本股票訊號更新"
                 market_events.append(
                     {
                         "stock_id": stock_id,
                         "date": trading_date,
-                        **events[(stock_id, trading_date)],
+                        **market_event(record, events),
                     }
                 )
                 continue
-
-            histories[stock_id].append(record)
 
             try:
                 if ranking_method == "rules":

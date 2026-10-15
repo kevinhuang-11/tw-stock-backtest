@@ -49,13 +49,14 @@ class PageCase(unittest.TestCase):
         write(folder, "settings.json", {"settings": {}})
         return folder
 
-    def add_backtest(self, name="20260930T020000_000000Z_bbbbbbbb", total="0.1076"):
+    def add_backtest(self, name="20260930T020000_000000Z_bbbbbbbb", total="0.1076", events=None):
         folder = self.reports / name
         performance = {"total_return": total, "max_drawdown": "0.0928",
                        "invested_days": 18, "average_exposure": "0.76"}
         write(folder, "settings.json", {"requested_start": "2026-09-01", "requested_end": "2026-09-29",
                                         "strategy_snapshot": SNAPSHOT, "settings": {}})
-        write(folder, "results.json", {"strategy": {"performance": performance, "result": {}},
+        result = {"market_events": events} if events else {}
+        write(folder, "results.json", {"strategy": {"performance": performance, "result": result},
                                        "benchmark": {"performance": {**performance, "total_return": "0.05"}}})
         write(folder, "input_data.json", {})
         (folder / "trades.csv").write_text("", encoding="utf-8")
@@ -337,6 +338,22 @@ class BacktestReportPageTests(PageCase):
         self.assertIn("訊號 2026-09-10", text)
         self.assertNotIn("total_return</td>", text)
         self.assert_navigation_works(text)
+
+    def test_halts_and_no_price_days_are_listed_separately(self):
+        # 舊報表的停牌事件沒有 market_status，仍顯示為已確認停牌。
+        self.add_backtest(events=[
+            {"stock_id": "2317", "date": "2026-09-03", "reason": "重大訊息待公布，暫停交易", "source": "x"},
+            {"stock_id": "1213", "date": "2026-09-14", "reason": "無成交價（原因未確認，不認定為停牌）",
+             "source": "y", "market_status": "NO_PRICE"}])
+        text = self.client.get(f"/reports/{self.key()}").text
+        self.assertIn("停牌與無成交價日", text)
+        self.assertIn('<span class="badge badge-warn">已確認停牌</span>', text)
+        self.assertIn('<span class="badge badge-neutral">無成交價</span>', text)
+        self.assertIn("不認定為停牌", text)
+
+    def test_backtest_without_events_has_no_event_card(self):
+        self.add_backtest()
+        self.assertNotIn("停牌與無成交價日", self.client.get(f"/reports/{self.key()}").text)
 
     def test_backtest_without_trades_has_an_empty_state(self):
         self.add_backtest(total="-0.0321")

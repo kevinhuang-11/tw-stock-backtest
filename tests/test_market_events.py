@@ -109,12 +109,24 @@ class TestMarketEvents(unittest.TestCase):
             "2026-01-07",
         )
 
-    def test_unconfirmed_missing_prices_are_rejected(self):
+    def test_unconfirmed_missing_prices_are_no_price_not_halt(self):
+        result = self.prepare(events={})
+
+        self.assertEqual(result[1]["market_status"], "NO_PRICE")
+        self.assertFalse(result[1]["tradable"])
+        self.assertIsNone(result[1]["close"])
+        self.assertEqual(result[1]["valuation_close"], Decimal("100"))
+        self.assertEqual(result[1]["valuation_price_date"], "2026-01-05")
+
+    def test_partially_missing_prices_are_rejected(self):
+        records = deepcopy(self.records)
+        records[1].update(open=Decimal("100"), volume=10, turnover=1000, trade_count=1)
+
         with self.assertRaisesRegex(
             ValueError,
             "未確認為停牌",
         ):
-            self.prepare(events={})
+            self.prepare(records=records, events={})
 
     def test_halt_without_prior_price_is_rejected(self):
         with self.assertRaisesRegex(

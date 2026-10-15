@@ -409,6 +409,11 @@ def main():
             f" | {order['reason']}"
         )
 
+    print(f"\n停牌與無成交價日：{len(result['market_events'])} 筆（當日不成交，持股沿用最近收盤估值）")
+
+    for event in result["market_events"]:
+        print(f"{event['date']} | {event['stock_id']} | {event['reason']}")
+
     print(
         f"\n有個別股票未更新訊號的日期："
         f"{len(result['skipped_rebalances'])} 日"

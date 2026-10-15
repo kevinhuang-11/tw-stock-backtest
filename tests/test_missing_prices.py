@@ -88,6 +88,49 @@ class TestBacktestWithMissingCloses(unittest.TestCase):
             factor_settings={k: Decimal(v) if k.endswith("_weight") else v
                              for k, v in self.factors.items()}, **extra)
 
+    def test_unconfirmed_unpriced_row_before_the_period_does_not_fail_the_backtest(self):
+        # 有量無價在回測期間之前（暖機資料中），期間內兩檔都有完整行情。
+        records = {"AAA": series("AAA", 60, {20: (25, 2)}), "BBB": series("BBB", 60)}
+        days = trading_days(60)
+        result = self.backtest(records, days[40], days[-1], confirmed_halts={})
+        self.assertEqual(result["equity_curve"][-1]["date"], days[-1])
+
+    def test_unconfirmed_unpriced_day_inside_the_period_is_not_tradable_and_reported(self):
+        records = {"AAA": series("AAA", 60, {50: (25, 2)}), "BBB": series("BBB", 60)}
+        days = trading_days(60)
+        result = self.backtest(records, days[40], days[-1], confirmed_halts={})
+        self.assertEqual(result["equity_curve"][-1]["date"], days[-1])
+        gap_day = next(p for p in result["equity_curve"] if p["date"] == days[50])
+        # 兩檔都在候選內且名額足夠，缺價日 AAA 已持有，以前一日收盤估值並標示日期。
+        self.assertIn("AAA", gap_day["holdings"])
+        self.assertEqual(gap_day["stale_prices"], {"AAA": days[49]})
+        event = [e for e in result["market_events"] if e["stock_id"] == "AAA"]
+        self.assertEqual([(e["date"], e["market_status"]) for e in event], [(days[50], "NO_PRICE")])
+        self.assertIn("不認定為停牌", event[0]["reason"])
+        for order in result["skipped_orders"]:
+            if order["stock_id"] == "AAA" and order["date"] == days[50]:
+                self.assertEqual(order["reason"], "無成交價（原因未確認），當日不成交")
+
+    def test_missing_row_still_fails_with_a_specific_message(self):
+        records = {"AAA": series("AAA", 60), "BBB": series("BBB", 60)}
+        del records["AAA"][50]
+        days = trading_days(60)
+        with self.assertRaisesRegex(ValueError, f"AAA 缺少 {days[50]} 的行情列.*重新下載"):
+            self.backtest(records, days[40], days[-1], confirmed_halts={})
+
+    def test_confirmed_halt_stays_in_the_window_like_research_ranking(self):
+        # 回測與研究排名同一套規則：停牌列不刪除，窗口（5 筆）內有它時因子不計算。
+        records = {"AAA": series("AAA", 60, {45: (0, 0)}), "BBB": series("BBB", 60)}
+        days = trading_days(60)
+        halts = {("AAA", days[45]): {"reason": "合成停牌", "source": "test fixture"}}
+        result = self.backtest(records, days[40], days[-1], confirmed_halts=halts)
+        self.assertEqual(result["market_events"][0]["market_status"], "CONFIRMED_HALT")
+        unavailable = {day for day, stocks in self.ranking_errors(result).items() if "AAA" in stocks}
+        self.assertEqual(unavailable, set(days[45:50]))
+
+    def ranking_errors(self, result):
+        return {row["date"]: row["errors"] for row in result["skipped_rebalances"]}
+
     def test_strategy_rsi_condition_recovers_after_a_confirmed_halt_in_warmup(self):
         records = {"AAA": series("AAA", 80, {10: (0, 0)}), "BBB": series("BBB", 80)}
         days = trading_days(80)

@@ -61,6 +61,7 @@ def report_details(path):
         return {'kind': 'backtest', 'status': 'complete',
                 'strategy': result['strategy']['performance'],
                 'benchmark': result['benchmark']['performance'],
+                'market_events': result['strategy']['result'].get('market_events', []),
                 'configuration': read_json(path / 'settings.json') if (path / 'settings.json').exists() else {}}
     return {'kind': 'unknown', 'status': 'incomplete'}
 

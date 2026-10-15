@@ -94,6 +94,21 @@
     {% else %}{{ ui.empty('這段期間沒有成交', '可能是沒有候選股，或資金不足以買進。', icon_name='empty') }}{% endif %}
   </section>
 
+  {% if detail.get('market_events') %}
+  <section class="card">
+    <div class="card-header"><div><h2>停牌與無成交價日</h2><p>這些日子該股不成交、不更新訊號，持股沿用最近一筆收盤估值。無成交價只表示來源當天沒有開高低收，不認定為停牌。</p></div></div>
+    <div class="table-wrap"><table class="table table-compact">
+      <thead><tr><th>日期</th><th>股票</th><th>狀態</th><th>說明</th></tr></thead>
+      <tbody>{% for e in detail.market_events %}<tr>
+        <td class="nowrap">{{ e.date }}</td>
+        <td><a href="/stocks/{{ e.stock_id }}">{{ e.stock_id }}</a></td>
+        <td>{{ ui.badge('無成交價', 'neutral') if e.market_status == 'NO_PRICE' else ui.badge('已確認停牌', 'warn') }}</td>
+        <td>{{ e.reason }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  {% endif %}
+
 {% elif kind == 'comparison' %}
   <section class="card">
     <div class="card-header"><div><h2>各策略結果</h2><p>{{ detail.note }}</p></div></div>

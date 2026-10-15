@@ -3,7 +3,7 @@ from decimal import Decimal
 
 
 # 第一版先保存已人工核實的事件。
-# 未列入清單的缺價紀錄，仍然視為待釐清問題。
+# 未列入清單的缺價紀錄不認定為停牌，只標示為無成交價（原因未確認）。
 CONFIRMED_HALTS = {
     ("2317", "2025-07-30"): {
         "reason": "重大訊息待公布，暫停交易",
@@ -16,13 +16,38 @@ CONFIRMED_HALTS = {
 }
 
 
+PRICE_FIELDS = ("open", "high", "low", "close")
+NO_PRICE_EVENT = {
+    "reason": "無成交價（原因未確認，不認定為停牌）",
+    "source": "行情來源當日有這一列，但沒有開高低收",
+}
+
+
+def market_event(record, confirmed_halts):
+    """不可交易日的說明：已確認停牌附上來源，無成交價則說明原因未確認。"""
+    if record["market_status"] == "CONFIRMED_HALT":
+        return {**confirmed_halts[(record["stock_id"], record["date"])],
+                "market_status": "CONFIRMED_HALT"}
+    return {**NO_PRICE_EVENT, "market_status": "NO_PRICE"}
+
+
+def not_tradable_reason(record):
+    if record["market_status"] == "CONFIRMED_HALT":
+        return "已確認停牌"
+    return "無成交價（原因未確認）"
+
+
 def prepare_market_records(
     records,
     *,
     confirmed_halts,
     allow_unpriced_halt=False,
 ):
-    """保留原始價格，增加交易狀態與估值價格。"""
+    """保留原始價格，增加交易狀態與估值價格。
+
+    不可交易日有兩種：列在 confirmed_halts 的停牌，以及來源有該日但開高低收全為空的
+    無成交價日。兩者都不補價格；估值沿用最近一筆有效收盤並標示其日期。
+    """
     prepared = []
     stock_id = None
     previous_date = None
@@ -59,6 +84,12 @@ def prepare_market_records(
             record["date"],
         ) in confirmed_halts
 
+        # 來源有這一天，但四個價格都是空的；只有部分價格為空仍視為資料錯誤。
+        no_price = not is_halted and all(
+            field in record and record[field] is None
+            for field in PRICE_FIELDS
+        )
+
         if is_halted:
             valid = (
                 all(
@@ -76,6 +107,10 @@ def prepare_market_records(
 
             if last_close is None and not allow_unpriced_halt:
                 raise ValueError("停牌前沒有有效收盤價可供估值")
+
+        elif no_price:
+            if last_close is None and not allow_unpriced_halt:
+                raise ValueError("無成交價日之前沒有有效收盤價可供估值")
 
         else:
             if "open" not in record or "close" not in record:
@@ -112,11 +147,13 @@ def prepare_market_records(
 
         row.update(
             {
-                "tradable": not is_halted,
+                "tradable": not (is_halted or no_price),
                 "valuation_close": last_close,
                 "valuation_price_date": last_close_date,
                 "market_status": (
-                    "CONFIRMED_HALT" if is_halted else "NORMAL"
+                    "CONFIRMED_HALT" if is_halted
+                    else "NO_PRICE" if no_price
+                    else "NORMAL"
                 ),
             }
         )
@@ -171,8 +208,9 @@ def prepare_backtest_market(
         for trading_date in trading_dates:
             if trading_date not in prices:
                 raise ValueError(
-                    f"{stock_id} 缺少 {trading_date} 行情，"
-                    "不能將未知缺漏當作停牌"
+                    f"{stock_id} 缺少 {trading_date} 的行情列（其他股票當天有行情），"
+                    "可能是下載缺漏，不能當作停牌或無成交；"
+                    "請重新下載該月行情，或將這檔移出股票池"
                 )
 
     return market, sorted(trading_dates)
