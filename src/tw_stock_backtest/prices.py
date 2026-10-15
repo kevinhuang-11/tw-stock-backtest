@@ -73,6 +73,25 @@ class PriceSource:
             self._track(stock_id, first_date, last_date)
         return AdjustedHistory(self.actions(stock_id) if self.mode == ADJUSTED else ())
 
+    def actions_by_stock(self, records_by_stock, last):
+        """回測引擎用：{股票: last 以前生效的公司行動}，並記錄涵蓋範圍；raw 模式為空字典。
+
+        引擎在每個訊號日只套用該日以前生效的事件（AdjustedHistory），不會提前使用。
+        """
+        if self.mode != ADJUSTED:
+            return {}
+        result = {}
+        for stock_id, rows in records_by_stock.items():
+            if rows:
+                self._track(stock_id, rows[0]["date"], last)
+            result[stock_id] = self.actions(stock_id, last)
+        return result
+
+    def describe_for(self, records_by_stock, last):
+        """記錄這些行情到 last 為止會用到的公司行動與涵蓋缺口，回傳摘要。"""
+        self.actions_by_stock(records_by_stock, last)
+        return self.describe()
+
     def describe(self):
         """寫入報表的摘要：模式、用到的公司行動、沒有公司行動資料的區間。"""
         return {

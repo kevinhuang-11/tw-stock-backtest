@@ -2,6 +2,7 @@ import argparse
 import sqlite3
 from collections import Counter
 
+from tw_stock_backtest.analysis.adjustment import AdjustedHistory
 from tw_stock_backtest.analysis.factors import (
     calculate_factor_row,
     rank_factor_candidates,
@@ -16,6 +17,7 @@ from tw_stock_backtest.data.market_events import (
     prepare_backtest_market,
 )
 from tw_stock_backtest.date_range import parse_date_range
+from tw_stock_backtest.prices import PriceSource, describe_prices
 
 
 def parse_arguments():
@@ -102,8 +104,14 @@ def main():
         records_by_stock = {stock_id: list(prices.values()) for stock_id, prices in market.items()}
 
         # 排名指標的暖機資料保留不可交易的列，與研究排名使用同一套規則。
+        # 訊號依價格模式逐日累積（每個訊號日只套用該日以前生效的公司行動）；
+        # 前瞻報酬仍以原始價格計算（公司行動的報酬調整尚未實作）。
+        prices = PriceSource(settings)
+        corporate_actions = prices.actions_by_stock(raw_records, end.isoformat())
         histories = {
-            stock_id: [record for record in records if record["date"] < start.isoformat()]
+            stock_id: AdjustedHistory(corporate_actions.get(stock_id, ())).extend(
+                record for record in records if record["date"] < start.isoformat()
+            )
             for stock_id, records in records_by_stock.items()
         }
 
@@ -143,13 +151,13 @@ def main():
                 try:
                     if args.ranking == "rules":
                         evaluation = evaluate_stock(
-                            histories[stock_id],
+                            histories[stock_id].rows,
                             signal_date,
                             **rule_settings,
                         )
                     else:
                         evaluation = calculate_factor_row(
-                            histories[stock_id],
+                            histories[stock_id].rows,
                             signal_date,
                             factor_settings=factor_settings,
                         )
@@ -207,6 +215,7 @@ def main():
     print(f"實際訊號期間：{trading_dates[0]} ～ {trading_dates[-1]}")
     print(f"行情資料截止：{end}")
     print(f"訊號日數：{len(ranking_history)}")
+    print(describe_prices(prices.describe()) + "；前瞻報酬仍為原始價格")
     print("評估名次使用 --top，不使用設定檔的 top_n")
 
     reason_labels = {

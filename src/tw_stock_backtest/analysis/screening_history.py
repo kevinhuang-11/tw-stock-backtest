@@ -1,5 +1,6 @@
 from datetime import date
 
+from tw_stock_backtest.analysis.adjustment import AdjustedHistory
 from tw_stock_backtest.analysis.screening import evaluate_stock
 from tw_stock_backtest.date_range import parse_date_range
 
@@ -10,6 +11,7 @@ def build_screening_history(
     end_text,
     *,
     screening_settings,
+    corporate_actions=None,
 ):
     """逐日產生候選名單；不模擬交易。"""
     start, end = parse_date_range(start_text, end_text)
@@ -52,7 +54,11 @@ def build_screening_history(
                 analysis_dates.add(current_date)
 
     # 隨日期向前推進，逐步加入當時已知的行情。
-    available = {stock_id: [] for stock_id in records_by_stock}
+    # 每個分析日只套用該日以前生效的公司行動（{股票: 公司行動}；省略時為原始價格）。
+    actions = corporate_actions or {}
+    available = {
+        stock_id: AdjustedHistory(actions.get(stock_id, ())) for stock_id in records_by_stock
+    }
     positions = {stock_id: 0 for stock_id in records_by_stock}
 
     history = []
@@ -76,7 +82,7 @@ def build_screening_history(
 
             try:
                 result = evaluate_stock(
-                    available[stock_id],
+                    available[stock_id].rows,
                     as_of,
                     **parameters,
                 )
