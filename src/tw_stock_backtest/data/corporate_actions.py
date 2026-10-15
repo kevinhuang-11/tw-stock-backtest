@@ -15,7 +15,7 @@ import json
 import re
 import sqlite3
 from contextlib import closing
-from datetime import date
+from datetime import date, timedelta
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 
@@ -397,8 +397,12 @@ def _encode(action, fetched_at):
     return row
 
 
-def save_actions(actions, db_path, *, fetched_at):
-    """寫入或更新公司行動（主鍵：股票、生效日、類型）；寫入前先升級 schema。"""
+def save_actions(actions, db_path, *, fetched_at, coverage=()):
+    """寫入或更新公司行動（主鍵：股票、生效日、類型）；寫入前先升級 schema。
+
+    coverage：[(股票, 開始日, 結束日)]，這次已完整下載的期間。和公司行動在同一個交易中寫入，
+    沒有公司行動的股票也會留下紀錄，日後才能分辨「沒有公司行動」與「沒有下載過」。
+    """
     for action in actions:
         if action["kind"] not in KINDS:
             raise ValueError(f"未知的公司行動類型：{action['kind']}")
@@ -413,7 +417,55 @@ def save_actions(actions, db_path, *, fetched_at):
             f"ON CONFLICT(stock_id, effective_date, kind) DO UPDATE SET {updates}",
             [_encode(action, fetched_at) for action in actions],
         )
+        connection.executemany(
+            "INSERT INTO corporate_action_coverage (stock_id, start_date, end_date, fetched_at) "
+            "VALUES (?, ?, ?, ?) ON CONFLICT(stock_id, start_date, end_date) "
+            "DO UPDATE SET fetched_at = excluded.fetched_at",
+            [(stock_id, start, end, fetched_at) for stock_id, start, end in coverage],
+        )
     return len(actions)
+
+
+def load_coverage(db_path, stock_ids=None):
+    """{股票: [(開始日, 結束日)]}，依開始日排序；資料庫或表不存在時為空。"""
+    path = Path(db_path).resolve()
+    if not path.is_file():
+        return {}
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as connection:
+        if not connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'corporate_action_coverage'"
+        ).fetchone():
+            return {}
+        rows = connection.execute(
+            "SELECT stock_id, start_date, end_date FROM corporate_action_coverage "
+            "ORDER BY stock_id, start_date, end_date"
+        ).fetchall()
+    wanted = None if stock_ids is None else set(stock_ids)
+    result = {}
+    for stock_id, start, end in rows:
+        if wanted is None or stock_id in wanted:
+            result.setdefault(stock_id, []).append((start, end))
+    return result
+
+
+def uncovered(ranges, start, end):
+    """[start, end]（ISO 日期，含頭尾）中沒有被 ranges 涵蓋的日曆日區間。"""
+    gaps, cursor = [], date.fromisoformat(start)
+    last = date.fromisoformat(end)
+    for range_start, range_end in sorted(ranges):
+        range_start, range_end = date.fromisoformat(range_start), date.fromisoformat(range_end)
+        if range_end < cursor:
+            continue
+        if range_start > cursor:
+            gaps.append(
+                (cursor.isoformat(), min(last, range_start - timedelta(days=1)).isoformat())
+            )
+        cursor = max(cursor, range_end + timedelta(days=1))
+        if cursor > last:
+            return gaps
+    if cursor <= last:
+        gaps.append((cursor.isoformat(), last.isoformat()))
+    return gaps
 
 
 def load_actions(db_path, stock_id=None, start=None, end=None):

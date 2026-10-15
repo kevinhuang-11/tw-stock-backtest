@@ -195,7 +195,8 @@ def main(argv=None):
         client = Client(settings["download"], args.max_requests)
         actions = collect(client, set(stocks), start, end)
         fetched_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        ca.save_actions(actions, db_path, fetched_at=fetched_at)
+        coverage = [(stock, start.isoformat(), end.isoformat()) for stock in sorted(set(stocks))]
+        ca.save_actions(actions, db_path, fetched_at=fetched_at, coverage=coverage)
 
     except NetworkDisabled as error:
         print(f"未連網：{error}")

@@ -103,6 +103,11 @@ class FetchCorporateActionsTests(unittest.TestCase):
         self.assertEqual(
             actions[("6592", "2026-06-30", ca.DIVIDEND)]["stock_dividend_per_1000"], D("30")
         )
+        # 每檔都記錄已下載的期間，包括沒有任何公司行動的股票。
+        self.assertEqual(
+            ca.load_coverage(self.db),
+            {stock: [("2024-01-01", "2026-10-15")] for stock in self.STOCKS},
+        )
 
     def test_budget_is_checked_before_details_and_nothing_is_saved(self):
         code, output, mock = self.run_cli(
@@ -147,6 +152,7 @@ class FetchCorporateActionsTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("公司行動下載失敗", output)
         self.assertEqual(ca.load_actions(self.db), [])
+        self.assertEqual(ca.load_coverage(self.db), {})
 
     def test_synthetic_universe_never_connects(self):
         save_synthetic_universe(

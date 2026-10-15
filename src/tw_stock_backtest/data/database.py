@@ -67,10 +67,24 @@ CORPORATE_ACTIONS = (
     "ON corporate_actions(stock_id, effective_date) WHERE needs_review = 1",
 )
 
+# 公司行動已下載的期間：沒有公司行動與「沒有下載過」要能分辨。
+CORPORATE_ACTION_COVERAGE = (
+    """
+    CREATE TABLE IF NOT EXISTS corporate_action_coverage (
+        stock_id TEXT NOT NULL,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL CHECK (end_date >= start_date),
+        fetched_at TEXT NOT NULL,
+        PRIMARY KEY (stock_id, start_date, end_date)
+    )
+    """,
+)
+
 MIGRATIONS = (
     (1, (TABLE,)),  # 行情表；v1 程式建立的資料庫已有此表，這一步不會改動它
     (2, INDEXES),  # 日期索引與缺價部分索引
     (3, CORPORATE_ACTIONS),  # 公司行動表
+    (4, CORPORATE_ACTION_COVERAGE),  # 公司行動已下載的期間
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 
