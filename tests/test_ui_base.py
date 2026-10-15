@@ -49,9 +49,9 @@ class UiBaseTests(unittest.TestCase):
             referenced.update(re.findall(r"icons\.svg#([a-z-]+)", text))
             # 以巨集或變數帶入的圖示名稱：icon('name') 與導覽列的 ('name', '標籤', ...)。
             referenced.update(re.findall(r"icon\('([a-z-]+)'", text))
-        # 導覽列的圖示名稱定義在 workbench.py。
+        # 導覽列的圖示名稱定義在 workbench.py；單、雙引號都接受，不依賴程式碼排版。
         source = PACKAGE.joinpath("workbench.py").read_text(encoding="utf-8")
-        navigation = re.findall(r"\('([a-z-]+)', '[^']+', '/", source)
+        navigation = re.findall(r"""\(['"]([a-z-]+)['"], ['"][^'"]+['"], ['"]/""", source)
         self.assertEqual(len(navigation), 7)
         referenced.update(navigation)
 
