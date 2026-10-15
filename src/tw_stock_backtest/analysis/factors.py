@@ -1,5 +1,6 @@
 from decimal import Decimal
 from datetime import date
+from tw_stock_backtest.analysis.indicators import window_gap_reason
 from tw_stock_backtest.date_range import parse_date_range
 
 
@@ -246,18 +247,12 @@ def calculate_factor_row(records, as_of, *, factor_settings):
             f"目前只有 {len(history)} 筆"
         )
 
-    closes = [
-        record["close"]
-        for record in history[-required_records:]
-    ]
+    window = history[-required_records:]
+    closes = [record["close"] for record in window]
 
-    for close in closes:
-        if (
-            not isinstance(close, Decimal)
-            or not close.is_finite()
-            or close <= 0
-        ):
-            raise ValueError("收盤價必須是正值且有限的 Decimal")
+    reason = window_gap_reason([record["date"] for record in window], closes)
+    if reason:
+        raise ValueError(reason)
 
     short_ma = (
         sum(closes[-short_window:], Decimal("0"))

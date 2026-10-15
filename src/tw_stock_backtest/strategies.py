@@ -15,7 +15,7 @@ from tw_stock_backtest.analysis.factors import calculate_factor_row, rank_factor
 from tw_stock_backtest.analysis.screening import evaluate_stock
 from tw_stock_backtest.analysis.indicators import (
     relative_strength_index, moving_average_convergence_divergence,
-    previous_high_breakout, simple_moving_average, restart_index,
+    previous_high_breakout, simple_moving_average, restart_index, window_gap_reason,
 )
 from tw_stock_backtest.cli.download_universe import save_progress
 
@@ -197,6 +197,9 @@ def evaluate_conditions(records, as_of, conditions):
                 result.update(previous_high_breakout(history, c['period']))
             elif kind == 'trend':
                 recent = closes[-c['long_window']:]
+                reason = window_gap_reason([r['date'] for r in history[-c['long_window']:]], recent)
+                if reason:
+                    raise ValueError(reason)
                 short = simple_moving_average(recent, c['short_window'])[-1]
                 long = simple_moving_average(recent, c['long_window'])[-1]
                 if long is None:

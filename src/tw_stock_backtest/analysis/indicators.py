@@ -74,6 +74,21 @@ def simple_moving_average(prices, period):
 
     return averages
 
+def window_gap_reason(dates, values, label="收盤價"):
+    """計算窗口（由舊到新）內有缺價時回傳說明，沒有時回傳 None。
+
+    沒有交易日曆，也不能看分析日之後的行情，所以恢復時間以「再幾個行情日」表示：
+    最後一筆缺價之後再累積這麼多筆有效行情，缺價就會移出窗口。
+    """
+    bad = [index for index, value in enumerate(values) if not is_valid_price(value)]
+    if not bad:
+        return None
+    last = bad[-1]
+    count = f"，窗口內共 {len(bad)} 筆缺價" if len(bad) > 1 else ""
+    return (f"{dates[last]} {label}缺失或無效，在 {len(values)} 筆計算窗口內{count}；"
+            f"之後再 {last + 1} 個行情日都有有效價格，缺價移出窗口後即可恢復評估")
+
+
 def windowed_moving_average(prices, period):
     """逐日 SMA；窗口內有任何缺價或無效價格時該日為 None，缺價離開窗口後恢復。
 
@@ -174,8 +189,11 @@ def previous_high_breakout(records, period):
     _period(period)
     if len(records) < period + 1:
         raise ValueError(f'突破需要 {period + 1} 筆行情')
-    highs = [r['high'] for r in records[-period - 1:-1]]
-    close = records[-1]['close']
-    _finite(highs + [close], positive=True)
+    window = records[-period - 1:]
+    highs = [r['high'] for r in window[:-1]]
+    close = window[-1]['close']
+    reason = window_gap_reason([r['date'] for r in window], highs + [close], '價格')
+    if reason:
+        raise ValueError(reason)
     threshold = max(highs)
     return {'close': close, 'threshold': threshold, 'passed': close > threshold}

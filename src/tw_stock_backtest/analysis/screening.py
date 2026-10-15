@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
-from tw_stock_backtest.analysis.indicators import simple_moving_average
+from tw_stock_backtest.analysis.indicators import simple_moving_average, window_gap_reason
 
 
 def evaluate_stock(
@@ -83,6 +83,13 @@ def evaluate_stock(
         )
 
     recent = history[-required_records:]
+    reason = window_gap_reason(
+        [record["date"] for record in recent],
+        [record["close"] for record in recent],
+    )
+    if reason:
+        raise ValueError(reason)
+
     closes = []
     volumes = []
 

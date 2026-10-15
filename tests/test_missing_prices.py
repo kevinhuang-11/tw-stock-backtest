@@ -6,6 +6,7 @@
 """
 import contextlib
 import io
+import re
 import sys
 import unittest
 from datetime import date, timedelta
@@ -15,7 +16,9 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from test_end_to_end import TEST_CONFIG
-from tw_stock_backtest.analysis.indicators import simple_moving_average, windowed_moving_average
+from tw_stock_backtest.analysis.factors import calculate_factor_row
+from tw_stock_backtest.analysis.indicators import simple_moving_average, window_gap_reason, windowed_moving_average
+from tw_stock_backtest.analysis.screening import evaluate_stock
 from tw_stock_backtest.backtesting.backtest import run_backtest
 from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.backtesting.portfolio import run_portfolio_backtest
@@ -210,6 +213,56 @@ class TestSingleStockWithMissingCloses(unittest.TestCase):
         code, output, days = self.run_cli(run_backtest_cli)
         self.assertEqual(code, 0, output)
         self.assertIn(f"{days[12]} | 無成交價（原因未確認，不認定為停牌）", output)
+
+
+class TestWindowGapReasons(unittest.TestCase):
+    """窗口型指標的排除原因要寫出缺價日期，以及再幾個行情日可恢復；承諾的天數必須成立。"""
+
+    FACTORS = {"short_window": 2, "long_window": 5, "momentum_window": 3, "volatility_window": 3}
+    RULES = {"short_window": 2, "long_window": 5, "volume_window": 3,
+             "min_volume_ratio": Decimal("0"), "momentum_window": 3}
+
+    def evaluators(self):
+        def condition(kind, **params):
+            def run(records, as_of):
+                result = status(records, as_of, {"type": kind, **params})
+                if result["status"] == "unavailable":
+                    raise ValueError(result["reason"])
+            return run
+        return {
+            "因子": lambda records, as_of: calculate_factor_row(records, as_of, factor_settings=self.FACTORS),
+            "規則篩選": lambda records, as_of: evaluate_stock(records, as_of, **self.RULES),
+            "突破": condition("breakout", period=5),
+            "均線趨勢": condition("trend", short_window=2, long_window=5),
+        }
+
+    def test_reason_names_the_gap_and_the_promised_recovery_holds(self):
+        records = series("2330", 50, {35: (25, 2)})
+        for name, evaluate in self.evaluators().items():
+            with self.subTest(name):
+                as_of = records[37]["date"]
+                with self.assertRaises(ValueError) as caught:
+                    evaluate(records, as_of)
+                reason = str(caught.exception)
+                self.assertIn(records[35]["date"], reason)
+                waiting = int(re.search(r"再 (\d+) 個行情日", reason)[1])
+                with self.assertRaises(ValueError):
+                    evaluate(records, records[37 + waiting - 1]["date"])
+                evaluate(records, records[37 + waiting]["date"])
+
+    def test_reason_counts_several_gaps_and_uses_the_latest(self):
+        dates = trading_days(5)
+        values = [Decimal(1), None, Decimal(1), None, Decimal(1)]
+        reason = window_gap_reason(dates, values)
+        self.assertIn(f"{dates[3]} 收盤價缺失", reason)
+        self.assertIn("窗口內共 2 筆缺價", reason)
+        self.assertIn("再 4 個行情日", reason)
+        self.assertIsNone(window_gap_reason(dates, [Decimal(1)] * 5))
+
+    def test_gap_on_the_analysis_date_needs_a_full_window(self):
+        records = series("2330", 20, {19: (0, 0)})
+        with self.assertRaisesRegex(ValueError, f"{records[19]['date']} 收盤價缺失.*再 5 個行情日"):
+            calculate_factor_row(records, records[19]["date"], factor_settings=self.FACTORS)
 
 
 if __name__ == "__main__":
