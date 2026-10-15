@@ -37,9 +37,40 @@ INDEXES = (
 
 # Schema 版本記在 PRAGMA user_version。每個版本只新增、不改寫既有資料，
 # 敘述都可重複執行；舊版程式建立的資料庫 user_version 為 0。
+# 公司行動（除權息、減資、變更面額），見 data/corporate_actions.py。
+# 數值以字串保存 Decimal；SQL 只用來篩選與排序，不做數值運算。
+CORPORATE_ACTIONS = (
+    """
+    CREATE TABLE IF NOT EXISTS corporate_actions (
+        stock_id TEXT NOT NULL,
+        effective_date TEXT NOT NULL,          -- 除權息日；減資與變更面額為恢復買賣日
+        kind TEXT NOT NULL CHECK (kind IN ('dividend', 'capital_reduction', 'par_change')),
+        previous_close TEXT NOT NULL,          -- 官方公告的前收
+        reference_price TEXT NOT NULL,         -- 官方參考價
+        cash_dividend TEXT NOT NULL,           -- 每股現金股利（元）
+        stock_dividend_per_1000 TEXT NOT NULL, -- 每千股無償配股
+        shares_per_1000 TEXT,                  -- 減資或變更面額：每千股換發新股；無法確定時為 NULL
+        cash_return TEXT NOT NULL,             -- 減資每股退還股款（元）
+        rights_per_1000 TEXT NOT NULL,         -- 現金增資每千股認購（只記錄，不認購）
+        rights_price TEXT NOT NULL,
+        halt_start TEXT,                       -- 減資的停止買賣首日
+        needs_review INTEGER NOT NULL CHECK (needs_review IN (0, 1)),
+        review_notes TEXT NOT NULL,            -- JSON 陣列
+        sources TEXT NOT NULL,                 -- JSON 陣列，https 網址
+        raw TEXT NOT NULL,                     -- 原始回應列（JSON）
+        fetched_at TEXT NOT NULL,
+        PRIMARY KEY (stock_id, effective_date, kind)
+    )
+    """,
+    # 待人工確認清單只占少數，用部分索引查詢。
+    "CREATE INDEX IF NOT EXISTS idx_corporate_actions_review "
+    "ON corporate_actions(stock_id, effective_date) WHERE needs_review = 1",
+)
+
 MIGRATIONS = (
     (1, (TABLE,)),  # 行情表；v1 程式建立的資料庫已有此表，這一步不會改動它
     (2, INDEXES),  # 日期索引與缺價部分索引
+    (3, CORPORATE_ACTIONS),  # 公司行動表
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 
