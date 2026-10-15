@@ -18,7 +18,9 @@ from tw_stock_backtest.research import program_version
 from tw_stock_backtest.research_digest import render_digest, load_digest
 from tw_stock_backtest.security import public_data
 from tw_stock_backtest.stock_research import (identities, report_bundles, saved_stock,
-    stock_id, today, parse_day, clean, MAX_ROWS)
+    stock_id, today, parse_day, clean, MAX_ROWS, CONDITION_LABELS)
+from tw_stock_backtest.web_format import (MISSING, fmt_datetime, fmt_int, fmt_number,
+    fmt_percent, fmt_signed, status_label)
 from tw_stock_backtest.strategies import analyze_strategy, from_settings, snapshot
 from tw_stock_backtest.supplemental_views import panel_context
 
@@ -181,32 +183,48 @@ def filter_rows(rows, query='', status='', sort='stock_id', descending=False):
     return sorted(present,key=lambda r:(value(r),r['stock_id']),reverse=descending)+sorted(missing,key=lambda r:r['stock_id'])
 
 
+# 條件診斷中要顯示的數值欄位與名稱；其餘欄位（參數、輸入範圍）留在保存的 JSON。
+CONDITION_VALUES = (('value', '數值'), ('close', '收盤'), ('threshold', '門檻'), ('short_ma', '短均線'),
+                    ('long_ma', '長均線'), ('macd', 'MACD'), ('signal', '訊號線'))
+
+
+def condition_line(c):
+    """把一筆條件診斷寫成一行可讀文字，數值取兩位小數。"""
+    values = [f'{label} {fmt_number(c[key])}' for key, label in CONDITION_VALUES
+              if key in c and not isinstance(c[key], dict) and fmt_number(c[key]) != MISSING]
+    text = f"條件 {CONDITION_LABELS.get(c.get('type'), c.get('type'))}：{status_label(c.get('status'))}"
+    if values: text += '（' + '、'.join(values) + '）'
+    if c.get('reason'): text += '；' + str(c['reason'])
+    return text
+
+
 def digest_lines(d):
-    def show(v): return '未提供' if v is None else str(v)
-    def rate(v): return '資料不足' if not v or v.get('value') is None else str(Decimal(v['value'])*100)+'%'
+    """自選快照摘要；網頁、純文字郵件與 HTML 郵件共用。只格式化顯示，保存的數值不變。"""
+    def show(v): return '未提供' if v is None or v == '' else str(v)
+    def rate(v): return fmt_percent((v or {}).get('value'), 2, signed=True)
     c=d['counts']
-    lines=[d['title'],f"產生時間：{d['generated_at']}；期間截止 {d['cutoff']}",
+    lines=[d['title'],f"產生時間：{fmt_datetime(d['generated_at'])}；期間截止 {d['cutoff']}",
         '策略：'+d['strategy_snapshot']['definition']['name']+'；SHA-256 '+d['strategy_snapshot']['sha256'],
         f"涵蓋 {c['requested']} 檔；欄位完整 {c['complete']} 檔；通過 {c['eligible']} 檔；無法評估 {c['unavailable']} 檔。",
         '完整指已具備所列數值，不保證市場資料齊全或最新。私人筆記不包含於此摘要。']
     for i,r in enumerate(d['rows'],1):
         lines+=['',f"{i}. {r['stock_id']} {show(r['name'])}｜{show(r['industry'])}",
-            f"行情 {show(r['price_date'])}：收盤 {show(r['close'])}；條件日期 {show(r['condition_date'])}：{LABELS.get(r['status'],'無法評估')}"]
+            f"行情 {show(r['price_date'])}：收盤 {fmt_number(r['close'])}；條件日期 {show(r['condition_date'])}：{LABELS.get(r['status'],'無法評估')}"]
         diag=r.get('diagnostic') or {}
-        lines+=['條件：'+json.dumps(x,ensure_ascii=False) for x in diag.get('conditions',[])]
+        lines+=[condition_line(x) for x in diag.get('conditions',[])]
         if diag.get('reason'): lines.append('原因：'+str(diag['reason']))
         ref=r['research']
-        if ref: lines.append(f"保存研究 {ref['date']}：名次 {show(r['rank'])}，相對分數 {show(r['score'])}；指定股票池 {','.join(ref['pool'])}；有效母體 {len(ref['population']) if ref['population'] is not None else '未提供'}；來源報表 {ref['report_key']}")
+        if ref: lines.append(f"保存研究 {ref['date']}：名次 {r['rank'] if r['rank'] is not None else MISSING}，相對分數 {fmt_number(r['score'])}；指定股票池 {','.join(ref['pool'])}；有效母體 {len(ref['population']) if ref['population'] is not None else '未提供'}；來源報表 {ref['report_key']}")
         else: lines.append('尚無與目前策略相符且保存此股票的研究排名；未建立單檔相對分數。')
         rev=r['revenue']
-        if rev: lines+= [f"營收 {rev['period']}：{show(rev['revenue'])} 千元；月增 {rate(rev['mom'])}；年增 {rate(rev['yoy'])}",f"来源 {rev['source']}；{rev['basis']}；抓取 {rev['fetched_at']}；公告時間未提供"]
+        if rev: lines+= [f"營收 {rev['period']}：{fmt_int(rev['revenue'])} 千元；月增 {rate(rev['mom'])}；年增 {rate(rev['yoy'])}",f"來源 {rev['source']}；{rev['basis']}；抓取 {fmt_datetime(rev['fetched_at'])}；公告時間未提供"]
         else: lines.append('營收未提供')
         inst=r['institution']
         lines.append('法人最新資料日期：'+show(inst['period'] if inst else None))
         for total in r['sums']:
-            lines.append(f"法人 {total['window']} 日：{total['count']} 筆；基準 {','.join(total['expected_dates'])}；"+('依本機行情日期完整' if total['complete'] else '資料不足')+'；外資／投信／自營商（股）：'+'/'.join(show(total['totals'].get(k)) for k in ('foreign','trust','dealer')))
+            lines.append(f"法人 {total['window']} 日：{total['count']} 筆；基準 {','.join(total['expected_dates'])}；"+('依本機行情日期完整' if total['complete'] else '資料不足')+'；外資／投信／自營商（股）：'+'／'.join(fmt_signed(total['totals'].get(k), 0) for k in ('foreign','trust','dealer')))
         lines+=r['warnings']
-        for kind,u in r['updates'].items(): lines.append(f"{kind} 最近更新 {u['finished_at']}：{u['counts']}；{u['reasons']}")
+        for kind,u in r['updates'].items(): lines.append(f"{kind} 最近更新 {fmt_datetime(u['finished_at'])}：{u['counts']}；{u['reasons']}")
     lines+=['','排名變化',d['comparison']['message']]
     for c in d['comparison']['changes']: lines.append(c['stock_id']+'：'+'；'.join(c['messages']))
     lines+=['','資料限制與研究提示','營收與法人僅展示目前保存版本；抓取時間不等於公告時間，不作歷史當時已知資訊。無獨立交易日曆；日期差為日曆日。相對分數不是上漲機率。','執行資訊','run_id：'+d.get('run_id','尚未保存'),'版本：'+json.dumps(d['version'],ensure_ascii=False)]

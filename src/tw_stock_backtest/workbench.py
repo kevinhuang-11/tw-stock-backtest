@@ -521,7 +521,11 @@ def create_app(workbench, dev=False):
             abort(404)
         if entry['details'].get('kind')=='watchlist':
             text, html=render_digest(entry['details'])
-            return render_template('watchlist_result.html',body=html.split('<body',1)[1].split('>',1)[1].rsplit('</body>',1)[0],report_key=key,rows=entry['details']['rows'])
+            body=html.split('<body',1)[1].split('>',1)[1].rsplit('</body>',1)[0]
+            # 郵件內容自帶一級標題；嵌入頁面時各級標題降一級，頁面只保留一個 h1。郵件本身不變。
+            for level in (3, 2, 1):
+                body=body.replace(f'<h{level} ',f'<h{level+1} ').replace(f'</h{level}>',f'</h{level+1}>')
+            return render_template('watchlist_result.html',body=body,report_key=key,rows=entry['details']['rows'])
         digest = None
         if entry['details'].get('kind') == 'research' and entry['details'].get('status') in ('success', 'partial', 'failed'):
             try:

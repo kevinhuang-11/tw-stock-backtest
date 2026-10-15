@@ -1,4 +1,5 @@
 import copy
+from decimal import Decimal
 import json
 import re
 import sqlite3
@@ -127,6 +128,32 @@ class WatchResearchTests(unittest.TestCase):
         with patch('tw_stock_backtest.watchlist_research.save_progress',side_effect=OSError):
             with self.assertRaises(OSError): save_snapshot(d,root)
         self.assertEqual(len(previous_snapshots(root)),2);self.assertTrue(list(root.glob('*.incomplete')))
+
+    def test_digest_numbers_are_formatted_for_display_only(self):
+        import re
+        from tw_stock_backtest.watchlist_research import digest_lines
+        d=self.data();row=d['rows'][0]
+        row.update(close=Decimal('92.9'),score='66.66666666666666666666666667',rank=1,
+                   research={'date':'2026-09-29','pool':['2330'],'population':['2330'],'report_key':'k'})
+        row['revenue']={'period':'2026-09','revenue':'112000','mom':{'value':'0.009009009009009009009009009'},
+                        'yoy':{'value':None,'reason':'缺少對應期'},'source':'s','basis':'b','fetched_at':'2026-10-14T02:00:00+00:00'}
+        row['diagnostic']={'conditions':[{'type':'rsi','status':'passed','value':'53.456789123','minimum':'30'}]}
+        text='\n'.join(digest_lines(d))
+        self.assertIn('收盤 92.90',text);self.assertIn('相對分數 66.67',text)
+        self.assertIn('營收 2026-09：112,000 千元；月增 +0.90%；年增 —',text)
+        self.assertIn('條件 RSI 位於上下限（含邊界）：通過（數值 53.46）',text)
+        self.assertIn('抓取 2026-10-14 10:00',text)
+        self.assertEqual(re.findall(r'\d+\.\d{5,}',text),[])
+        # 保存的數值不變，只改顯示。
+        self.assertEqual(row['score'],'66.66666666666666666666666667')
+
+    def test_snapshot_page_has_a_single_top_heading(self):
+        response=self.client.post('/watchlist/snapshot',data={'csrf':self.token,'as_of':'2026-09-29'})
+        page=self.client.get(response.location).text
+        self.assertEqual(page.count('<h1'),1)
+        self.assertIn('自選股研究總覽',page)
+        # 郵件 HTML 保持原樣，仍以一級標題開頭。
+        self.assertEqual(self.client.get(response.location+'/preview').text.count('<h1'),1)
 
     def test_snapshot_html_routes_protection_and_json_job_coexist(self):
         self.assertEqual(self.client.post('/watchlist/snapshot').status_code,403)
