@@ -6,6 +6,7 @@
 計數、分組與日期比較都在 SQLite 中完成（GROUP BY、視窗函式），不把全部日期讀進 Python；
 SQL 只處理日期字串、筆數與 NULL，不碰以字串保存的 Decimal 價格。
 """
+
 import json
 import sqlite3
 from contextlib import closing
@@ -20,7 +21,9 @@ def _connect(path):
 
 
 def _has_prices(db):
-    return db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='stock_prices'").fetchone()
+    return db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='stock_prices'"
+    ).fetchone()
 
 
 # 只比較日期字串與計數，不在 SQL 中處理價格；價格是以字串保存的 Decimal。
@@ -67,7 +70,9 @@ def market_dates(db_path):
     with _connect(path) as db:
         if not _has_prices(db):
             return ()
-        return tuple(row[0] for row in db.execute("SELECT DISTINCT date FROM stock_prices ORDER BY date"))
+        return tuple(
+            row[0] for row in db.execute("SELECT DISTINCT date FROM stock_prices ORDER BY date")
+        )
 
 
 def market_lag(db_path, day):
@@ -81,8 +86,9 @@ def market_lag(db_path, day):
         if not db.execute("SELECT EXISTS (SELECT 1 FROM stock_prices)").fetchone()[0]:
             return None
         # 有日期索引時是 SEARCH，只讀 day 之後的索引項。
-        return db.execute("SELECT COUNT(DISTINCT date) FROM stock_prices WHERE date > ?",
-                          (day,)).fetchone()[0]
+        return db.execute(
+            "SELECT COUNT(DISTINCT date) FROM stock_prices WHERE date > ?", (day,)
+        ).fetchone()[0]
 
 
 STOCK_QUALITY_SQL = """
@@ -164,8 +170,10 @@ def price_gaps(db_path, stock_id=None, calendar_days=20):
         if not _has_prices(db):
             return []
         columns = ("stock_id", "previous_date", "date", "missing_market_days", "calendar_days")
-        return [dict(zip(columns, row)) for row in db.execute(
-            GAPS_SQL, {"stock_id": stock_id, "calendar_days": calendar_days})]
+        return [
+            dict(zip(columns, row))
+            for row in db.execute(GAPS_SQL, {"stock_id": stock_id, "calendar_days": calendar_days})
+        ]
 
 
 def _supplemental(path):
@@ -175,8 +183,12 @@ def _supplemental(path):
     with _connect(path) as db:
         if not db.execute("SELECT 1 FROM sqlite_master WHERE name='supplemental'").fetchone():
             return {}
-        return {kind: {"latest": latest, "stocks": stocks} for kind, latest, stocks in db.execute(
-            "SELECT kind, MAX(period), COUNT(DISTINCT stock_id) FROM supplemental GROUP BY kind")}
+        return {
+            kind: {"latest": latest, "stocks": stocks}
+            for kind, latest, stocks in db.execute(
+                "SELECT kind, MAX(period), COUNT(DISTINCT stock_id) FROM supplemental GROUP BY kind"
+            )
+        }
 
 
 def _listing(path):
@@ -185,8 +197,11 @@ def _listing(path):
         return None
     try:
         snapshot = json.loads(path.read_text(encoding="utf-8"))
-        return {"downloaded_at": snapshot.get("downloaded_at"), "count": snapshot.get("count"),
-                "synthetic": snapshot.get("scope") == "synthetic_example"}
+        return {
+            "downloaded_at": snapshot.get("downloaded_at"),
+            "count": snapshot.get("count"),
+            "synthetic": snapshot.get("scope") == "synthetic_example",
+        }
     except (OSError, ValueError):
         return None
 

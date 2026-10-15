@@ -1,21 +1,20 @@
 from datetime import date
 from decimal import Decimal
 
+from tw_stock_backtest.analysis.factors import (
+    build_factor_history,
+    calculate_factor_row,
+    rank_factor_candidates,
+)
+from tw_stock_backtest.analysis.screening import evaluate_stock
 from tw_stock_backtest.analysis.screening_history import (
     build_screening_history,
 )
 from tw_stock_backtest.backtesting.costs import (
     CostSettings,
-    calculate_transaction,
-    calculate_buy_quantity,
     apply_slippage,
-)
-from tw_stock_backtest.date_range import parse_date_range
-from tw_stock_backtest.analysis.factors import build_factor_history
-from tw_stock_backtest.analysis.screening import evaluate_stock
-from tw_stock_backtest.analysis.factors import (
-    calculate_factor_row,
-    rank_factor_candidates,
+    calculate_buy_quantity,
+    calculate_transaction,
 )
 from tw_stock_backtest.data.market_events import (
     CONFIRMED_HALTS,
@@ -23,6 +22,7 @@ from tw_stock_backtest.data.market_events import (
     not_tradable_reason,
     prepare_backtest_market,
 )
+from tw_stock_backtest.date_range import parse_date_range
 
 
 def plan_rebalance(
@@ -42,11 +42,7 @@ def plan_rebalance(
 
     本函式不執行交易、不檢查現金，也不修改輸入。
     """
-    if (
-        isinstance(max_positions, bool)
-        or not isinstance(max_positions, int)
-        or max_positions <= 0
-    ):
+    if isinstance(max_positions, bool) or not isinstance(max_positions, int) or max_positions <= 0:
         raise ValueError("max_positions 必須是正整數")
 
     if not isinstance(holdings, dict):
@@ -56,26 +52,14 @@ def plan_rebalance(
         raise ValueError("候選排名必須是清單或 tuple")
 
     for stock_id, quantity in holdings.items():
-        if (
-            not isinstance(stock_id, str)
-            or not stock_id
-            or stock_id != stock_id.strip()
-        ):
+        if not isinstance(stock_id, str) or not stock_id or stock_id != stock_id.strip():
             raise ValueError("持股代號必須是非空且無前後空白的字串")
 
-        if (
-            isinstance(quantity, bool)
-            or not isinstance(quantity, int)
-            or quantity <= 0
-        ):
+        if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
             raise ValueError("持股股數必須是正整數")
 
     for stock_id in ranked_stock_ids:
-        if (
-            not isinstance(stock_id, str)
-            or not stock_id
-            or stock_id != stock_id.strip()
-        ):
+        if not isinstance(stock_id, str) or not stock_id or stock_id != stock_id.strip():
             raise ValueError("候選代號必須是非空且無前後空白的字串")
 
     if len(set(ranked_stock_ids)) != len(ranked_stock_ids):
@@ -89,17 +73,9 @@ def plan_rebalance(
     sell = sorted(held_set - target_set)
 
     # 買進順序保留候選排名。
-    buy = [
-        stock_id
-        for stock_id in target
-        if stock_id not in held_set
-    ]
+    buy = [stock_id for stock_id in target if stock_id not in held_set]
 
-    keep = [
-        stock_id
-        for stock_id in target
-        if stock_id in held_set
-    ]
+    keep = [stock_id for stock_id in target if stock_id in held_set]
 
     return {
         "target": target,
@@ -107,6 +83,7 @@ def plan_rebalance(
         "buy": buy,
         "keep": keep,
     }
+
 
 def run_portfolio_backtest(
     records_by_stock,
@@ -128,25 +105,23 @@ def run_portfolio_backtest(
 
     strategy_diagnostics = []
     if strategy is not None:
-        from tw_stock_backtest.strategies import validate_strategy, analyze_strategy, snapshot
+        from tw_stock_backtest.strategies import analyze_strategy, snapshot, validate_strategy
+
         strategy = validate_strategy(strategy)
-        ranking_method = strategy['ranking_mode']
-        factor_settings = {k: Decimal(v) if k.endswith('_weight') else v for k,v in strategy['factors'].items()}
-        screening_settings = {k: Decimal(v) if k == 'min_volume_ratio' else v for k,v in strategy['screening'].items()}
+        ranking_method = strategy["ranking_mode"]
+        factor_settings = {
+            k: Decimal(v) if k.endswith("_weight") else v for k, v in strategy["factors"].items()
+        }
+        screening_settings = {
+            k: Decimal(v) if k == "min_volume_ratio" else v
+            for k, v in strategy["screening"].items()
+        }
     start, end = parse_date_range(start_text, end_text)
 
-    if (
-        not isinstance(initial_cash, Decimal)
-        or not initial_cash.is_finite()
-        or initial_cash <= 0
-    ):
+    if not isinstance(initial_cash, Decimal) or not initial_cash.is_finite() or initial_cash <= 0:
         raise ValueError("初始資金必須是正值且有限的 Decimal")
 
-    if (
-        isinstance(quantity, bool)
-        or not isinstance(quantity, int)
-        or quantity <= 0
-    ):
+    if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
         raise ValueError("買進股數必須是正整數")
 
     if not isinstance(cost_settings, CostSettings):
@@ -156,9 +131,7 @@ def run_portfolio_backtest(
 
     plan_rebalance({}, [], max_positions=max_positions)
     if sizing_mode not in ("fixed_quantity", "fixed_budget"):
-        raise ValueError(
-            "股數配置模式必須是 fixed_quantity 或 fixed_budget"
-        )
+        raise ValueError("股數配置模式必須是 fixed_quantity 或 fixed_budget")
 
     # 整段回測使用相同的單檔買進預算上限。
     # 此版本不隨資產變化調整預算，也不調整既有持股股數。
@@ -235,19 +208,12 @@ def run_portfolio_backtest(
                     reason = None
                     transaction = None
 
-                    shares = (
-                        holdings[stock_id]
-                        if action == "SELL"
-                        else quantity
-                    )
+                    shares = holdings[stock_id] if action == "SELL" else quantity
 
                     if not record["tradable"]:
                         reason = f"{not_tradable_reason(record)}，當日不成交"
 
-                    elif (
-                        action == "BUY"
-                        and len(holdings) >= max_positions
-                    ):
+                    elif action == "BUY" and len(holdings) >= max_positions:
                         reason = "已達持股上限"
 
                     else:
@@ -258,10 +224,7 @@ def run_portfolio_backtest(
                         )
 
                         # 只有固定預算買進，需要重新計算股數。
-                        if (
-                            action == "BUY"
-                            and sizing_mode == "fixed_budget"
-                        ):
+                        if action == "BUY" and sizing_mode == "fixed_budget":
                             available_budget = min(
                                 budget_per_position,
                                 cash,
@@ -274,9 +237,7 @@ def run_portfolio_backtest(
                             )
 
                             if shares == 0:
-                                reason = (
-                                    "預算或現金不足以買進一股，含手續費"
-                                )
+                                reason = "預算或現金不足以買進一股，含手續費"
 
                         # 所有可成交的買進與賣出，都要計算交易金額。
                         # 這個 if 與上方配置模式的 if 同一層。
@@ -288,10 +249,7 @@ def run_portfolio_backtest(
                                 cost_settings,
                             )
 
-                            if (
-                                action == "BUY"
-                                and cash < -transaction["cash_change"]
-                            ):
+                            if action == "BUY" and cash < -transaction["cash_change"]:
                                 reason = "資金不足，含手續費"
 
                     if reason is not None:
@@ -397,12 +355,8 @@ def run_portfolio_backtest(
                 errors[stock_id] = str(error)
 
         if ranking_method == "rules":
-            candidates = [
-                row for row in evaluations if row["selected"]
-            ]
-            candidates.sort(
-                key=lambda row: (-row["momentum"], row["stock_id"])
-            )
+            candidates = [row for row in evaluations if row["selected"]]
+            candidates.sort(key=lambda row: (-row["momentum"], row["stock_id"]))
         else:
             candidates = rank_factor_candidates(
                 evaluations,
@@ -410,24 +364,20 @@ def run_portfolio_backtest(
             )
 
         if strategy is not None:
-            analysis = analyze_strategy(histories, trading_date, strategy, indicator_records=records_by_stock)
-            candidates = analysis['candidates']
-            errors.update(analysis['errors'])
-            strategy_diagnostics.append({'date': trading_date, **analysis})
+            analysis = analyze_strategy(
+                histories, trading_date, strategy, indicator_records=records_by_stock
+            )
+            candidates = analysis["candidates"]
+            errors.update(analysis["errors"])
+            strategy_diagnostics.append({"date": trading_date, **analysis})
 
         # 停牌或無法更新訊號的既有持股暫時保留，仍占名額。
-        frozen = sorted(
-            stock_id
-            for stock_id in holdings
-            if stock_id in errors
-        )
+        frozen = sorted(stock_id for stock_id in holdings if stock_id in errors)
 
         available_slots = max_positions - len(frozen)
 
         ranked_ids = [
-            row["stock_id"]
-            for row in candidates[:top_n]
-            if row["stock_id"] not in frozen
+            row["stock_id"] for row in candidates[:top_n] if row["stock_id"] not in frozen
         ]
 
         target_ids = frozen + ranked_ids[:available_slots]
@@ -452,14 +402,14 @@ def run_portfolio_backtest(
     final_equity = equity_curve[-1]["equity"]
 
     return {
-        **({"strategy_snapshot": snapshot(strategy), "strategy_diagnostics": strategy_diagnostics} if strategy is not None else {}),
+        **(
+            {"strategy_snapshot": snapshot(strategy), "strategy_diagnostics": strategy_diagnostics}
+            if strategy is not None
+            else {}
+        ),
         "ranking_method": ranking_method,
         "sizing_mode": sizing_mode,
-        "budget_per_position": (
-            budget_per_position
-            if sizing_mode == "fixed_budget"
-            else None
-        ),
+        "budget_per_position": (budget_per_position if sizing_mode == "fixed_budget" else None),
         "initial_cash": initial_cash,
         "cash": cash,
         "holdings": holdings.copy(),
@@ -474,4 +424,3 @@ def run_portfolio_backtest(
         "market_events": market_events,
         "slippage_rate": slippage_rate,
     }
-

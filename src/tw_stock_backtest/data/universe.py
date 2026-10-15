@@ -1,27 +1,20 @@
-import re
-from datetime import date
-from html.parser import HTMLParser
-from urllib.request import Request, urlopen
 import json
 import os
+import re
 from datetime import date, datetime, timezone
+from html.parser import HTMLParser
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from urllib.request import Request, urlopen
 
-
-TWSE_UNIVERSE_URL = (
-    "https://isin.twse.com.tw/isin/C_public.jsp?strMode=2"
-)
+TWSE_UNIVERSE_URL = "https://isin.twse.com.tw/isin/C_public.jsp?strMode=2"
 
 # 名單範圍：官方上市普通股，或離線展示用的合成示例。
 SCOPE_TWSE = "current_twse_common_stocks"
 SCOPE_SYNTHETIC = "synthetic_example"
 SYNTHETIC_URL_PREFIX = "synthetic://"
 SYNTHETIC_MARKET = "合成示例"
-OFFLINE_REASON = (
-    "合成示例環境不提供連網更新；"
-    "合成代號在官方來源查不到資料"
-)
+OFFLINE_REASON = "合成示例環境不提供連網更新；合成代號在官方來源查不到資料"
 
 
 class NetworkDisabled(ValueError):
@@ -90,16 +83,10 @@ def parse_listed_stocks(html, *, as_of=None):
 
     for row in parser.rows:
         # 移除欄位名稱中的空白，以免網頁排版影響比對。
-        headings = [
-            re.sub(r"\s+", "", value)
-            for value in row
-        ]
+        headings = [re.sub(r"\s+", "", value) for value in row]
 
         if all(field in headings for field in required_fields):
-            positions = {
-                field: headings.index(field)
-                for field in required_fields
-            }
+            positions = {field: headings.index(field) for field in required_fields}
             continue
 
         # 略過標題、分類名稱等非資料列。
@@ -131,13 +118,9 @@ def parse_listed_stocks(html, *, as_of=None):
         listed_text = row[positions["上市日"]]
 
         try:
-            listed_date = date.fromisoformat(
-                listed_text.replace("/", "-")
-            )
+            listed_date = date.fromisoformat(listed_text.replace("/", "-"))
         except ValueError as error:
-            raise ValueError(
-                f"{stock_id} 的上市日期無效：{listed_text}"
-            ) from error
+            raise ValueError(f"{stock_id} 的上市日期無效：{listed_text}") from error
 
         if listed_date > as_of:
             continue
@@ -180,6 +163,7 @@ def fetch_listed_stocks(*, timeout=30):
         html = raw.decode("cp950")
 
     return parse_listed_stocks(html)
+
 
 def _validate_stock_list(stocks, *, synthetic=False):
     """檢查要保存或讀取的股票名單。"""
@@ -224,20 +208,11 @@ def _validate_stock_list(stocks, *, synthetic=False):
             raise ValueError(f"{stock_id} 的股票名稱不可為空")
 
         if synthetic:
-            if (
-                stock["market"] != SYNTHETIC_MARKET
-                or "cfi_code" in stock
-                or "listed_date" in stock
-            ):
-                raise ValueError(
-                    f"{stock_id} 的合成資料不可標示為上市證券"
-                )
+            if stock["market"] != SYNTHETIC_MARKET or "cfi_code" in stock or "listed_date" in stock:
+                raise ValueError(f"{stock_id} 的合成資料不可標示為上市證券")
             continue
 
-        if (
-            stock["market"] != "上市"
-            or not stock["cfi_code"].startswith("ES")
-        ):
+        if stock["market"] != "上市" or not stock["cfi_code"].startswith("ES"):
             raise ValueError(f"{stock_id} 不符合上市普通股條件")
 
         date.fromisoformat(stock["listed_date"])
@@ -325,10 +300,7 @@ def load_universe(path):
     if not isinstance(snapshot, dict):
         raise ValueError("名單檔案格式錯誤")
 
-    if (
-        type(snapshot.get("schema_version")) is not int
-        or snapshot["schema_version"] != 1
-    ):
+    if type(snapshot.get("schema_version")) is not int or snapshot["schema_version"] != 1:
         raise ValueError("不支援的名單格式版本")
 
     scope = snapshot.get("scope")
@@ -361,10 +333,7 @@ def load_universe(path):
     stocks = snapshot.get("stocks")
     _validate_stock_list(stocks, synthetic=scope == SCOPE_SYNTHETIC)
 
-    if (
-        type(snapshot.get("count")) is not int
-        or snapshot["count"] != len(stocks)
-    ):
+    if type(snapshot.get("count")) is not int or snapshot["count"] != len(stocks):
         raise ValueError("名單筆數與實際內容不符")
 
     return snapshot

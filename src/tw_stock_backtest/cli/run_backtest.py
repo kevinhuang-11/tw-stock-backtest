@@ -1,22 +1,20 @@
 import argparse
 import sqlite3
 
+from tw_stock_backtest.analysis.indicators import windowed_moving_average
+from tw_stock_backtest.analysis.strategies import moving_average_crossover
 from tw_stock_backtest.backtesting.backtest import run_backtest
+from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.config import (
     DEFAULT_CONFIG_PATH,
     apply_overrides,
     load_config,
 )
-from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.data.database import load_records
-from tw_stock_backtest.analysis.indicators import windowed_moving_average
-from tw_stock_backtest.analysis.strategies import moving_average_crossover
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="執行均線交叉策略回測，包含設定的交易費稅"
-    )
+    parser = argparse.ArgumentParser(description="執行均線交叉策略回測，包含設定的交易費稅")
 
     parser.add_argument(
         "--config",
@@ -173,28 +171,16 @@ def main():
     print("成交價格仍以日線開盤價模擬，未精確模擬零股成交")
     print(f"股票代號：{stock_id}")
     print(f"資料庫位置：{db_path}")
-    print(
-        f"實際期間：{records[0]['date']}"
-        f" ～ {records[-1]['date']}"
-    )
-    print(
-        f"均線期間：短期 {short_window}，"
-        f"長期 {long_window}"
-    )
+    print(f"實際期間：{records[0]['date']} ～ {records[-1]['date']}")
+    print(f"均線期間：短期 {short_window}，長期 {long_window}")
     print(f"每次買進股數：{quantity}")
 
     print(f"\n手續費率：{cost_settings.commission_rate:.4%}")
     print(f"折扣倍率：{cost_settings.commission_discount}")
     print(f"最低手續費：{cost_settings.minimum_commission} 元")
     print(f"賣出交易稅率：{cost_settings.sell_tax_rate:.2%}")
-    print(
-        "手續費取整："
-        + rounding_names[cost_settings.commission_rounding]
-    )
-    print(
-        "交易稅取整："
-        + rounding_names[cost_settings.tax_rounding]
-    )
+    print("手續費取整：" + rounding_names[cost_settings.commission_rounding])
+    print("交易稅取整：" + rounding_names[cost_settings.tax_rounding])
 
     print(f"\n初始資金：{result['initial_cash']:.2f}")
     print(f"期末現金：{result['cash']:.2f}")
@@ -206,12 +192,16 @@ def main():
     print(f"成交筆數：{len(result['trades'])}")
 
     if result["market_events"]:
-        print(f"\n停牌與無成交價日：{len(result['market_events'])} 筆（當日不成交，持股沿用最近收盤估值）")
+        print(
+            f"\n停牌與無成交價日：{len(result['market_events'])} 筆（當日不成交，持股沿用最近收盤估值）"
+        )
         for event in result["market_events"]:
             print(f"{event['date']} | {event['reason']}")
 
     for order in result["skipped_orders"]:
-        print(f"未成交：訊號日 {order['signal_date']} → {order['date']}，{order['action']}，{order['reason']}")
+        print(
+            f"未成交：訊號日 {order['signal_date']} → {order['date']}，{order['action']}，{order['reason']}"
+        )
 
     print("\n成交紀錄：")
 

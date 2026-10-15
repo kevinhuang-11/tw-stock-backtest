@@ -50,9 +50,7 @@ class TestMarketEvents(unittest.TestCase):
     def prepare(self, records=None, events=None):
         return prepare_market_records(
             self.records if records is None else records,
-            confirmed_halts=(
-                self.events if events is None else events
-            ),
+            confirmed_halts=(self.events if events is None else events),
         )
 
     def test_normal_record_uses_its_own_close(self):

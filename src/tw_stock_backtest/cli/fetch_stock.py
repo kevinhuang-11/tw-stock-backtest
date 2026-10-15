@@ -8,13 +8,13 @@ from urllib.request import Request, urlopen
 
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config
 from tw_stock_backtest.data.database import save_records
+from tw_stock_backtest.data.stock_data import normalize_row
+from tw_stock_backtest.data.universe import ensure_network_allowed
 from tw_stock_backtest.date_range import (
     filter_records,
     month_starts,
     parse_date_range,
 )
-from tw_stock_backtest.data.stock_data import normalize_row
-from tw_stock_backtest.data.universe import ensure_network_allowed
 
 
 class NoMarketData(ValueError):
@@ -47,14 +47,13 @@ def fetch_month(stock_id, month, *, timeout_seconds):
         raise NoMarketData("行情查詢未成功：來源明確回覆無資料")
 
     if result.get("stat") != "OK":
-        raise ValueError(
-            f"行情查詢未成功：{result.get('stat')}"
-        )
+        raise ValueError(f"行情查詢未成功：{result.get('stat')}")
 
     if not result.get("fields") or not result.get("data"):
         raise ValueError("回應缺少欄位或行情資料")
 
     return result
+
 
 def fetch_month_with_retry(
     stock_id,
@@ -69,11 +68,7 @@ def fetch_month_with_retry(
         ("max_attempts", max_attempts),
         ("retry_wait_seconds", retry_wait_seconds),
     ):
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, int)
-            or value <= 0
-        ):
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise ValueError(f"{name} 必須是正整數")
 
     for attempt in range(1, max_attempts + 1):
@@ -86,10 +81,7 @@ def fetch_month_with_retry(
 
         except HTTPError as error:
             # HTTPError 是 URLError 的子類別，必須先處理。
-            if (
-                error.code not in (502, 503, 504)
-                or attempt == max_attempts
-            ):
+            if error.code not in (502, 503, 504) or attempt == max_attempts:
                 raise
 
             message = f"HTTP {error.code}"
@@ -113,9 +105,7 @@ def fetch_month_with_retry(
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="下載指定股票與日期區間的行情，存入 SQLite"
-    )
+    parser = argparse.ArgumentParser(description="下載指定股票與日期區間的行情，存入 SQLite")
 
     parser.add_argument(
         "--config",
@@ -163,9 +153,7 @@ def main():
 
         download_settings = settings["download"]
         timeout_seconds = download_settings["timeout_seconds"]
-        request_interval = download_settings[
-            "request_interval_seconds"
-        ]
+        request_interval = download_settings["request_interval_seconds"]
         db_path = settings["storage"]["database_path"]
 
         # 合成示例環境不下載；在第一個請求之前就停止。
@@ -187,9 +175,7 @@ def main():
                 month.strftime("%Y%m%d"),
                 timeout_seconds=timeout_seconds,
                 max_attempts=download_settings["max_attempts"],
-                retry_wait_seconds=download_settings[
-                    "retry_wait_seconds"
-                ],
+                retry_wait_seconds=download_settings["retry_wait_seconds"],
             )
 
             monthly_records = [
@@ -237,10 +223,7 @@ def main():
     print(f"整理後筆數：{len(records)}")
     print(f"資料庫本次處理筆數：{processed_count}")
     print(f"資料庫位置：{db_path}")
-    print(
-        f"實際資料期間：{records[0]['date']}"
-        f" ～ {records[-1]['date']}"
-    )
+    print(f"實際資料期間：{records[0]['date']} ～ {records[-1]['date']}")
 
     if args.show:
         print("\n全部整理後資料：")

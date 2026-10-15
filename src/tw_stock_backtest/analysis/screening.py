@@ -23,11 +23,7 @@ def evaluate_stock(
     }
 
     for name, value in periods.items():
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, int)
-            or value <= 0
-        ):
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise ValueError(f"{name} 必須是正整數")
 
     if short_window >= long_window:
@@ -77,10 +73,7 @@ def evaluate_stock(
     )
 
     if len(history) < required_records:
-        raise ValueError(
-            f"至少需要 {required_records} 筆行情，"
-            f"目前只有 {len(history)} 筆"
-        )
+        raise ValueError(f"至少需要 {required_records} 筆行情，目前只有 {len(history)} 筆")
 
     recent = history[-required_records:]
     reason = window_gap_reason(
@@ -97,18 +90,10 @@ def evaluate_stock(
         close = record["close"]
         volume = record["volume"]
 
-        if (
-            not isinstance(close, Decimal)
-            or not close.is_finite()
-            or close <= 0
-        ):
+        if not isinstance(close, Decimal) or not close.is_finite() or close <= 0:
             raise ValueError("收盤價必須是正值且有限的 Decimal")
 
-        if (
-            isinstance(volume, bool)
-            or not isinstance(volume, int)
-            or volume < 0
-        ):
+        if isinstance(volume, bool) or not isinstance(volume, int) or volume < 0:
             raise ValueError("成交量必須是非負整數")
 
         closes.append(close)
@@ -121,10 +106,8 @@ def evaluate_stock(
     long_ma = simple_moving_average(closes, long_window)[-1]
 
     # 均量只使用當天之前的 volume_window 筆。
-    previous_volumes = volumes[-(volume_window + 1):-1]
-    previous_avg_volume = (
-        Decimal(sum(previous_volumes)) / Decimal(volume_window)
-    )
+    previous_volumes = volumes[-(volume_window + 1) : -1]
+    previous_avg_volume = Decimal(sum(previous_volumes)) / Decimal(volume_window)
 
     if previous_avg_volume == 0:
         raise ValueError("前期平均成交量為 0，無法計算量比")
@@ -141,14 +124,10 @@ def evaluate_stock(
     failed_conditions = []
 
     if not trend_ok:
-        failed_conditions.append(
-            f"未符合 Close > SMA{short_window} > SMA{long_window}"
-        )
+        failed_conditions.append(f"未符合 Close > SMA{short_window} > SMA{long_window}")
 
     if not volume_ok:
-        failed_conditions.append(
-            f"量比未大於 {min_volume_ratio}"
-        )
+        failed_conditions.append(f"量比未大於 {min_volume_ratio}")
 
     return {
         "stock_id": stock_id,

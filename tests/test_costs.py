@@ -1,9 +1,12 @@
 import unittest
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
-from tw_stock_backtest.backtesting.costs import CostSettings, calculate_transaction
-from tw_stock_backtest.backtesting.costs import calculate_buy_quantity
-from tw_stock_backtest.backtesting.costs import apply_slippage
+from tw_stock_backtest.backtesting.costs import (
+    CostSettings,
+    apply_slippage,
+    calculate_buy_quantity,
+    calculate_transaction,
+)
 
 
 class TestTransactionCosts(unittest.TestCase):
@@ -142,6 +145,7 @@ class TestTransactionCosts(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     CostSettings(**values)
 
+
 class TestBuyQuantity(unittest.TestCase):
     def setUp(self):
         self.settings = CostSettings(
@@ -239,6 +243,8 @@ class TestBuyQuantity(unittest.TestCase):
                         budget,
                         self.settings,
                     )
+
+
 class TestSlippage(unittest.TestCase):
     def test_buy_price_increases(self):
         result = apply_slippage(
@@ -302,6 +308,6 @@ class TestSlippage(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     apply_slippage(price, action, rate)
 
-                    
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,9 @@
 import argparse
 import sqlite3
 
+from tw_stock_backtest.analysis.screening_history import (
+    build_screening_history,
+)
 from tw_stock_backtest.config import (
     DEFAULT_CONFIG_PATH,
     apply_overrides,
@@ -8,15 +11,10 @@ from tw_stock_backtest.config import (
 )
 from tw_stock_backtest.data.database import load_records
 from tw_stock_backtest.date_range import parse_date_range
-from tw_stock_backtest.analysis.screening_history import (
-    build_screening_history,
-)
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="依歷史日期逐日篩選與排名股票"
-    )
+    parser = argparse.ArgumentParser(description="依歷史日期逐日篩選與排名股票")
 
     parser.add_argument(
         "--config",
@@ -87,10 +85,7 @@ def main():
     has_errors = False
 
     for day in history:
-        candidates_text = ", ".join(
-            result["stock_id"]
-            for result in day["candidates"]
-        ) or "無"
+        candidates_text = ", ".join(result["stock_id"] for result in day["candidates"]) or "無"
 
         print(
             f"{day['date']}"

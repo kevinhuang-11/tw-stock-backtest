@@ -72,8 +72,7 @@ class TestBuyAndHold(unittest.TestCase):
         self.assertEqual(len(result["trades"]), 2)
         self.assertTrue(
             all(
-                trade["date"] == "2026-01-05"
-                and trade["action"] == "BUY"
+                trade["date"] == "2026-01-05" and trade["action"] == "BUY"
                 for trade in result["trades"]
             )
         )
@@ -110,6 +109,7 @@ class TestBuyAndHold(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             self.run_benchmark()
+
 
 class TestBenchmarkSlippage(unittest.TestCase):
     def setUp(self):
@@ -239,6 +239,6 @@ class TestBenchmarkSlippage(unittest.TestCase):
                 slippage_rate=Decimal("-0.01"),
             )
 
-            
+
 if __name__ == "__main__":
     unittest.main()

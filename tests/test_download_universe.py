@@ -1,11 +1,11 @@
 import subprocess
 import unittest
 from pathlib import Path
-from unittest.mock import patch
-from tw_stock_backtest.cli.download_universe import download_batch
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from tw_stock_backtest.cli.download_universe import (
+    download_batch,
     load_progress,
     save_progress,
     select_pending_stocks,
@@ -141,6 +141,7 @@ class TestDownloadBatch(unittest.TestCase):
             command[command.index("--start") + 1],
             "2026-08-15",
         )
+
     def test_resume_retries_failed_and_unstarted_stocks(self):
         stocks = self.stocks + [
             {
@@ -234,7 +235,7 @@ class TestDownloadBatch(unittest.TestCase):
         self.assertEqual(len(recorded), 1)
         self.assertEqual(recorded[0]["stock_id"], "1101")
         self.assertEqual(recorded[0]["status"], "completed")
-        
+
 
 if __name__ == "__main__":
     unittest.main()

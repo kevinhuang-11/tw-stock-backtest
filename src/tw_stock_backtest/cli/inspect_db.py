@@ -8,9 +8,7 @@ from tw_stock_backtest.data_status import market_dates, price_gaps, stock_qualit
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="查看資料庫中的股票摘要與最近行情"
-    )
+    parser = argparse.ArgumentParser(description="查看資料庫中的股票摘要與最近行情")
 
     parser.add_argument(
         "--config",
@@ -53,9 +51,7 @@ def main():
             raise ValueError("顯示筆數必須大於 0")
 
         stock_id = (
-            args.stock.strip()
-            if args.stock is not None
-            else settings["universe"]["stocks"][0]
+            args.stock.strip() if args.stock is not None else settings["universe"]["stocks"][0]
         )
 
         if not stock_id:
@@ -66,9 +62,7 @@ def main():
         # 唯讀開啟；資料庫不存在時報錯，不建立空資料庫。
         database_uri = db_path.as_uri() + "?mode=ro"
 
-        with closing(
-            sqlite3.connect(database_uri, uri=True)
-        ) as connection:
+        with closing(sqlite3.connect(database_uri, uri=True)) as connection:
             recent_records = connection.execute(
                 """
                 SELECT
@@ -90,11 +84,7 @@ def main():
 
         # 筆數、起訖日、缺價與落後行情日數都由 SQL 分組與視窗函式計算。
         summaries = stock_quality(db_path)
-        gaps = (
-            price_gaps(db_path, calendar_days=args.gap_days)
-            if args.gaps
-            else None
-        )
+        gaps = price_gaps(db_path, calendar_days=args.gap_days) if args.gaps else None
         days = market_dates(db_path) if gaps else ()
 
     except (ValueError, sqlite3.Error, OSError) as error:
@@ -129,14 +119,9 @@ def main():
                 if gap["missing_market_days"]
                 else "全庫都沒有行情"
             )
-            missing = [
-                day for day in days
-                if gap["previous_date"] < day < gap["date"]
-            ]
+            missing = [day for day in days if gap["previous_date"] < day < gap["date"]]
             # 缺漏的行情日全部屬於已確認停牌時註明；讀取行情時會補上停牌列。
-            if missing and all(
-                (gap["stock_id"], day) in CONFIRMED_HALTS for day in missing
-            ):
+            if missing and all((gap["stock_id"], day) in CONFIRMED_HALTS for day in missing):
                 reason += "（已確認停牌）"
             print(
                 f"{gap['stock_id']}：{gap['previous_date']} → {gap['date']}，"
@@ -161,12 +146,7 @@ def main():
 
             close_text = "--" if close is None else close
 
-            print(
-                f"{record_date} | {close_text}"
-                f" | {volume:,}"
-                f" | {turnover:,}"
-                f" | {trade_count:,}"
-            )
+            print(f"{record_date} | {close_text} | {volume:,} | {turnover:,} | {trade_count:,}")
 
     return 0
 

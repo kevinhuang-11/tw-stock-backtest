@@ -3,8 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from tw_stock_backtest.config import apply_overrides, load_config
-from tw_stock_backtest.config import validate_settings
+from tw_stock_backtest.config import apply_overrides, load_config, validate_settings
 
 TEST_CONFIG = """
 [universe]
@@ -90,9 +89,7 @@ class TestConfig(unittest.TestCase):
     def test_database_path_is_relative_to_config(self):
         settings = load_config(self.config_path)
 
-        expected = (
-            self.config_path.parent / "data" / "stocks.db"
-        ).resolve()
+        expected = (self.config_path.parent / "data" / "stocks.db").resolve()
 
         self.assertEqual(
             settings["storage"]["database_path"],
@@ -103,17 +100,13 @@ class TestConfig(unittest.TestCase):
         self.assertFalse(expected.exists())
 
     def test_missing_field_is_rejected(self):
-        self.write_config(
-            TEST_CONFIG.replace("top_n = 3", "")
-        )
+        self.write_config(TEST_CONFIG.replace("top_n = 3", ""))
 
         with self.assertRaises(ValueError):
             load_config(self.config_path)
 
     def test_unknown_field_is_rejected(self):
-        self.write_config(
-            TEST_CONFIG.replace("top_n = 3", "top_count = 3")
-        )
+        self.write_config(TEST_CONFIG.replace("top_n = 3", "top_count = 3"))
 
         with self.assertRaises(ValueError):
             load_config(self.config_path)
@@ -135,9 +128,7 @@ class TestConfig(unittest.TestCase):
 
         for original, replacement in cases:
             with self.subTest(replacement=replacement):
-                self.write_config(
-                    TEST_CONFIG.replace(original, replacement)
-                )
+                self.write_config(TEST_CONFIG.replace(original, replacement))
 
                 with self.assertRaises(ValueError):
                     load_config(self.config_path)
@@ -280,6 +271,7 @@ class TestConfig(unittest.TestCase):
                 settings,
                 {"backtest": {"sizing_mode": "unknown"}},
             )
+
     def test_legacy_config_defaults_to_zero_slippage(self):
         settings = load_config(self.config_path)
         settings["backtest"].pop("slippage_rate", None)
@@ -352,6 +344,7 @@ class TestConfig(unittest.TestCase):
                         settings,
                         {"backtest": {"slippage_rate": value}},
                     )
+
 
 if __name__ == "__main__":
     unittest.main()

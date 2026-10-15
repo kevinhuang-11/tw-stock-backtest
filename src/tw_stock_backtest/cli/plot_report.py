@@ -4,9 +4,7 @@ from tw_stock_backtest.plotting import plot_portfolio_report
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="讀取回測報表，繪製資產與回撤比較圖"
-    )
+    parser = argparse.ArgumentParser(description="讀取回測報表，繪製資產與回撤比較圖")
 
     parser.add_argument(
         "--report-dir",
@@ -21,9 +19,7 @@ def main():
     args = parse_arguments()
 
     try:
-        output_path = plot_portfolio_report(
-            args.report_dir
-        )
+        output_path = plot_portfolio_report(args.report_dir)
     except (
         ValueError,
         TypeError,

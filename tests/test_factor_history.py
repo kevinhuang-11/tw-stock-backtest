@@ -33,9 +33,7 @@ class TestFactorHistory(unittest.TestCase):
         return [
             {
                 "stock_id": stock_id,
-                "date": (
-                    start + timedelta(days=index)
-                ).isoformat(),
+                "date": (start + timedelta(days=index)).isoformat(),
                 "open": Decimal(10 + index),
                 "close": Decimal(str(close)),
                 "volume": 100 * (index + 1),

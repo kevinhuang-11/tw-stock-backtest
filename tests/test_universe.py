@@ -1,14 +1,14 @@
+import json
 import unittest
 from datetime import date
 from html import escape
-from tw_stock_backtest.data.universe import parse_listed_stocks
-import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from tw_stock_backtest.data.universe import (
     TWSE_UNIVERSE_URL,
     load_universe,
+    parse_listed_stocks,
     save_synthetic_universe,
     save_universe,
 )
@@ -44,15 +44,14 @@ class TestListedStocks(unittest.TestCase):
 
         all_rows = [headers, *rows]
 
-        return "<table>" + "".join(
-            "<tr>"
+        return (
+            "<table>"
             + "".join(
-                f"<td>{escape(value)}</td>"
-                for value in row
+                "<tr>" + "".join(f"<td>{escape(value)}</td>" for value in row) + "</tr>"
+                for row in all_rows
             )
-            + "</tr>"
-            for row in all_rows
-        ) + "</table>"
+            + "</table>"
+        )
 
     def parse(self, rows, headers=None):
         return parse_listed_stocks(
@@ -65,14 +64,16 @@ class TestListedStocks(unittest.TestCase):
 
         self.assertEqual(
             result,
-            [{
-                "stock_id": "2330",
-                "name": "台積電",
-                "market": "上市",
-                "industry": "半導體業",
-                "listed_date": "1994-09-05",
-                "cfi_code": "ESVUFR",
-            }],
+            [
+                {
+                    "stock_id": "2330",
+                    "name": "台積電",
+                    "market": "上市",
+                    "industry": "半導體業",
+                    "listed_date": "1994-09-05",
+                    "cfi_code": "ESVUFR",
+                }
+            ],
         )
 
     def test_excludes_other_security_types_and_markets(self):
@@ -138,6 +139,7 @@ class TestListedStocks(unittest.TestCase):
             [stock["stock_id"] for stock in result],
             ["1101", "2330"],
         )
+
     def test_save_and_load_universe(self):
         stocks = self.parse([self.row])
 

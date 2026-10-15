@@ -82,11 +82,7 @@ class TestReporting(unittest.TestCase):
             },
         )
 
-        results = json.loads(
-            (report_dir / "results.json").read_text(
-                encoding="utf-8"
-            )
-        )
+        results = json.loads((report_dir / "results.json").read_text(encoding="utf-8"))
 
         self.assertEqual(
             results["strategy"]["result"]["final_equity"],
@@ -114,9 +110,7 @@ class TestReporting(unittest.TestCase):
 
     def test_repeated_export_does_not_overwrite(self):
         first_dir = self.export()
-        original_text = (
-            first_dir / "results.json"
-        ).read_text(encoding="utf-8")
+        original_text = (first_dir / "results.json").read_text(encoding="utf-8")
 
         self.result["final_equity"] = Decimal("2000")
         second_dir = self.export()
@@ -124,9 +118,7 @@ class TestReporting(unittest.TestCase):
         self.assertNotEqual(first_dir, second_dir)
 
         self.assertEqual(
-            (first_dir / "results.json").read_text(
-                encoding="utf-8"
-            ),
+            (first_dir / "results.json").read_text(encoding="utf-8"),
             original_text,
         )
 

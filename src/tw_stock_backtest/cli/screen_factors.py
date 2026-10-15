@@ -2,6 +2,10 @@ import argparse
 import sqlite3
 from datetime import date
 
+from tw_stock_backtest.analysis.factors import (
+    calculate_factor_row,
+    rank_factor_candidates,
+)
 from tw_stock_backtest.config import (
     DEFAULT_CONFIG_PATH,
     apply_overrides,
@@ -9,16 +13,10 @@ from tw_stock_backtest.config import (
 )
 from tw_stock_backtest.data.database import load_records, next_record_date
 from tw_stock_backtest.data.universe import load_universe
-from tw_stock_backtest.analysis.factors import (
-    calculate_factor_row,
-    rank_factor_candidates,
-)
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="計算動能、趨勢與低波動因子，產生綜合排名"
-    )
+    parser = argparse.ArgumentParser(description="計算動能、趨勢與低波動因子，產生綜合排名")
 
     parser.add_argument(
         "--config",
@@ -105,10 +103,7 @@ def collect_factor_rows(
                         f"前一個行情日為 {latest_date}，下一個為 {following}"
                     )
 
-                raise ValueError(
-                    f"行情未更新至分析日期；"
-                    f"最後行情日期為 {latest_date}"
-                )
+                raise ValueError(f"行情未更新至分析日期；最後行情日期為 {latest_date}")
 
             row = calculate_factor_row(
                 records,
@@ -160,7 +155,7 @@ def main():
             )
 
             if args.limit is not None:
-                stocks = stocks[:args.limit]
+                stocks = stocks[: args.limit]
 
         else:
             stocks = [
@@ -202,10 +197,7 @@ def main():
             print("\n無法評估的股票：")
 
             for item in errors:
-                print(
-                    f"{item['stock_id']} {item['name']}"
-                    f" | {item['reason']}"
-                )
+                print(f"{item['stock_id']} {item['name']} | {item['reason']}")
 
             if not args.allow_partial:
                 print(
@@ -228,10 +220,7 @@ def main():
         print(f"因子分析失敗：{error}")
         return 1
 
-    metadata = {
-        stock["stock_id"]: stock
-        for stock in stocks
-    }
+    metadata = {stock["stock_id"]: stock for stock in stocks}
 
     print(
         f"\n期間：動能 {factor_settings['momentum_window']}，"
@@ -240,9 +229,7 @@ def main():
         f"波動 {factor_settings['volatility_window']}"
     )
     print(
-        f"權重：動能 {weights['momentum']}，"
-        f"趨勢 {weights['trend']}，"
-        f"低波動 {weights['volatility']}"
+        f"權重：動能 {weights['momentum']}，趨勢 {weights['trend']}，低波動 {weights['volatility']}"
     )
     print(f"實際排名母體：{len(factor_rows)} 檔")
 
@@ -251,7 +238,7 @@ def main():
 
     print("\n因子排名：")
 
-    for row in ranked[:factor_settings["top_n"]]:
+    for row in ranked[: factor_settings["top_n"]]:
         values = row["factors"]
         scores = row["factor_scores"]
         stock = metadata[row["stock_id"]]
@@ -259,11 +246,7 @@ def main():
         name = stock.get("name", "")
         industry = stock.get("industry", "") or "未提供產業"
 
-        print(
-            f"{row['rank']}. {row['stock_id']} {name}"
-            f" | {industry}"
-            f" | 總分 {row['score']:.2f}"
-        )
+        print(f"{row['rank']}. {row['stock_id']} {name} | {industry} | 總分 {row['score']:.2f}")
         print(
             f"   原始值：動能 {values['momentum']:.2%}"
             f" | 趨勢 {values['trend']:.2%}"
@@ -275,10 +258,7 @@ def main():
             f" | 低波動 {scores['volatility']:.2f}"
         )
 
-    print(
-        "\n分數代表成功評估股票之間的相對排名，"
-        "不是獲利機率。"
-    )
+    print("\n分數代表成功評估股票之間的相對排名，不是獲利機率。")
     return 0
 
 

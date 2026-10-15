@@ -1,10 +1,13 @@
 import unittest
 from decimal import Decimal
 
-from tw_stock_backtest.data.stock_data import parse_twse_date, parse_price, parse_volume
-from tw_stock_backtest.data.stock_data import normalize_row
-from tw_stock_backtest.data.stock_data import parse_nonnegative_integer
-
+from tw_stock_backtest.data.stock_data import (
+    normalize_row,
+    parse_nonnegative_integer,
+    parse_price,
+    parse_twse_date,
+    parse_volume,
+)
 
 
 class TestParseTwseDate(unittest.TestCase):
@@ -50,6 +53,7 @@ class TestParseVolume(unittest.TestCase):
             with self.subTest(value=value):
                 with self.assertRaises(ValueError):
                     parse_volume(value)
+
 
 class TestNormalizeRow(unittest.TestCase):
     def setUp(self):

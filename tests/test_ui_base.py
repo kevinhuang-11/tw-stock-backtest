@@ -1,4 +1,5 @@
 """共用版型：靜態資產有被打包、圖示都存在、開發用頁面預設不提供。"""
+
 import re
 import unittest
 from importlib import resources
@@ -6,6 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from test_end_to_end import TEST_CONFIG
+
 from tw_stock_backtest.workbench import Workbench, create_app
 
 PACKAGE = resources.files("tw_stock_backtest")
@@ -23,15 +25,16 @@ class UiBaseTests(unittest.TestCase):
 
     def test_shared_assets_are_packaged_and_served(self):
         # CI 從安裝後的套件執行測試；缺少 package-data 樣式時這裡會失敗。
-        for name in ("static/app.css", "static/app.js", "static/icons.svg",
-                     "templates/base.html"):
+        for name in ("static/app.css", "static/app.js", "static/icons.svg", "templates/base.html"):
             with self.subTest(name=name):
                 self.assertTrue(PACKAGE.joinpath(name).is_file())
 
         client = create_app(self.workbench).test_client()
-        for name, mimetype in (("app.css", "text/css"),
-                               ("app.js", "text/javascript"),
-                               ("icons.svg", "image/svg+xml")):
+        for name, mimetype in (
+            ("app.css", "text/css"),
+            ("app.js", "text/javascript"),
+            ("icons.svg", "image/svg+xml"),
+        ):
             with self.subTest(name=name):
                 response = client.get("/static/" + name)
                 self.assertEqual(response.status_code, 200)
@@ -61,14 +64,14 @@ class UiBaseTests(unittest.TestCase):
     def test_no_external_resources_in_templates_or_styles(self):
         # 離線示範不能依賴 CDN：模板、樣式與腳本都不得載入外部網址的資源。
         loaders = re.compile(
-            r"""(?:src|href)\s*=\s*["']?(?:https?:)?//|url\(\s*["']?(?:https?:)?//|@import""",
-            re.I)
+            r"""(?:src|href)\s*=\s*["']?(?:https?:)?//|url\(\s*["']?(?:https?:)?//|@import""", re.I
+        )
         for folder in ("templates", "static"):
             for item in PACKAGE.joinpath(folder).iterdir():
                 text = item.read_text(encoding="utf-8")
                 for match in loaders.finditer(text):
                     start = text.rfind("<", 0, match.start())
-                    tag = text[start:match.end() + 80]
+                    tag = text[start : match.end() + 80]
                     # 一般超連結（<a href>）不是載入資源，允許指向官方資料來源。
                     if folder == "templates" and re.match(r"<a\s", tag):
                         continue
@@ -83,7 +86,7 @@ class UiBaseTests(unittest.TestCase):
         # 已存在的頁面出現在導覽列；每個導覽連結都必須能開啟。
         for label in ("總覽", "自選", "個股", "策略"):
             self.assertIn(label + "</a>", page.text)
-        nav = page.text[page.text.index('<nav class="site-nav"'):page.text.index("</nav>")]
+        nav = page.text[page.text.index('<nav class="site-nav"') : page.text.index("</nav>")]
         links = re.findall(r'<a href="([^"]+)"', nav)
         self.assertGreaterEqual(len(links), 4)
         for href in links:
@@ -93,8 +96,7 @@ class UiBaseTests(unittest.TestCase):
         self.assertNotIn("元件展示</a>", page.text)
 
     def test_components_render_formatted_values_and_status_labels(self):
-        text = create_app(self.workbench, dev=True).test_client().get(
-            "/dev/components").text
+        text = create_app(self.workbench, dev=True).test_client().get("/dev/components").text
 
         # 原始的長小數與內部代碼不直接出現在畫面上。
         self.assertNotIn("66.66666666666666666666666667", text)

@@ -1,8 +1,7 @@
+import tomllib
 from copy import deepcopy
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-import tomllib
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config.toml"
@@ -100,12 +99,8 @@ POSITIVE_INTEGER_FIELDS = (
 
 def _to_decimal(value, name):
     """將設定中的字串或整數轉成 Decimal，不接受浮點數。"""
-    if isinstance(value, bool) or not isinstance(
-        value, (str, int, Decimal)
-    ):
-        raise ValueError(
-            f"{name} 必須使用字串或整數；小數請加引號"
-        )
+    if isinstance(value, bool) or not isinstance(value, (str, int, Decimal)):
+        raise ValueError(f"{name} 必須使用字串或整數；小數請加引號")
 
     try:
         result = Decimal(value)
@@ -124,9 +119,7 @@ def validate_settings(settings):
 
     unknown_sections = set(result) - set(REQUIRED_FIELDS)
     if unknown_sections:
-        raise ValueError(
-            f"未知設定區段：{', '.join(sorted(unknown_sections))}"
-        )
+        raise ValueError(f"未知設定區段：{', '.join(sorted(unknown_sections))}")
 
     for section, required in REQUIRED_FIELDS.items():
         values = result.get(section)
@@ -136,18 +129,14 @@ def validate_settings(settings):
 
         missing = required - set(values)
         if missing:
-            raise ValueError(
-                f"{section} 缺少欄位：{', '.join(sorted(missing))}"
-            )
+            raise ValueError(f"{section} 缺少欄位：{', '.join(sorted(missing))}")
 
         optional = OPTIONAL_DEFAULTS.get(section, {})
         allowed = required | set(optional)
 
         unknown = set(values) - allowed
         if unknown:
-            raise ValueError(
-                f"{section} 有未知欄位：{', '.join(sorted(unknown))}"
-            )
+            raise ValueError(f"{section} 有未知欄位：{', '.join(sorted(unknown))}")
 
         # 只在沒提供欄位時補預設值，不掩蓋無效值。
         for key, default in optional.items():
@@ -155,46 +144,29 @@ def validate_settings(settings):
     sizing_mode = result["backtest"]["sizing_mode"]
 
     if sizing_mode not in ("fixed_quantity", "fixed_budget"):
-        raise ValueError(
-            "backtest.sizing_mode 必須是 "
-            "fixed_quantity 或 fixed_budget"
-        )
-    
+        raise ValueError("backtest.sizing_mode 必須是 fixed_quantity 或 fixed_budget")
+
     stocks = result["universe"]["stocks"]
 
     if (
         not isinstance(stocks, list)
         or not stocks
-        or any(
-            not isinstance(stock, str) or not stock.strip()
-            for stock in stocks
-        )
+        or any(not isinstance(stock, str) or not stock.strip() for stock in stocks)
     ):
         raise ValueError("universe.stocks 必須是非空的股票代號字串清單")
 
     # 去掉前後空白，並保留原順序去除重複代號。
-    result["universe"]["stocks"] = list(
-        dict.fromkeys(stock.strip() for stock in stocks)
-    )
+    result["universe"]["stocks"] = list(dict.fromkeys(stock.strip() for stock in stocks))
 
     for section, key in POSITIVE_INTEGER_FIELDS:
         value = result[section][key]
 
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, int)
-            or value <= 0
-        ):
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise ValueError(f"{section}.{key} 必須是正整數")
 
     for section in ("screening", "strategy", "factors"):
-        if (
-            result[section]["short_window"]
-            >= result[section]["long_window"]
-        ):
-            raise ValueError(
-                f"{section} 必須符合：短期期間 < 長期期間"
-            )
+        if result[section]["short_window"] >= result[section]["long_window"]:
+            raise ValueError(f"{section} 必須符合：短期期間 < 長期期間")
 
     for section, key in DECIMAL_FIELDS:
         result[section][key] = _to_decimal(
@@ -204,9 +176,7 @@ def validate_settings(settings):
     slippage_rate = result["backtest"]["slippage_rate"]
 
     if not Decimal("0") <= slippage_rate < Decimal("1"):
-        raise ValueError(
-            "backtest.slippage_rate 必須介於 0（含）與 1（不含）"
-        )
+        raise ValueError("backtest.slippage_rate 必須介於 0（含）與 1（不含）")
     factor_weights = [
         result["factors"][key]
         for key in (
@@ -244,9 +214,7 @@ def validate_settings(settings):
 
     for key in ("commission_rounding", "tax_rounding"):
         if costs[key] not in ("ROUND_DOWN", "ROUND_HALF_UP"):
-            raise ValueError(
-                f"costs.{key} 只支援 ROUND_DOWN 或 ROUND_HALF_UP"
-            )
+            raise ValueError(f"costs.{key} 只支援 ROUND_DOWN 或 ROUND_HALF_UP")
 
     for key in ("timeout_seconds", "request_interval_seconds"):
         value = result["download"][key]
@@ -276,9 +244,7 @@ def load_config(config_path=DEFAULT_CONFIG_PATH):
 
     settings = validate_settings(settings)
 
-    db_path = Path(
-        settings["storage"]["database_path"]
-    ).expanduser()
+    db_path = Path(settings["storage"]["database_path"]).expanduser()
 
     if not db_path.is_absolute():
         db_path = path.parent / db_path
@@ -296,10 +262,7 @@ def apply_overrides(settings, overrides):
         if section not in REQUIRED_FIELDS:
             raise ValueError(f"未知設定區段：{section}")
 
-        allowed = (
-            REQUIRED_FIELDS[section]
-            | set(OPTIONAL_DEFAULTS.get(section, {}))
-        )
+        allowed = REQUIRED_FIELDS[section] | set(OPTIONAL_DEFAULTS.get(section, {}))
 
         for key, value in values.items():
             if key not in allowed:

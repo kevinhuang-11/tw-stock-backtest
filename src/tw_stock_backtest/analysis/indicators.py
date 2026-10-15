@@ -74,6 +74,7 @@ def simple_moving_average(prices, period):
 
     return averages
 
+
 def window_gap_reason(dates, values, label="收盤價"):
     """計算窗口（由舊到新）內有缺價時回傳說明，沒有時回傳 None。
 
@@ -85,8 +86,10 @@ def window_gap_reason(dates, values, label="收盤價"):
         return None
     last = bad[-1]
     count = f"，窗口內共 {len(bad)} 筆缺價" if len(bad) > 1 else ""
-    return (f"{dates[last]} {label}缺失或無效，在 {len(values)} 筆計算窗口內{count}；"
-            f"之後再 {last + 1} 個行情日都有有效價格，缺價移出窗口後即可恢復評估")
+    return (
+        f"{dates[last]} {label}缺失或無效，在 {len(values)} 筆計算窗口內{count}；"
+        f"之後再 {last + 1} 個行情日都有有效價格，缺價移出窗口後即可恢復評估"
+    )
 
 
 def windowed_moving_average(prices, period):
@@ -97,21 +100,24 @@ def windowed_moving_average(prices, period):
     _period(period)
     result = []
     for index in range(len(prices)):
-        window = prices[max(0, index - period + 1):index + 1]
+        window = prices[max(0, index - period + 1) : index + 1]
         if len(window) < period or not all(is_valid_price(price) for price in window):
             result.append(None)
         else:
             result.append(simple_moving_average(window, period)[-1])
     return result
 
+
 def _period(period):
     if isinstance(period, bool) or not isinstance(period, int) or period <= 0:
-        raise ValueError('期間必須為正整數')
+        raise ValueError("期間必須為正整數")
 
 
 def _finite(values, positive=False):
-    if any(not isinstance(v, Decimal) or not v.is_finite() or (positive and v <= 0) for v in values):
-        raise ValueError('輸入必須為有限 Decimal；價格須正值，不可缺值')
+    if any(
+        not isinstance(v, Decimal) or not v.is_finite() or (positive and v <= 0) for v in values
+    ):
+        raise ValueError("輸入必須為有限 Decimal；價格須正值，不可缺值")
 
 
 def exponential_moving_average(values, period):
@@ -149,8 +155,16 @@ def relative_strength_index(prices, period=14):
     losses = [max(-c, Decimal(0)) for c in changes]
     gain = sum(gains[:period], Decimal(0)) / period
     loss = sum(losses[:period], Decimal(0)) / period
+
     def value():
-        return Decimal(50) if gain == loss == 0 else Decimal(100) if loss == 0 else Decimal(100) * gain / (gain + loss)
+        return (
+            Decimal(50)
+            if gain == loss == 0
+            else Decimal(100)
+            if loss == 0
+            else Decimal(100) * gain / (gain + loss)
+        )
+
     result[period] = value()
     for i in range(period, len(changes)):
         gain = (gain * (period - 1) + gains[i]) / period
@@ -168,16 +182,19 @@ def moving_average_convergence_divergence(prices, fast=12, slow=26, signal=9):
     for p in (fast, slow, signal):
         _period(p)
     if fast >= slow:
-        raise ValueError('MACD fast 必須小於 slow')
+        raise ValueError("MACD fast 必須小於 slow")
     _finite(prices, positive=True)
     a, b = exponential_moving_average(prices, fast), exponential_moving_average(prices, slow)
     values = [a[i] - b[i] for i in range(slow - 1, len(prices))]
     signals = exponential_moving_average(values, signal)
-    result = [{'macd': None, 'signal': None, 'histogram': None} for _ in prices]
+    result = [{"macd": None, "signal": None, "histogram": None} for _ in prices]
     for offset, value in enumerate(values):
         line = signals[offset]
-        result[slow - 1 + offset] = {'macd': value, 'signal': line,
-                                    'histogram': value - line if line is not None else None}
+        result[slow - 1 + offset] = {
+            "macd": value,
+            "signal": line,
+            "histogram": value - line if line is not None else None,
+        }
     return result
 
 
@@ -188,12 +205,12 @@ def previous_high_breakout(records, period):
     """
     _period(period)
     if len(records) < period + 1:
-        raise ValueError(f'突破需要 {period + 1} 筆行情')
-    window = records[-period - 1:]
-    highs = [r['high'] for r in window[:-1]]
-    close = window[-1]['close']
-    reason = window_gap_reason([r['date'] for r in window], highs + [close], '價格')
+        raise ValueError(f"突破需要 {period + 1} 筆行情")
+    window = records[-period - 1 :]
+    highs = [r["high"] for r in window[:-1]]
+    close = window[-1]["close"]
+    reason = window_gap_reason([r["date"] for r in window], highs + [close], "價格")
     if reason:
         raise ValueError(reason)
     threshold = max(highs)
-    return {'close': close, 'threshold': threshold, 'passed': close > threshold}
+    return {"close": close, "threshold": threshold, "passed": close > threshold}

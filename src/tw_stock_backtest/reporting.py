@@ -16,9 +16,7 @@ def _json_default(value):
     if isinstance(value, (date, datetime)):
         return value.isoformat()
 
-    raise TypeError(
-        f"不支援的 JSON 資料型別：{type(value).__name__}"
-    )
+    raise TypeError(f"不支援的 JSON 資料型別：{type(value).__name__}")
 
 
 def export_portfolio_report(
@@ -35,19 +33,22 @@ def export_portfolio_report(
     strategy=None,
 ):
     """將本次回測輸出到新的獨立資料夾，不覆寫舊報表。"""
-    from tw_stock_backtest.strategies import snapshot, from_settings
-    effective_strategy = snapshot(strategy) if strategy is not None else (
-        snapshot(from_settings(settings, result.get('ranking_method', 'rules')))
-        if 'factors' in settings and 'screening' in settings else None)
+    from tw_stock_backtest.strategies import from_settings, snapshot
+
+    effective_strategy = (
+        snapshot(strategy)
+        if strategy is not None
+        else (
+            snapshot(from_settings(settings, result.get("ranking_method", "rules")))
+            if "factors" in settings and "screening" in settings
+            else None
+        )
+    )
     strategy_curve = result["equity_curve"]
     benchmark_curve = benchmark["equity_curve"]
 
-    strategy_dates = [
-        point["date"] for point in strategy_curve
-    ]
-    benchmark_dates = [
-        point["date"] for point in benchmark_curve
-    ]
+    strategy_dates = [point["date"] for point in strategy_curve]
+    benchmark_dates = [point["date"] for point in benchmark_curve]
 
     if strategy_dates != benchmark_dates:
         raise ValueError("策略與基準的資產日期不一致，無法匯出比較表")
@@ -95,11 +96,7 @@ def export_portfolio_report(
     output_root = Path(output_root).expanduser().resolve()
     output_root.mkdir(parents=True, exist_ok=True)
 
-    run_name = (
-        created_at.strftime("%Y%m%dT%H%M%S_%fZ")
-        + "_"
-        + uuid4().hex[:8]
-    )
+    run_name = created_at.strftime("%Y%m%dT%H%M%S_%fZ") + "_" + uuid4().hex[:8]
 
     report_dir = output_root / run_name
     report_dir.mkdir()
@@ -141,10 +138,7 @@ def export_portfolio_report(
             ("benchmark", benchmark),
         ):
             for trade in source_result["trades"]:
-                row = {
-                    field: trade.get(field, "")
-                    for field in trade_fields
-                }
+                row = {field: trade.get(field, "") for field in trade_fields}
                 row["source"] = source
                 writer.writerow(row)
 
@@ -177,22 +171,20 @@ def export_portfolio_report(
                 {
                     "date": strategy_point["date"],
                     "strategy_cash": strategy_point["cash"],
-                    "strategy_market_value": (
-                        strategy_point["market_value"]
-                    ),
+                    "strategy_market_value": (strategy_point["market_value"]),
                     "strategy_equity": strategy_point["equity"],
                     "benchmark_cash": benchmark_point["cash"],
-                    "benchmark_market_value": (
-                        benchmark_point["market_value"]
-                    ),
+                    "benchmark_market_value": (benchmark_point["market_value"]),
                     "benchmark_equity": benchmark_point["equity"],
                 }
             )
 
     return report_dir
 
+
 class ResearchReport:
     """執行中目錄保留 .incomplete；全部檔案完成後才原子改名。"""
+
     def __init__(self, output_root):
         root = Path(output_root).expanduser().resolve()
         root.mkdir(parents=True, exist_ok=True)
@@ -204,9 +196,11 @@ class ResearchReport:
 
     def write_json(self, name, document):
         from tw_stock_backtest.cli.download_universe import save_progress
+
         # 重用既有原子 JSON 寫入；先套用 Decimal/date/Path 序列化。
-        safe = json.loads(json.dumps(document, default=_json_default,
-                                     ensure_ascii=False, allow_nan=False))
+        safe = json.loads(
+            json.dumps(document, default=_json_default, ensure_ascii=False, allow_nan=False)
+        )
         save_progress(safe, self.path / name)
 
     def finish(self, summary):
@@ -218,7 +212,12 @@ class ResearchReport:
             writer = csv.DictWriter(file, fieldnames=fields)
             writer.writeheader()
             for row in rankings:
-                writer.writerow({**{k: row[k] for k in fields[:4]}, **{k: row.get("factors", {}).get(k, "") for k in fields[4:]}})
+                writer.writerow(
+                    {
+                        **{k: row[k] for k in fields[:4]},
+                        **{k: row.get("factors", {}).get(k, "") for k in fields[4:]},
+                    }
+                )
         self.write_json("summary.json", {**summary, "report_complete": True})
         self.path.rename(self.final_path)
         return self.final_path

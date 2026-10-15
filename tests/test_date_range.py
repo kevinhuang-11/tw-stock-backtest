@@ -2,9 +2,9 @@ import unittest
 from datetime import date
 
 from tw_stock_backtest.date_range import (
-    parse_date_range,
-    month_starts,
     filter_records,
+    month_starts,
+    parse_date_range,
 )
 
 
@@ -24,16 +24,12 @@ class TestDateRange(unittest.TestCase):
             parse_date_range("2026-09-22", "2026-09-01")
 
     def test_same_month(self):
-        result = list(
-            month_starts(date(2026, 9, 2), date(2026, 9, 22))
-        )
+        result = list(month_starts(date(2026, 9, 2), date(2026, 9, 22)))
 
         self.assertEqual(result, [date(2026, 9, 1)])
 
     def test_cross_year(self):
-        result = list(
-            month_starts(date(2025, 12, 15), date(2026, 2, 10))
-        )
+        result = list(month_starts(date(2025, 12, 15), date(2026, 2, 10)))
 
         self.assertEqual(
             result,

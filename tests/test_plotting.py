@@ -13,9 +13,7 @@ class TestPrepareSeries(unittest.TestCase):
             "initial_cash": "100",
             "equity_curve": [
                 {
-                    "date": (
-                        start + timedelta(days=index)
-                    ).isoformat(),
+                    "date": (start + timedelta(days=index)).isoformat(),
                     "equity": str(equity),
                     "holdings": {},
                 }
@@ -24,9 +22,7 @@ class TestPrepareSeries(unittest.TestCase):
         }
 
     def test_drawdown_series(self):
-        series = prepare_series(
-            self.make_result([100, 120, 90, 120])
-        )
+        series = prepare_series(self.make_result([100, 120, 90, 120]))
 
         self.assertEqual(
             series["drawdowns"],
@@ -44,9 +40,7 @@ class TestPrepareSeries(unittest.TestCase):
         )
 
     def test_first_day_loss_uses_initial_capital(self):
-        series = prepare_series(
-            self.make_result([90, 95])
-        )
+        series = prepare_series(self.make_result([90, 95]))
 
         self.assertEqual(
             series["drawdowns"],

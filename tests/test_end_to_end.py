@@ -11,7 +11,6 @@ from tempfile import TemporaryDirectory
 
 from tw_stock_backtest.data.database import save_records
 
-
 TEST_CONFIG = """
 [universe]
 stocks = ["AAA"]
@@ -79,9 +78,7 @@ class TestEndToEnd(unittest.TestCase):
 
         # Matplotlib 的快取也放到臨時目錄。
         self.environment = os.environ.copy()
-        self.environment["MPLCONFIGDIR"] = str(
-            self.root / "matplotlib-cache"
-        )
+        self.environment["MPLCONFIGDIR"] = str(self.root / "matplotlib-cache")
         self.environment["MPLBACKEND"] = "Agg"
         self.environment["PYTHONIOENCODING"] = "utf-8"
 
@@ -90,14 +87,12 @@ class TestEndToEnd(unittest.TestCase):
 
         for index in range(4):
             price = Decimal(10 + index)
-            volume = 100 * (2 ** index)
+            volume = 100 * (2**index)
 
             records.append(
                 {
                     "stock_id": "AAA",
-                    "date": (
-                        start + timedelta(days=index)
-                    ).isoformat(),
+                    "date": (start + timedelta(days=index)).isoformat(),
                     "open": price,
                     "high": price,
                     "low": price,
@@ -159,11 +154,7 @@ class TestEndToEnd(unittest.TestCase):
 
         self.assertTrue(self.reports_path.is_dir())
 
-        report_dirs = [
-            path
-            for path in self.reports_path.iterdir()
-            if path.is_dir()
-        ]
+        report_dirs = [path for path in self.reports_path.iterdir() if path.is_dir()]
         self.assertEqual(len(report_dirs), 1)
         report_dir = report_dirs[0]
 
@@ -182,11 +173,7 @@ class TestEndToEnd(unittest.TestCase):
         )
 
         # 3. 檢查輸出的設定確實來自臨時 config。
-        settings_document = json.loads(
-            (report_dir / "settings.json").read_text(
-                encoding="utf-8"
-            )
-        )
+        settings_document = json.loads((report_dir / "settings.json").read_text(encoding="utf-8"))
 
         exported_settings = settings_document["settings"]
 
@@ -200,11 +187,7 @@ class TestEndToEnd(unittest.TestCase):
         )
 
         # 4. 檢查策略結果與下一日成交行為。
-        results_document = json.loads(
-            (report_dir / "results.json").read_text(
-                encoding="utf-8"
-            )
-        )
+        results_document = json.loads((report_dir / "results.json").read_text(encoding="utf-8"))
 
         strategy = results_document["strategy"]["result"]
         benchmark = results_document["benchmark"]["result"]
@@ -238,11 +221,7 @@ class TestEndToEnd(unittest.TestCase):
         )
 
         # 5. 檢查行情快照與資產 CSV。
-        input_document = json.loads(
-            (report_dir / "input_data.json").read_text(
-                encoding="utf-8"
-            )
-        )
+        input_document = json.loads((report_dir / "input_data.json").read_text(encoding="utf-8"))
 
         self.assertEqual(
             len(input_document["records_by_stock"]["AAA"]),

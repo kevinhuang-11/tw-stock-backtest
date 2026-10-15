@@ -1,4 +1,5 @@
 """合成示例名單：名稱可讀取，所有連網入口在發出請求前被拒絕。"""
+
 import contextlib
 import io
 import re
@@ -8,6 +9,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 
 from test_end_to_end import TEST_CONFIG
+
 from tw_stock_backtest.cli import (
     download_universe,
     fetch_stock,
@@ -31,10 +33,18 @@ from tw_stock_backtest.stock_research import Watchlist, identities
 from tw_stock_backtest.workbench import Workbench, create_app
 
 SYNTHETIC_STOCKS = [
-    {"stock_id": "9001", "name": "示範股 A（合成）",
-     "industry": "示範產業甲", "market": "合成示例"},
-    {"stock_id": "9002", "name": "示範股 B（合成）",
-     "industry": "示範產業乙", "market": "合成示例"},
+    {
+        "stock_id": "9001",
+        "name": "示範股 A（合成）",
+        "industry": "示範產業甲",
+        "market": "合成示例",
+    },
+    {
+        "stock_id": "9002",
+        "name": "示範股 B（合成）",
+        "industry": "示範產業乙",
+        "market": "合成示例",
+    },
 ]
 
 
@@ -44,15 +54,12 @@ class OfflineDemoTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
         self.config = self.root / "config.toml"
-        self.config.write_text(
-            TEST_CONFIG.replace("AAA", "9001"), encoding="utf-8"
-        )
+        self.config.write_text(TEST_CONFIG.replace("AAA", "9001"), encoding="utf-8")
         self.settings = load_config(self.config)
-        self.listed = universe_path_for(
-            self.settings["storage"]["database_path"]
-        )
+        self.listed = universe_path_for(self.settings["storage"]["database_path"])
         save_synthetic_universe(
-            SYNTHETIC_STOCKS, self.listed,
+            SYNTHETIC_STOCKS,
+            self.listed,
             source_url="synthetic://offline-example",
         )
 
@@ -70,13 +77,13 @@ class OfflineDemoTests(unittest.TestCase):
     def workbench(self):
         self.runner = Mock()
         wb = Workbench(
-            self.config, self.root / "reports", self.root / "jobs",
+            self.config,
+            self.root / "reports",
+            self.root / "jobs",
             runner=self.runner,
         )
         self.addCleanup(wb.close)
-        Watchlist(wb.state / "private" / "watchlist.sqlite3").save(
-            "9001", "", 0
-        )
+        Watchlist(wb.state / "private" / "watchlist.sqlite3").save("9001", "", 0)
         client = create_app(wb).test_client()
         page = client.get("/watchlist")
         token = re.search('name="csrf" value="([^"]+)"', page.text)[1]
@@ -96,9 +103,7 @@ class OfflineDemoTests(unittest.TestCase):
         snapshot = load_universe(self.listed)
 
         self.assertEqual(snapshot["scope"], "synthetic_example")
-        self.assertEqual(
-            snapshot["source_url"], "synthetic://offline-example"
-        )
+        self.assertEqual(snapshot["source_url"], "synthetic://offline-example")
         text = self.listed.read_text(encoding="utf-8")
         for forbidden in ("twse.com.tw", "上市", "cfi_code", "listed_date"):
             self.assertNotIn(forbidden, text)
@@ -106,8 +111,7 @@ class OfflineDemoTests(unittest.TestCase):
         wb, _, _ = self.workbench()
         self.assertEqual(
             identities(wb)["9001"],
-            {"stock_id": "9001", "name": "示範股 A（合成）",
-             "industry": "示範產業甲"},
+            {"stock_id": "9001", "name": "示範股 A（合成）", "industry": "示範產業甲"},
         )
 
     def test_shared_update_paths_refuse_before_any_request(self):
@@ -116,13 +120,16 @@ class OfflineDemoTests(unittest.TestCase):
 
         with self.assertRaises(NetworkDisabled):
             update_stocks(
-                [{"stock_id": "9001"}], self.settings,
+                [{"stock_id": "9001"}],
+                self.settings,
                 self.settings_end(),
             )
 
         with self.assertRaises(NetworkDisabled):
             update_watchlist.run(
-                self.settings, ["9001"], self.root / "updates",
+                self.settings,
+                ["9001"],
+                self.root / "updates",
                 kind="prices",
             )
 
@@ -131,37 +138,62 @@ class OfflineDemoTests(unittest.TestCase):
 
     def settings_end(self):
         from datetime import date
+
         return date(2026, 9, 29)
 
     def test_every_network_cli_refuses_with_exit_code_one(self):
         config = ["--config", str(self.config)]
         cases = [
-            (update_supplemental.main,
-             [*config, "--stocks", "9001",
-              "--output-dir", str(self.root / "out")], False),
-            (update_watchlist.main,
-             [*config, "--stocks", "9001",
-              "--output-dir", str(self.root / "out")], False),
-            (run_research.main,
-             [*config, "--stocks", "9001", "--as-of", "2026-09-29",
-              "--output-dir", str(self.root / "out")], False),
-            (fetch_stock.main,
-             [*config, "--stock", "9001", "--start", "2026-09-01",
-              "--end", "2026-09-29"], True),
-            (download_universe.main,
-             [*config, "--universe", str(self.listed),
-              "--start", "2026-09-01", "--end", "2026-09-29",
-              "--log-dir", str(self.root / "logs")], True),
-            (update_universe.main,
-             ["--output", str(self.listed)], True),
+            (
+                update_supplemental.main,
+                [*config, "--stocks", "9001", "--output-dir", str(self.root / "out")],
+                False,
+            ),
+            (
+                update_watchlist.main,
+                [*config, "--stocks", "9001", "--output-dir", str(self.root / "out")],
+                False,
+            ),
+            (
+                run_research.main,
+                [
+                    *config,
+                    "--stocks",
+                    "9001",
+                    "--as-of",
+                    "2026-09-29",
+                    "--output-dir",
+                    str(self.root / "out"),
+                ],
+                False,
+            ),
+            (
+                fetch_stock.main,
+                [*config, "--stock", "9001", "--start", "2026-09-01", "--end", "2026-09-29"],
+                True,
+            ),
+            (
+                download_universe.main,
+                [
+                    *config,
+                    "--universe",
+                    str(self.listed),
+                    "--start",
+                    "2026-09-01",
+                    "--end",
+                    "2026-09-29",
+                    "--log-dir",
+                    str(self.root / "logs"),
+                ],
+                True,
+            ),
+            (update_universe.main, ["--output", str(self.listed)], True),
         ]
         original = self.listed.read_bytes()
 
         for main, argv, uses_sys_argv in cases:
             with self.subTest(cli=main.__module__):
-                code, output = self.run_cli(
-                    main, argv, uses_sys_argv=uses_sys_argv
-                )
+                code, output = self.run_cli(main, argv, uses_sys_argv=uses_sys_argv)
                 self.assertEqual(code, 1)
                 self.assertIn("合成示例", output)
 
@@ -177,17 +209,14 @@ class OfflineDemoTests(unittest.TestCase):
             ("/watchlist/update", {"update_kind": "prices"}),
             ("/supplemental/update", {"stock_id": "9001"}),
             ("/supplemental/update", {"scope": "watchlist"}),
-            ("/jobs", {"kind": "research", "stocks": "9001",
-                       "download": "yes"}),
+            ("/jobs", {"kind": "research", "stocks": "9001", "download": "yes"}),
         ]
 
         for url, data in requests:
             with self.subTest(url=url, data=data):
                 response = client.post(url, data={"csrf": token, **data})
                 self.assertEqual(response.status_code, 400)
-                self.assertIn(
-                    OFFLINE_REASON, response.get_json()["errors"]["_form"]
-                )
+                self.assertIn(OFFLINE_REASON, response.get_json()["errors"]["_form"])
 
         wb.pool.shutdown(wait=True)
         self.assertEqual(wb.jobs(), [])
@@ -216,7 +245,10 @@ class OfflineDemoTests(unittest.TestCase):
         stock = client.get("/stocks/9001").text
         self.assertIn('<span class="btn btn-sm" aria-disabled="true"', stock)
         self.assertNotIn("download=yes", stock)
-        self.assertIn('name="download" value="yes" disabled>', client.get("/new/research?stocks=9001&download=yes").text)
+        self.assertIn(
+            'name="download" value="yes" disabled>',
+            client.get("/new/research?stocks=9001&download=yes").text,
+        )
 
         research = client.get("/new/research").text
         self.assertIn('name="download" value="yes" disabled', research)
@@ -238,9 +270,16 @@ class OfflineDemoTests(unittest.TestCase):
 
     def test_official_universe_keeps_buttons_enabled(self):
         save_universe(
-            [{"stock_id": "9001", "name": "測試", "market": "上市",
-              "industry": "測試", "listed_date": "2000-01-01",
-              "cfi_code": "ESVUFR"}],
+            [
+                {
+                    "stock_id": "9001",
+                    "name": "測試",
+                    "market": "上市",
+                    "industry": "測試",
+                    "listed_date": "2000-01-01",
+                    "cfi_code": "ESVUFR",
+                }
+            ],
             self.listed,
         )
         _, client, _ = self.workbench()
@@ -250,8 +289,7 @@ class OfflineDemoTests(unittest.TestCase):
         self.assertIn("<button>更新自選股資料（最多 10 檔）</button>", text)
         self.assertNotIn(OFFLINE_REASON, text)
         self.assertEqual(
-            [s["stock_id"] for s in
-             listed_scope(self.settings, ["9001"])["stocks"]],
+            [s["stock_id"] for s in listed_scope(self.settings, ["9001"])["stocks"]],
             ["9001"],
         )
 

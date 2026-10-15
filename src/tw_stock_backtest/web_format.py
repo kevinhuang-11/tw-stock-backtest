@@ -1,4 +1,5 @@
 """工作台顯示用的格式化；只影響畫面，不改變保存或匯出的數值。"""
+
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from zoneinfo import ZoneInfo

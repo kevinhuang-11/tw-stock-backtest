@@ -28,13 +28,9 @@ class TestScreening(unittest.TestCase):
             records.append(
                 {
                     "stock_id": "2330",
-                    "date": (
-                        start + timedelta(days=index)
-                    ).isoformat(),
+                    "date": (start + timedelta(days=index)).isoformat(),
                     "close": Decimal(close),
-                    "volume": (
-                        last_volume if index == 20 else 100
-                    ),
+                    "volume": (last_volume if index == 20 else 100),
                 }
             )
 
@@ -68,9 +64,7 @@ class TestScreening(unittest.TestCase):
         self.assertEqual(result["failed_conditions"], [])
 
     def test_falling_stock_is_not_selected(self):
-        result = self.evaluate(
-            self.make_records(descending=True)
-        )
+        result = self.evaluate(self.make_records(descending=True))
 
         self.assertFalse(result["selected"])
         self.assertIn(
@@ -79,9 +73,7 @@ class TestScreening(unittest.TestCase):
         )
 
     def test_equal_volume_does_not_pass(self):
-        result = self.evaluate(
-            self.make_records(last_volume=100)
-        )
+        result = self.evaluate(self.make_records(last_volume=100))
 
         self.assertFalse(result["selected"])
         self.assertEqual(result["volume_ratio"], Decimal("1"))

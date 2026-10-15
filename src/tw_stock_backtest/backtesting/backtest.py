@@ -35,18 +35,10 @@ def run_backtest(
     if len(records) != len(signals):
         raise ValueError("行情與訊號的長度必須相同")
 
-    if (
-        not isinstance(initial_cash, Decimal)
-        or not initial_cash.is_finite()
-        or initial_cash <= 0
-    ):
+    if not isinstance(initial_cash, Decimal) or not initial_cash.is_finite() or initial_cash <= 0:
         raise ValueError("初始資金必須是大於 0 的有限 Decimal")
 
-    if (
-        isinstance(quantity, bool)
-        or not isinstance(quantity, int)
-        or quantity <= 0
-    ):
+    if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
         raise ValueError("買入股數必須是正整數")
 
     previous_date = None
@@ -96,12 +88,14 @@ def run_backtest(
             )
 
             if (signal == "BUY" and shares == 0) or (signal == "SELL" and shares > 0):
-                skipped_orders.append({
-                    "signal_date": records[index - 1]["date"],
-                    "date": record["date"],
-                    "action": signal,
-                    "reason": f"{not_tradable_reason(record)}，當日不成交",
-                })
+                skipped_orders.append(
+                    {
+                        "signal_date": records[index - 1]["date"],
+                        "date": record["date"],
+                        "action": signal,
+                        "reason": f"{not_tradable_reason(record)}，當日不成交",
+                    }
+                )
 
         elif signal == "BUY" and shares == 0:
             proposed = calculate_transaction(
@@ -138,39 +132,37 @@ def run_backtest(
             total_commission += transaction["commission"]
             total_tax += transaction["tax"]
 
-            trades.append({
-                "signal_date": records[index - 1]["date"],
-                "date": record["date"],
-                "action": action,
-                "price": open_price,
-                "quantity": executed_quantity,
-                "amount": transaction["amount"],
-                "commission": transaction["commission"],
-                "tax": transaction["tax"],
-                "cash_change": transaction["cash_change"],
-                "cash_after": cash,
-            })
+            trades.append(
+                {
+                    "signal_date": records[index - 1]["date"],
+                    "date": record["date"],
+                    "action": action,
+                    "price": open_price,
+                    "quantity": executed_quantity,
+                    "amount": transaction["amount"],
+                    "commission": transaction["commission"],
+                    "tax": transaction["tax"],
+                    "cash_change": transaction["cash_change"],
+                    "cash_after": cash,
+                }
+            )
 
         # 不可交易日沿用最近有效收盤；尚未持股時不需要估值價格。
         equity = cash + (record["valuation_close"] * shares if shares else Decimal("0"))
 
-        equity_curve.append({
-            "date": record["date"],
-            "cash": cash,
-            "shares": shares,
-            "equity": equity,
-            "stale_price_date": (
-                record["valuation_price_date"]
-                if shares and not record["tradable"]
-                else None
-            ),
-        })
+        equity_curve.append(
+            {
+                "date": record["date"],
+                "cash": cash,
+                "shares": shares,
+                "equity": equity,
+                "stale_price_date": (
+                    record["valuation_price_date"] if shares and not record["tradable"] else None
+                ),
+            }
+        )
 
-    final_equity = (
-        equity_curve[-1]["equity"]
-        if equity_curve
-        else initial_cash
-    )
+    final_equity = equity_curve[-1]["equity"] if equity_curve else initial_cash
 
     return {
         "initial_cash": initial_cash,

@@ -5,7 +5,6 @@ from unittest.mock import patch
 
 from tw_stock_backtest.cli.screen_factors import collect_factor_rows
 
-
 MODULE = "tw_stock_backtest.cli.screen_factors"
 
 
@@ -100,10 +99,14 @@ class TestCollectFactorRows(unittest.TestCase):
             {"stock_id": "1101", "date": "2026-08-31", "close": Decimal("12")},
         ]
         rows, errors = collect_factor_rows(
-            self.stocks[:1], "2026-08-31", db_path="unused.db",
+            self.stocks[:1],
+            "2026-08-31",
+            db_path="unused.db",
             factor_settings={
-                "short_window": 1, "long_window": 2,
-                "momentum_window": 1, "volatility_window": 1,
+                "short_window": 1,
+                "long_window": 2,
+                "momentum_window": 1,
+                "volatility_window": 1,
             },
         )
         self.assertEqual(errors, [])
@@ -112,13 +115,10 @@ class TestCollectFactorRows(unittest.TestCase):
 
     @patch(f"{MODULE}.load_records")
     def test_database_error_is_not_hidden(self, mock_load):
-        mock_load.side_effect = sqlite3.OperationalError(
-            "資料庫無法讀取"
-        )
+        mock_load.side_effect = sqlite3.OperationalError("資料庫無法讀取")
 
         with self.assertRaises(sqlite3.OperationalError):
             self.collect()
-
 
 
 class TestAnalysisDateMessages(unittest.TestCase):
@@ -127,22 +127,35 @@ class TestAnalysisDateMessages(unittest.TestCase):
     def setUp(self):
         from pathlib import Path
         from tempfile import TemporaryDirectory
+
         from tw_stock_backtest.data.database import save_records
 
         self.tmp = TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.db = Path(self.tmp.name) / "stocks.db"
         # 2026-07-31 是星期五、2026-08-03 是星期一，中間是週末。
-        save_records([
-            {"stock_id": "2330", "date": day, "open": Decimal("10"), "high": Decimal("11"),
-             "low": Decimal("9"), "close": Decimal("10"), "volume": 1000,
-             "turnover": 10000, "trade_count": 10}
-            for day in ("2026-07-30", "2026-07-31", "2026-08-03")
-        ], db_path=self.db)
+        save_records(
+            [
+                {
+                    "stock_id": "2330",
+                    "date": day,
+                    "open": Decimal("10"),
+                    "high": Decimal("11"),
+                    "low": Decimal("9"),
+                    "close": Decimal("10"),
+                    "volume": 1000,
+                    "turnover": 10000,
+                    "trade_count": 10,
+                }
+                for day in ("2026-07-30", "2026-07-31", "2026-08-03")
+            ],
+            db_path=self.db,
+        )
 
     def reason(self, as_of):
         rows, errors = collect_factor_rows(
-            [{"stock_id": "2330"}], as_of, db_path=self.db, factor_settings={})
+            [{"stock_id": "2330"}], as_of, db_path=self.db, factor_settings={}
+        )
         self.assertEqual(rows, [])
         return errors[0]["reason"]
 
@@ -158,6 +171,7 @@ class TestAnalysisDateMessages(unittest.TestCase):
 
     def test_missing_database_keeps_the_original_message(self):
         from tw_stock_backtest.data.database import next_record_date
+
         self.assertIsNone(next_record_date("2330", "2026-08-01", db_path="no-such.db"))
         self.assertEqual(next_record_date("2330", "2026-08-01", db_path=self.db), "2026-08-03")
         self.assertIsNone(next_record_date("2330", "2026-08-03", db_path=self.db))

@@ -1,20 +1,18 @@
 import argparse
 import sqlite3
 
+from tw_stock_backtest.analysis.indicators import windowed_moving_average
+from tw_stock_backtest.analysis.strategies import moving_average_crossover
 from tw_stock_backtest.config import (
     DEFAULT_CONFIG_PATH,
     apply_overrides,
     load_config,
 )
 from tw_stock_backtest.data.database import load_records
-from tw_stock_backtest.analysis.indicators import windowed_moving_average
-from tw_stock_backtest.analysis.strategies import moving_average_crossover
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="讀取股票行情，顯示均線與交叉訊號"
-    )
+    parser = argparse.ArgumentParser(description="讀取股票行情，顯示均線與交叉訊號")
 
     parser.add_argument(
         "--config",
@@ -120,10 +118,7 @@ def main():
     print(f"資料庫位置：{db_path}")
     print(f"均線期間：短期 {short_window}，長期 {long_window}")
     print(f"資料筆數：{len(records)}")
-    print(
-        f"實際期間：{records[0]['date']}"
-        f" ～ {records[-1]['date']}"
-    )
+    print(f"實際期間：{records[0]['date']} ～ {records[-1]['date']}")
 
     print(
         f"\n{'Date':<12}"

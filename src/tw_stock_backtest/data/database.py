@@ -1,15 +1,13 @@
 import sqlite3
 from contextlib import closing
-from pathlib import Path
 from decimal import Decimal
+from pathlib import Path
+
 from tw_stock_backtest.data.market_events import CONFIRMED_HALTS
 from tw_stock_backtest.date_range import parse_date_range
 
-
 # 資料庫位置：專案資料夾/data/stocks.db
-DEFAULT_DB_PATH = (
-    Path(__file__).resolve().parents[3] / "data" / "stocks.db"
-)
+DEFAULT_DB_PATH = Path(__file__).resolve().parents[3] / "data" / "stocks.db"
 
 
 TABLE = """
@@ -40,8 +38,8 @@ INDEXES = (
 # Schema 版本記在 PRAGMA user_version。每個版本只新增、不改寫既有資料，
 # 敘述都可重複執行；舊版程式建立的資料庫 user_version 為 0。
 MIGRATIONS = (
-    (1, (TABLE,)),      # 行情表；v1 程式建立的資料庫已有此表，這一步不會改動它
-    (2, INDEXES),       # 日期索引與缺價部分索引
+    (1, (TABLE,)),  # 行情表；v1 程式建立的資料庫已有此表，這一步不會改動它
+    (2, INDEXES),  # 日期索引與缺價部分索引
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 
@@ -120,21 +118,24 @@ def save_records(records, db_path=DEFAULT_DB_PATH):
             for key in ("open", "high", "low", "close")
         ]
 
-        rows.append((
-            record["stock_id"],
-            record["date"],
-            *prices,
-            record["volume"],
-            record["turnover"],
-            record["trade_count"],
-        ))
+        rows.append(
+            (
+                record["stock_id"],
+                record["date"],
+                *prices,
+                record["volume"],
+                record["turnover"],
+                record["trade_count"],
+            )
+        )
 
     # 開啟資料庫；檔案不存在時會自動建立。
     # closing 會在結束時關閉連線。
     with closing(sqlite3.connect(db_path)) as connection:
         # 寫入成功時提交；失敗時回滾本次交易。
         with connection:
-            connection.executemany("""
+            connection.executemany(
+                """
                 INSERT INTO stock_prices (
                     stock_id, date, open, high, low, close,
                     volume, turnover, trade_count
@@ -149,7 +150,9 @@ def save_records(records, db_path=DEFAULT_DB_PATH):
                     volume = excluded.volume,
                     turnover = excluded.turnover,
                     trade_count = excluded.trade_count
-            """, rows)
+            """,
+                rows,
+            )
 
     # 本次處理筆數，包含新增與更新。
     return len(rows)
@@ -181,7 +184,8 @@ def load_records(
         # 讓查詢結果可以透過欄位名稱取值。
         connection.row_factory = sqlite3.Row
 
-        rows = connection.execute("""
+        rows = connection.execute(
+            """
             SELECT
                 stock_id, date, open, high, low, close,
                 volume, turnover, trade_count
@@ -190,11 +194,13 @@ def load_records(
               AND date >= ?
               AND date <= ?
             ORDER BY date ASC
-        """, (
-            stock_id,
-            start.isoformat(),
-            end.isoformat(),
-        )).fetchall()
+        """,
+            (
+                stock_id,
+                start.isoformat(),
+                end.isoformat(),
+            ),
+        ).fetchall()
 
         existing = {row["date"] for row in rows}
         halt_days = sorted(
@@ -229,17 +235,19 @@ def load_records(
         records.append(record)
 
     for day in sorted(market_days):
-        records.append({
-            "stock_id": stock_id,
-            "date": day,
-            "open": None,
-            "high": None,
-            "low": None,
-            "close": None,
-            "volume": 0,
-            "turnover": 0,
-            "trade_count": 0,
-        })
+        records.append(
+            {
+                "stock_id": stock_id,
+                "date": day,
+                "open": None,
+                "high": None,
+                "low": None,
+                "close": None,
+                "volume": 0,
+                "turnover": 0,
+                "trade_count": 0,
+            }
+        )
 
     records.sort(key=lambda record: record["date"])
     return records

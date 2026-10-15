@@ -22,16 +22,10 @@ def moving_average_crossover(short_ma, long_ma):
         if any(value is None for value in values):
             continue
 
-        if (
-            previous_short <= previous_long
-            and current_short > current_long
-        ):
+        if previous_short <= previous_long and current_short > current_long:
             signals[index] = "BUY"
 
-        elif (
-            previous_short >= previous_long
-            and current_short < current_long
-        ):
+        elif previous_short >= previous_long and current_short < current_long:
             signals[index] = "SELL"
 
     return signals

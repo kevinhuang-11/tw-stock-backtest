@@ -2,19 +2,17 @@ import argparse
 import sqlite3
 from datetime import date
 
+from tw_stock_backtest.analysis.screening import evaluate_stock
 from tw_stock_backtest.config import (
     DEFAULT_CONFIG_PATH,
     apply_overrides,
     load_config,
 )
 from tw_stock_backtest.data.database import load_records
-from tw_stock_backtest.analysis.screening import evaluate_stock
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="依照趨勢與成交量條件篩選股票並排名"
-    )
+    parser = argparse.ArgumentParser(description="依照趨勢與成交量條件篩選股票並排名")
 
     parser.add_argument(
         "--config",
@@ -106,17 +104,9 @@ def main():
 
     print(f"分析日期：{as_of}")
     print(f"資料庫位置：{db_path}")
-    print(
-        f"趨勢條件：Close > SMA{short_window} > SMA{long_window}"
-    )
-    print(
-        f"量比條件：當日量 / 前 {volume_window} 筆均量"
-        f" > {min_volume_ratio}"
-    )
-    print(
-        f"排名依據：{momentum_window} 期價格報酬率，"
-        f"最多顯示 {top_n} 檔"
-    )
+    print(f"趨勢條件：Close > SMA{short_window} > SMA{long_window}")
+    print(f"量比條件：當日量 / 前 {volume_window} 筆均量 > {min_volume_ratio}")
+    print(f"排名依據：{momentum_window} 期價格報酬率，最多顯示 {top_n} 檔")
     print(f"指定股票數：{len(stock_ids)}")
     print(f"成功評估：{len(evaluations)}")
     print(f"無法評估：{len(errors)}")
@@ -137,10 +127,7 @@ def main():
         )
 
         if result["failed_conditions"]:
-            print(
-                "  原因："
-                + "；".join(result["failed_conditions"])
-            )
+            print("  原因：" + "；".join(result["failed_conditions"]))
 
     if errors:
         print("\n無法評估的股票：")
@@ -148,11 +135,7 @@ def main():
         for stock_id, message in errors:
             print(f"{stock_id}：{message}")
 
-    candidates = [
-        result
-        for result in evaluations
-        if result["selected"]
-    ]
+    candidates = [result for result in evaluations if result["selected"]]
 
     candidates.sort(
         key=lambda result: (

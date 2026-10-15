@@ -10,16 +10,11 @@ from tw_stock_backtest.data.universe import (
     synthetic_file_reason,
 )
 
-
-DEFAULT_UNIVERSE_PATH = (
-    DEFAULT_CONFIG_PATH.parent / "data" / "listed_stocks.json"
-)
+DEFAULT_UNIVERSE_PATH = DEFAULT_CONFIG_PATH.parent / "data" / "listed_stocks.json"
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="下載並保存目前上市普通股名單"
-    )
+    parser = argparse.ArgumentParser(description="下載並保存目前上市普通股名單")
 
     parser.add_argument(
         "--output",
@@ -38,10 +33,7 @@ def main():
     try:
         # 不連網，也不以官方名單覆寫合成示例名單。
         if synthetic_file_reason(output_path) is not None:
-            raise NetworkDisabled(
-                "目標檔案是合成示例名單；不連網也不覆寫，"
-                "請改用其他 --output"
-            )
+            raise NetworkDisabled("目標檔案是合成示例名單；不連網也不覆寫，請改用其他 --output")
 
         stocks = fetch_listed_stocks()
         snapshot = save_universe(stocks, output_path)

@@ -3,6 +3,7 @@
 中文標籤需要系統上有中文字型；CI、未裝中文字型的 Linux 或字型不齊的環境，
 改用英文標籤。判斷時實際檢查字型是否含有要畫的每一個字，避免出現方框。
 """
+
 from functools import lru_cache
 
 # 與網頁設計變數一致。紅綠保留給漲跌，資產曲線不使用紅綠。
@@ -14,8 +15,14 @@ GRID = "#dde1e8"
 
 # 依常見程度排列：Windows、macOS、Linux 的繁體中文字型。
 CJK_FAMILIES = (
-    "Microsoft JhengHei", "PingFang TC", "Noto Sans CJK TC", "Noto Sans TC",
-    "Source Han Sans TC", "Heiti TC", "Noto Sans CJK JP", "WenQuanYi Zen Hei",
+    "Microsoft JhengHei",
+    "PingFang TC",
+    "Noto Sans CJK TC",
+    "Noto Sans TC",
+    "Source Han Sans TC",
+    "Heiti TC",
+    "Noto Sans CJK JP",
+    "WenQuanYi Zen Hei",
 )
 
 TEXT = {
@@ -58,9 +65,11 @@ TEXT = {
 
 def _font_path(family):
     from matplotlib import font_manager
+
     try:
-        return font_manager.findfont(font_manager.FontProperties(family=family),
-                                     fallback_to_default=False)
+        return font_manager.findfont(
+            font_manager.FontProperties(family=family), fallback_to_default=False
+        )
     except ValueError:
         return None
 
@@ -68,6 +77,7 @@ def _font_path(family):
 @lru_cache(maxsize=None)
 def _glyphs(path):
     from matplotlib.ft2font import FT2Font
+
     return FT2Font(path)
 
 
@@ -101,7 +111,7 @@ def style(font=None):
         "axes.spines.right": False,
         "axes.grid": True,
         "grid.color": GRID,
-        "grid.linewidth": .8,
+        "grid.linewidth": 0.8,
         "xtick.color": MUTED,
         "ytick.color": MUTED,
         "legend.frameon": False,
@@ -113,6 +123,7 @@ def style(font=None):
         rc["axes.unicode_minus"] = False
         return "zh", rc, found[1]
     from matplotlib import font_manager
+
     return "en", rc, font_manager.findfont("DejaVu Sans")
 
 

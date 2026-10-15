@@ -4,6 +4,7 @@
 - 已確認停牌：開高低收皆空，量、值、筆數為 0，且列在停牌事件中。
 - 有量無價：來源有該日，但開高低收為空（例如只有零星零股成交），未確認為停牌。
 """
+
 import contextlib
 import io
 import re
@@ -16,13 +17,19 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from test_end_to_end import TEST_CONFIG
+
 from tw_stock_backtest.analysis.factors import calculate_factor_row
-from tw_stock_backtest.analysis.indicators import simple_moving_average, window_gap_reason, windowed_moving_average
+from tw_stock_backtest.analysis.indicators import (
+    simple_moving_average,
+    window_gap_reason,
+    windowed_moving_average,
+)
 from tw_stock_backtest.analysis.screening import evaluate_stock
 from tw_stock_backtest.backtesting.backtest import run_backtest
 from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.backtesting.portfolio import run_portfolio_backtest
-from tw_stock_backtest.cli import analyze_stock, run_backtest as run_backtest_cli
+from tw_stock_backtest.cli import analyze_stock
+from tw_stock_backtest.cli import run_backtest as run_backtest_cli
 from tw_stock_backtest.data.database import save_records
 from tw_stock_backtest.strategies import evaluate_conditions
 
@@ -41,22 +48,40 @@ def trading_days(count, first=date(2026, 1, 5)):
 
 def priced(stock_id, day, index):
     close = Decimal(100 + (index * 7) % 11 - 5)
-    return {"stock_id": stock_id, "date": day, "open": close, "high": close + 1,
-            "low": close - 1, "close": close, "volume": 1000 + index,
-            "turnover": 100000, "trade_count": 50}
+    return {
+        "stock_id": stock_id,
+        "date": day,
+        "open": close,
+        "high": close + 1,
+        "low": close - 1,
+        "close": close,
+        "volume": 1000 + index,
+        "turnover": 100000,
+        "trade_count": 50,
+    }
 
 
 def unpriced(stock_id, day, volume=0, trade_count=0):
-    return {"stock_id": stock_id, "date": day, "open": None, "high": None,
-            "low": None, "close": None, "volume": volume, "turnover": volume * 100,
-            "trade_count": trade_count}
+    return {
+        "stock_id": stock_id,
+        "date": day,
+        "open": None,
+        "high": None,
+        "low": None,
+        "close": None,
+        "volume": volume,
+        "turnover": volume * 100,
+        "trade_count": trade_count,
+    }
 
 
 def series(stock_id, count, gaps=None):
     """gaps: {位置: 缺價列的量與筆數}；其餘位置為正常行情。"""
     gaps = gaps or {}
-    return [unpriced(stock_id, day, *gaps[i]) if i in gaps else priced(stock_id, day, i)
-            for i, day in enumerate(trading_days(count))]
+    return [
+        unpriced(stock_id, day, *gaps[i]) if i in gaps else priced(stock_id, day, i)
+        for i, day in enumerate(trading_days(count))
+    ]
 
 
 def status(records, as_of, condition):
@@ -89,18 +114,39 @@ class TestRecursiveIndicatorsAfterMissingClose(unittest.TestCase):
 
 class TestBacktestWithMissingCloses(unittest.TestCase):
     def setUp(self):
-        self.costs = CostSettings(commission_rate=Decimal("0"), commission_discount=Decimal("1"),
-                                  minimum_commission=Decimal("0"), sell_tax_rate=Decimal("0"))
-        self.factors = {"short_window": 2, "long_window": 5, "momentum_window": 3,
-                        "volatility_window": 3, "top_n": 2, "momentum_weight": "1",
-                        "trend_weight": "1", "volatility_weight": "1"}
+        self.costs = CostSettings(
+            commission_rate=Decimal("0"),
+            commission_discount=Decimal("1"),
+            minimum_commission=Decimal("0"),
+            sell_tax_rate=Decimal("0"),
+        )
+        self.factors = {
+            "short_window": 2,
+            "long_window": 5,
+            "momentum_window": 3,
+            "volatility_window": 3,
+            "top_n": 2,
+            "momentum_weight": "1",
+            "trend_weight": "1",
+            "volatility_weight": "1",
+        }
 
     def backtest(self, records, start, end, **extra):
         return run_portfolio_backtest(
-            records, start, end, screening_settings=None, initial_cash=Decimal("1000000"),
-            quantity=10, max_positions=2, cost_settings=self.costs, ranking_method="factors",
-            factor_settings={k: Decimal(v) if k.endswith("_weight") else v
-                             for k, v in self.factors.items()}, **extra)
+            records,
+            start,
+            end,
+            screening_settings=None,
+            initial_cash=Decimal("1000000"),
+            quantity=10,
+            max_positions=2,
+            cost_settings=self.costs,
+            ranking_method="factors",
+            factor_settings={
+                k: Decimal(v) if k.endswith("_weight") else v for k, v in self.factors.items()
+            },
+            **extra,
+        )
 
     def test_unconfirmed_unpriced_row_before_the_period_does_not_fail_the_backtest(self):
         # 有量無價在回測期間之前（暖機資料中），期間內兩檔都有完整行情。
@@ -139,7 +185,9 @@ class TestBacktestWithMissingCloses(unittest.TestCase):
         halts = {("AAA", days[45]): {"reason": "合成停牌", "source": "test fixture"}}
         result = self.backtest(records, days[40], days[-1], confirmed_halts=halts)
         self.assertEqual(result["market_events"][0]["market_status"], "CONFIRMED_HALT")
-        unavailable = {day for day, stocks in self.ranking_errors(result).items() if "AAA" in stocks}
+        unavailable = {
+            day for day, stocks in self.ranking_errors(result).items() if "AAA" in stocks
+        }
         self.assertEqual(unavailable, set(days[45:50]))
 
     def ranking_errors(self, result):
@@ -149,19 +197,37 @@ class TestBacktestWithMissingCloses(unittest.TestCase):
         records = {"AAA": series("AAA", 80, {10: (0, 0)}), "BBB": series("BBB", 80)}
         days = trading_days(80)
         halts = {("AAA", days[10]): {"reason": "合成停牌", "source": "test fixture"}}
-        strategy = {"schema_version": 1, "id": "rsi_case", "name": "RSI", "description": "測試",
-                    "ranking_mode": "factors", "factors": self.factors,
-                    "screening": {"short_window": 2, "long_window": 5, "volume_window": 3,
-                                  "min_volume_ratio": "1", "momentum_window": 3, "top_n": 2},
-                    "conditions": [RSI]}
-        result = self.backtest(records, days[60], days[-1], confirmed_halts=halts, strategy=strategy)
+        strategy = {
+            "schema_version": 1,
+            "id": "rsi_case",
+            "name": "RSI",
+            "description": "測試",
+            "ranking_mode": "factors",
+            "factors": self.factors,
+            "screening": {
+                "short_window": 2,
+                "long_window": 5,
+                "volume_window": 3,
+                "min_volume_ratio": "1",
+                "momentum_window": 3,
+                "top_n": 2,
+            },
+            "conditions": [RSI],
+        }
+        result = self.backtest(
+            records, days[60], days[-1], confirmed_halts=halts, strategy=strategy
+        )
         last = result["strategy_diagnostics"][-1]["diagnostics"]["AAA"]
         self.assertNotEqual(last["status"], "unavailable", last.get("reason") or last["conditions"])
 
 
 class TestSingleStockWithMissingCloses(unittest.TestCase):
     def test_windowed_average_skips_only_windows_that_contain_the_gap(self):
-        closes = [Decimal(n) for n in (10, 11, 12, 13, 14)] + [None] + [Decimal(n) for n in (16, 17, 18, 19)]
+        closes = (
+            [Decimal(n) for n in (10, 11, 12, 13, 14)]
+            + [None]
+            + [Decimal(n) for n in (16, 17, 18, 19)]
+        )
         result = windowed_moving_average(closes, 3)
         self.assertEqual(result[:2], [None, None])
         self.assertEqual(result[4], Decimal(13))
@@ -172,18 +238,36 @@ class TestSingleStockWithMissingCloses(unittest.TestCase):
     def test_engine_does_not_trade_on_a_no_price_day_and_says_why(self):
         # 單檔引擎只在訊號隔日開盤成交；隔日無成交價時這筆訊號不成交，也不順延。
         records = series("2330", 6, {2: (25, 2)})
-        result = run_backtest(records, ["NONE", "BUY", "NONE", "NONE", "NONE", "NONE"],
-                              Decimal("100000"), 10, confirmed_halts={})
+        result = run_backtest(
+            records,
+            ["NONE", "BUY", "NONE", "NONE", "NONE", "NONE"],
+            Decimal("100000"),
+            10,
+            confirmed_halts={},
+        )
         self.assertEqual(result["trades"], [])
-        self.assertEqual(result["skipped_orders"], [{
-            "signal_date": records[1]["date"], "date": records[2]["date"], "action": "BUY",
-            "reason": "無成交價（原因未確認），當日不成交"}])
+        self.assertEqual(
+            result["skipped_orders"],
+            [
+                {
+                    "signal_date": records[1]["date"],
+                    "date": records[2]["date"],
+                    "action": "BUY",
+                    "reason": "無成交價（原因未確認），當日不成交",
+                }
+            ],
+        )
         self.assertEqual(result["market_events"][0]["market_status"], "NO_PRICE")
 
     def test_engine_values_a_held_position_at_the_last_close_on_a_no_price_day(self):
         records = series("2330", 5, {3: (0, 0)})
-        result = run_backtest(records, ["BUY", "NONE", "NONE", "NONE", "NONE"],
-                              Decimal("100000"), 10, confirmed_halts={})
+        result = run_backtest(
+            records,
+            ["BUY", "NONE", "NONE", "NONE", "NONE"],
+            Decimal("100000"),
+            10,
+            confirmed_halts={},
+        )
         gap = result["equity_curve"][3]
         self.assertEqual(gap["stale_price_date"], records[2]["date"])
         self.assertEqual(gap["equity"], gap["cash"] + records[2]["close"] * 10)
@@ -192,10 +276,22 @@ class TestSingleStockWithMissingCloses(unittest.TestCase):
         with TemporaryDirectory() as folder:
             config = Path(folder) / "config.toml"
             config.write_text(TEST_CONFIG.replace("AAA", "2330"), encoding="utf-8")
-            save_records(series("2330", 30, {12: (25, 2)}), db_path=Path(folder) / "data" / "stocks.db")
+            save_records(
+                series("2330", 30, {12: (25, 2)}), db_path=Path(folder) / "data" / "stocks.db"
+            )
             days = trading_days(30)
-            argv = [module.__name__, "--config", str(config), "--stock", "2330",
-                    "--start", days[0], "--end", days[-1], *arguments]
+            argv = [
+                module.__name__,
+                "--config",
+                str(config),
+                "--stock",
+                "2330",
+                "--start",
+                days[0],
+                "--end",
+                days[-1],
+                *arguments,
+            ]
             output = io.StringIO()
             with patch.object(sys, "argv", argv), contextlib.redirect_stdout(output):
                 code = module.main()
@@ -219,8 +315,13 @@ class TestWindowGapReasons(unittest.TestCase):
     """窗口型指標的排除原因要寫出缺價日期，以及再幾個行情日可恢復；承諾的天數必須成立。"""
 
     FACTORS = {"short_window": 2, "long_window": 5, "momentum_window": 3, "volatility_window": 3}
-    RULES = {"short_window": 2, "long_window": 5, "volume_window": 3,
-             "min_volume_ratio": Decimal("0"), "momentum_window": 3}
+    RULES = {
+        "short_window": 2,
+        "long_window": 5,
+        "volume_window": 3,
+        "min_volume_ratio": Decimal("0"),
+        "momentum_window": 3,
+    }
 
     def evaluators(self):
         def condition(kind, **params):
@@ -228,9 +329,13 @@ class TestWindowGapReasons(unittest.TestCase):
                 result = status(records, as_of, {"type": kind, **params})
                 if result["status"] == "unavailable":
                     raise ValueError(result["reason"])
+
             return run
+
         return {
-            "因子": lambda records, as_of: calculate_factor_row(records, as_of, factor_settings=self.FACTORS),
+            "因子": lambda records, as_of: calculate_factor_row(
+                records, as_of, factor_settings=self.FACTORS
+            ),
             "規則篩選": lambda records, as_of: evaluate_stock(records, as_of, **self.RULES),
             "突破": condition("breakout", period=5),
             "均線趨勢": condition("trend", short_window=2, long_window=5),

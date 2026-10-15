@@ -37,8 +37,4 @@ def filter_records(records, start, end):
     if start > end:
         raise ValueError("開始日期不能晚於結束日期")
 
-    return [
-        record
-        for record in records
-        if start <= date.fromisoformat(record["date"]) <= end
-    ]
+    return [record for record in records if start <= date.fromisoformat(record["date"]) <= end]

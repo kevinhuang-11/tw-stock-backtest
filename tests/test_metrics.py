@@ -2,9 +2,7 @@ import unittest
 from datetime import date, timedelta
 from decimal import Decimal
 
-from tw_stock_backtest.backtesting.metrics import (
-    summarize_performance, summarize_exposure
-)
+from tw_stock_backtest.backtesting.metrics import summarize_exposure, summarize_performance
 
 
 class TestPerformanceMetrics(unittest.TestCase):
@@ -13,15 +11,9 @@ class TestPerformanceMetrics(unittest.TestCase):
 
         return [
             {
-                "date": (
-                    start + timedelta(days=index)
-                ).isoformat(),
+                "date": (start + timedelta(days=index)).isoformat(),
                 "equity": Decimal(str(value)),
-                "holdings": (
-                    {"AAA": 100}
-                    if index in invested_indices
-                    else {}
-                ),
+                "holdings": ({"AAA": 100} if index in invested_indices else {}),
             }
             for index, value in enumerate(values)
         ]
@@ -104,6 +96,7 @@ class TestPerformanceMetrics(unittest.TestCase):
                         Decimal("100"),
                     )
 
+
 class TestExposure(unittest.TestCase):
     def test_average_includes_cash_only_days(self):
         curve = [
@@ -177,14 +170,12 @@ class TestExposure(unittest.TestCase):
         invalid_curves = [
             # 沒有資料。
             [],
-
             # 缺少持股市值。
             [
                 {
                     "equity": Decimal("1000"),
                 },
             ],
-
             # 總資產不是有限數值。
             [
                 {
@@ -192,7 +183,6 @@ class TestExposure(unittest.TestCase):
                     "market_value": Decimal("0"),
                 },
             ],
-
             # 持股市值不是有限數值。
             [
                 {
@@ -200,7 +190,6 @@ class TestExposure(unittest.TestCase):
                     "market_value": Decimal("Infinity"),
                 },
             ],
-
             # 總資產為負。
             [
                 {
@@ -208,7 +197,6 @@ class TestExposure(unittest.TestCase):
                     "market_value": Decimal("0"),
                 },
             ],
-
             # 持股市值為負。
             [
                 {
@@ -216,7 +204,6 @@ class TestExposure(unittest.TestCase):
                     "market_value": Decimal("-1"),
                 },
             ],
-
             # 本專案不融資，持股市值不可超過總資產。
             [
                 {
@@ -224,7 +211,6 @@ class TestExposure(unittest.TestCase):
                     "market_value": Decimal("1001"),
                 },
             ],
-
             # 型別錯誤：應使用 Decimal。
             [
                 {

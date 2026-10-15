@@ -1,8 +1,8 @@
-from decimal import Decimal
 from datetime import date
+from decimal import Decimal
+
 from tw_stock_backtest.analysis.indicators import window_gap_reason
 from tw_stock_backtest.date_range import parse_date_range
-
 
 FACTOR_DIRECTIONS = {
     "momentum": True,
@@ -33,23 +33,13 @@ def _rank_scores(values, *, higher_is_better):
         end = start + 1
 
         # 找出這一組相同數值。
-        while (
-            end < count
-            and values[ordered_indices[end]]
-            == values[ordered_indices[start]]
-        ):
+        while end < count and values[ordered_indices[end]] == values[ordered_indices[start]]:
             end += 1
 
         # start 到 end - 1 的平均排名，排名從 0 開始。
-        average_rank = (
-            Decimal(start) + Decimal(end - 1)
-        ) / Decimal("2")
+        average_rank = (Decimal(start) + Decimal(end - 1)) / Decimal("2")
 
-        score = (
-            average_rank
-            / Decimal(count - 1)
-            * Decimal("100")
-        )
+        score = average_rank / Decimal(count - 1) * Decimal("100")
 
         if not higher_is_better:
             score = Decimal("100") - score
@@ -74,19 +64,11 @@ def rank_factor_candidates(factor_rows, *, weights):
     權重不必加總為 1，函式會除以權重總和。
     """
     if set(weights) != set(FACTOR_DIRECTIONS):
-        raise ValueError(
-            "權重必須完整提供 momentum、trend、volatility"
-        )
+        raise ValueError("權重必須完整提供 momentum、trend、volatility")
 
     for name, weight in weights.items():
-        if (
-            not isinstance(weight, Decimal)
-            or not weight.is_finite()
-            or weight < 0
-        ):
-            raise ValueError(
-                f"{name} 權重必須是非負且有限的 Decimal"
-            )
+        if not isinstance(weight, Decimal) or not weight.is_finite() or weight < 0:
+            raise ValueError(f"{name} 權重必須是非負且有限的 Decimal")
 
     total_weight = sum(weights.values(), Decimal("0"))
 
@@ -102,11 +84,7 @@ def rank_factor_candidates(factor_rows, *, weights):
     for row in factor_rows:
         stock_id = row["stock_id"]
 
-        if (
-            not isinstance(stock_id, str)
-            or not stock_id
-            or stock_id != stock_id.strip()
-        ):
+        if not isinstance(stock_id, str) or not stock_id or stock_id != stock_id.strip():
             raise ValueError("股票代號必須是非空且無前後空白的字串")
 
         if stock_id in seen_stock_ids:
@@ -120,13 +98,8 @@ def rank_factor_candidates(factor_rows, *, weights):
         for factor in FACTOR_DIRECTIONS:
             value = row[factor]
 
-            if (
-                not isinstance(value, Decimal)
-                or not value.is_finite()
-            ):
-                raise ValueError(
-                    f"{stock_id} 的 {factor} 必須是有限的 Decimal"
-                )
+            if not isinstance(value, Decimal) or not value.is_finite():
+                raise ValueError(f"{stock_id} 的 {factor} 必須是有限的 Decimal")
 
         if row["volatility"] < 0:
             raise ValueError("波動程度不可為負數")
@@ -142,27 +115,21 @@ def rank_factor_candidates(factor_rows, *, weights):
     ranked = []
 
     for index, row in enumerate(factor_rows):
-        factor_scores = {
-            factor: scores_by_factor[factor][index]
-            for factor in FACTOR_DIRECTIONS
-        }
+        factor_scores = {factor: scores_by_factor[factor][index] for factor in FACTOR_DIRECTIONS}
 
-        weighted_score = sum(
-            (
-                factor_scores[factor] * weights[factor]
-                for factor in FACTOR_DIRECTIONS
-            ),
-            Decimal("0"),
-        ) / total_weight
+        weighted_score = (
+            sum(
+                (factor_scores[factor] * weights[factor] for factor in FACTOR_DIRECTIONS),
+                Decimal("0"),
+            )
+            / total_weight
+        )
 
         ranked.append(
             {
                 "stock_id": row["stock_id"],
                 "date": row["date"],
-                "factors": {
-                    factor: row[factor]
-                    for factor in FACTOR_DIRECTIONS
-                },
+                "factors": {factor: row[factor] for factor in FACTOR_DIRECTIONS},
                 "factor_scores": factor_scores,
                 "score": weighted_score,
             }
@@ -180,6 +147,7 @@ def rank_factor_candidates(factor_rows, *, weights):
 
     return ranked
 
+
 def calculate_factor_row(records, as_of, *, factor_settings):
     """使用分析日期當天及之前的收盤價，計算單檔股票因子。"""
     short_window = factor_settings["short_window"]
@@ -193,11 +161,7 @@ def calculate_factor_row(records, as_of, *, factor_settings):
         ("momentum_window", momentum_window),
         ("volatility_window", volatility_window),
     ):
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, int)
-            or value <= 0
-        ):
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise ValueError(f"{name} 必須是正整數")
 
     if short_window >= long_window:
@@ -218,10 +182,7 @@ def calculate_factor_row(records, as_of, *, factor_settings):
         if record["stock_id"] != stock_id:
             raise ValueError("行情不可混合不同股票")
 
-        if (
-            previous_date is not None
-            and current_date <= previous_date
-        ):
+        if previous_date is not None and current_date <= previous_date:
             raise ValueError("行情日期必須遞增且不可重複")
 
         previous_date = current_date
@@ -229,10 +190,7 @@ def calculate_factor_row(records, as_of, *, factor_settings):
         if current_date <= target_date:
             history.append(record)
 
-    if (
-        not history
-        or history[-1]["date"] != target_date.isoformat()
-    ):
+    if not history or history[-1]["date"] != target_date.isoformat():
         raise ValueError("缺少分析日期當天的行情")
 
     required_records = max(
@@ -242,10 +200,7 @@ def calculate_factor_row(records, as_of, *, factor_settings):
     )
 
     if len(history) < required_records:
-        raise ValueError(
-            f"至少需要 {required_records} 筆行情，"
-            f"目前只有 {len(history)} 筆"
-        )
+        raise ValueError(f"至少需要 {required_records} 筆行情，目前只有 {len(history)} 筆")
 
     window = history[-required_records:]
     closes = [record["close"] for record in window]
@@ -254,23 +209,14 @@ def calculate_factor_row(records, as_of, *, factor_settings):
     if reason:
         raise ValueError(reason)
 
-    short_ma = (
-        sum(closes[-short_window:], Decimal("0"))
-        / Decimal(short_window)
-    )
-    long_ma = (
-        sum(closes[-long_window:], Decimal("0"))
-        / Decimal(long_window)
-    )
+    short_ma = sum(closes[-short_window:], Decimal("0")) / Decimal(short_window)
+    long_ma = sum(closes[-long_window:], Decimal("0")) / Decimal(long_window)
 
-    momentum = (
-        closes[-1] / closes[-(momentum_window + 1)]
-        - Decimal("1")
-    )
+    momentum = closes[-1] / closes[-(momentum_window + 1)] - Decimal("1")
     trend = short_ma / long_ma - Decimal("1")
 
     # N 個每日報酬率需要 N + 1 筆收盤價。
-    volatility_prices = closes[-(volatility_window + 1):]
+    volatility_prices = closes[-(volatility_window + 1) :]
 
     daily_returns = [
         current / previous - Decimal("1")
@@ -280,21 +226,12 @@ def calculate_factor_row(records, as_of, *, factor_settings):
         )
     ]
 
-    mean_return = (
-        sum(daily_returns, Decimal("0"))
-        / Decimal(volatility_window)
-    )
+    mean_return = sum(daily_returns, Decimal("0")) / Decimal(volatility_window)
 
-    variance = (
-        sum(
-            (
-                (value - mean_return) ** 2
-                for value in daily_returns
-            ),
-            Decimal("0"),
-        )
-        / Decimal(volatility_window)
-    )
+    variance = sum(
+        ((value - mean_return) ** 2 for value in daily_returns),
+        Decimal("0"),
+    ) / Decimal(volatility_window)
 
     return {
         "stock_id": stock_id,
@@ -303,6 +240,7 @@ def calculate_factor_row(records, as_of, *, factor_settings):
         "trend": trend,
         "volatility": variance.sqrt(),
     }
+
 
 def build_factor_history(
     records_by_stock,
@@ -315,11 +253,7 @@ def build_factor_history(
     start, end = parse_date_range(start_text, end_text)
     top_n = factor_settings["top_n"]
 
-    if (
-        isinstance(top_n, bool)
-        or not isinstance(top_n, int)
-        or top_n <= 0
-    ):
+    if isinstance(top_n, bool) or not isinstance(top_n, int) or top_n <= 0:
         raise ValueError("top_n 必須是正整數")
 
     weights = {
@@ -342,10 +276,7 @@ def build_factor_history(
             if record["stock_id"] != stock_id:
                 raise ValueError(f"{stock_id} 的行情混入其他股票")
 
-            if (
-                previous_date is not None
-                and current_date <= previous_date
-            ):
+            if previous_date is not None and current_date <= previous_date:
                 raise ValueError("行情日期必須遞增且不可重複")
 
             previous_date = current_date
@@ -353,14 +284,8 @@ def build_factor_history(
             if start <= current_date <= end:
                 analysis_dates.add(current_date)
 
-    available = {
-        stock_id: []
-        for stock_id in records_by_stock
-    }
-    positions = {
-        stock_id: 0
-        for stock_id in records_by_stock
-    }
+    available = {stock_id: [] for stock_id in records_by_stock}
+    positions = {stock_id: 0 for stock_id in records_by_stock}
 
     history = []
 
@@ -374,9 +299,7 @@ def build_factor_history(
 
             while (
                 position < len(records)
-                and date.fromisoformat(
-                    records[position]["date"]
-                ) <= analysis_date
+                and date.fromisoformat(records[position]["date"]) <= analysis_date
             ):
                 available[stock_id].append(records[position])
                 position += 1

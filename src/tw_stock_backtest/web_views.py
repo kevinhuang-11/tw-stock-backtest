@@ -1,12 +1,19 @@
 """把報表與工作整理成畫面用的摘要；只做呈現，不重新計算任何結果。"""
+
 import re
 from datetime import datetime, timezone
 
 from tw_stock_backtest.web_format import fmt_percent, kind_label
 
 # 報表清單的類型篩選；順序即畫面上的順序。
-REPORT_KINDS = ("research", "backtest", "comparison", "period_comparison",
-                "watchlist", "supplemental")
+REPORT_KINDS = (
+    "research",
+    "backtest",
+    "comparison",
+    "period_comparison",
+    "watchlist",
+    "supplemental",
+)
 
 
 def created_at(path):
@@ -14,10 +21,14 @@ def created_at(path):
     name = path.name
     stamp = re.match(r"(\d{8})T(\d{6})_(\d{6})Z", name)
     if stamp:
-        return datetime.strptime("".join(stamp.groups()), "%Y%m%d%H%M%S%f").replace(tzinfo=timezone.utc)
+        return datetime.strptime("".join(stamp.groups()), "%Y%m%d%H%M%S%f").replace(
+            tzinfo=timezone.utc
+        )
     stamp = re.match(r"(\d{4}-\d{2}-\d{2})T(\d{6})\.(\d{6})_0000", name)
     if stamp:
-        return datetime.strptime("".join(stamp.groups()), "%Y-%m-%d%H%M%S%f").replace(tzinfo=timezone.utc)
+        return datetime.strptime("".join(stamp.groups()), "%Y-%m-%d%H%M%S%f").replace(
+            tzinfo=timezone.utc
+        )
     try:
         return datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
     except OSError:
@@ -53,7 +64,9 @@ def describe_report(key, entry):
         title = "回測" + (" · " + name if name else "")
         start, end = configuration.get("requested_start"), configuration.get("requested_end")
         subtitle = f"{start} ～ {end}" if start and end else ""
-        if (path.parent / "comparison.json").is_file() or (path.parent.parent / "comparison.json").is_file():
+        if (path.parent / "comparison.json").is_file() or (
+            path.parent.parent / "comparison.json"
+        ).is_file():
             subtitle += " · 策略比較的子報表"
         total = (details.get("strategy") or {}).get("total_return")
         if total is not None:
@@ -79,9 +92,17 @@ def describe_report(key, entry):
         title = "營收與法人更新"
         subtitle = "、".join(stocks[:5]) + (f" 等 {len(stocks)} 檔" if len(stocks) > 5 else "")
 
-    return {"key": key, "kind": kind, "kind_label": kind_label(kind), "title": title,
-            "subtitle": subtitle, "status": status, "created": created_at(path).isoformat(),
-            "metric": metric, "folder": path.name}
+    return {
+        "key": key,
+        "kind": kind,
+        "kind_label": kind_label(kind),
+        "title": title,
+        "subtitle": subtitle,
+        "status": status,
+        "created": created_at(path).isoformat(),
+        "metric": metric,
+        "folder": path.name,
+    }
 
 
 def report_list(catalog, kind=None):

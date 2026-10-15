@@ -2,6 +2,7 @@
 
 互動行為需要瀏覽器，由 tools/check_stock_picker.py 驗證。
 """
+
 import re
 import unittest
 from importlib import resources
@@ -9,6 +10,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from test_end_to_end import TEST_CONFIG
+
 from tw_stock_backtest.stock_research import Watchlist
 from tw_stock_backtest.workbench import Workbench, create_app
 
@@ -25,8 +27,7 @@ class StockPickerTests(unittest.TestCase):
         self.workbench = Workbench(config, root / "reports", root / "jobs")
         self.addCleanup(self.workbench.close)
         self.client = create_app(self.workbench).test_client()
-        self.notes = Watchlist(
-            self.workbench.state / "private" / "watchlist.sqlite3")
+        self.notes = Watchlist(self.workbench.state / "private" / "watchlist.sqlite3")
 
     def test_assets_are_packaged(self):
         for name in ("static/stock-picker.js", "static/stock-picker.css"):
@@ -59,8 +60,7 @@ class StockPickerTests(unittest.TestCase):
         self.assertIn("window.StockPicker?.mount", script)
 
     def test_watchlist_options_returns_codes_only(self):
-        self.assertEqual(
-            self.client.get("/api/watchlist-options").get_json(), {"stocks": []})
+        self.assertEqual(self.client.get("/api/watchlist-options").get_json(), {"stocks": []})
 
         self.notes.save("2454", "PRIVATE_NOTE_ONLY", 0)
         self.notes.save("2330", "", 0)

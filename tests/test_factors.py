@@ -1,11 +1,11 @@
 import unittest
 from copy import deepcopy
 from decimal import Decimal
+
 from tw_stock_backtest.analysis.factors import (
     calculate_factor_row,
     rank_factor_candidates,
 )
-
 
 
 class TestFactorRanking(unittest.TestCase):
@@ -173,6 +173,7 @@ class TestFactorRanking(unittest.TestCase):
     def test_empty_input(self):
         self.assertEqual(self.rank(rows=[]), [])
 
+
 class TestCalculateFactorRow(unittest.TestCase):
     def setUp(self):
         self.settings = {
@@ -254,10 +255,14 @@ class TestCalculateFactorRow(unittest.TestCase):
                 records = deepcopy(self.records)
                 records[index]["close"] = None
                 # 不可刪除缺失列，再用更舊的有效價格湊窗口。
-                records.insert(0, {
-                    "stock_id": "AAA", "date": "2025-12-31",
-                    "close": Decimal("5"),
-                })
+                records.insert(
+                    0,
+                    {
+                        "stock_id": "AAA",
+                        "date": "2025-12-31",
+                        "close": Decimal("5"),
+                    },
+                )
                 with self.assertRaisesRegex(ValueError, "收盤價"):
                     self.calculate(records=records)
 
@@ -270,28 +275,36 @@ class TestCalculateFactorRow(unittest.TestCase):
             with self.subTest(setting=setting):
                 settings = {**self.settings, setting: periods}
                 records = [
-                    {"stock_id": "AAA", "date": "2025-12-31",
-                     "close": Decimal("5")},
+                    {"stock_id": "AAA", "date": "2025-12-31", "close": Decimal("5")},
                     *self.records,
                 ]
                 result = calculate_factor_row(
-                    records, "2026-01-03", factor_settings=settings,
+                    records,
+                    "2026-01-03",
+                    factor_settings=settings,
                 )
-                self.assertTrue(all(
-                    result[name].is_finite()
-                    for name in ("momentum", "trend", "volatility")
-                ))
+                self.assertTrue(
+                    all(result[name].is_finite() for name in ("momentum", "trend", "volatility"))
+                )
                 with self.assertRaisesRegex(
-                    ValueError, "至少需要 4 筆行情，目前只有 3 筆",
+                    ValueError,
+                    "至少需要 4 筆行情，目前只有 3 筆",
                 ):
                     calculate_factor_row(
-                        records[1:], "2026-01-03", factor_settings=settings,
+                        records[1:],
+                        "2026-01-03",
+                        factor_settings=settings,
                     )
 
     def test_future_missing_close_is_ignored(self):
-        records = [*self.records, {
-            "stock_id": "AAA", "date": "2026-01-04", "close": None,
-        }]
+        records = [
+            *self.records,
+            {
+                "stock_id": "AAA",
+                "date": "2026-01-04",
+                "close": None,
+            },
+        ]
         self.assertEqual(self.calculate(records=records), self.calculate())
 
     def test_future_prices_cannot_complete_insufficient_history(self):
@@ -305,6 +318,7 @@ class TestCalculateFactorRow(unittest.TestCase):
     def test_missing_analysis_date(self):
         with self.assertRaises(ValueError):
             self.calculate(as_of="2026-01-04")
+
 
 if __name__ == "__main__":
     unittest.main()

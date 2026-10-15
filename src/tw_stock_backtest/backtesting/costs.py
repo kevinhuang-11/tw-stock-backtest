@@ -1,10 +1,11 @@
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 
 
 @dataclass(frozen=True)
 class CostSettings:
     """交易成本設定；預設值為本專案的基準模擬情境。"""
+
     commission_rate: Decimal = Decimal("0.001425")
     commission_discount: Decimal = Decimal("1")
     minimum_commission: Decimal = Decimal("20")
@@ -48,18 +49,10 @@ class CostSettings:
 
 def calculate_transaction(price, quantity, side, settings):
     """計算一筆成交的股款、手續費、交易稅與現金變動。"""
-    if (
-        not isinstance(price, Decimal)
-        or not price.is_finite()
-        or price <= 0
-    ):
+    if not isinstance(price, Decimal) or not price.is_finite() or price <= 0:
         raise ValueError("成交價格必須是大於 0 的有限 Decimal")
 
-    if (
-        isinstance(quantity, bool)
-        or not isinstance(quantity, int)
-        or quantity <= 0
-    ):
+    if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
         raise ValueError("成交股數必須是正整數")
 
     if side not in ("BUY", "SELL"):
@@ -67,11 +60,7 @@ def calculate_transaction(price, quantity, side, settings):
 
     amount = price * quantity
 
-    raw_commission = (
-        amount
-        * settings.commission_rate
-        * settings.commission_discount
-    )
+    raw_commission = amount * settings.commission_rate * settings.commission_discount
 
     commission = raw_commission.quantize(
         Decimal("1"),
@@ -99,20 +88,13 @@ def calculate_transaction(price, quantity, side, settings):
         "cash_change": cash_change,
     }
 
+
 def calculate_buy_quantity(price, budget, settings):
     """找出預算內可買的最大整數股數，預算包含手續費。"""
-    if (
-        not isinstance(price, Decimal)
-        or not price.is_finite()
-        or price <= 0
-    ):
+    if not isinstance(price, Decimal) or not price.is_finite() or price <= 0:
         raise ValueError("價格必須是大於零的有限 Decimal")
 
-    if (
-        not isinstance(budget, Decimal)
-        or not budget.is_finite()
-        or budget < 0
-    ):
+    if not isinstance(budget, Decimal) or not budget.is_finite() or budget < 0:
         raise ValueError("預算必須是非負的有限 Decimal")
 
     if not isinstance(settings, CostSettings):
@@ -142,6 +124,7 @@ def calculate_buy_quantity(price, budget, settings):
 
     return low
 
+
 def apply_slippage(price, action, slippage_rate=Decimal("0")):
     """
     依固定比例模擬不利滑價。
@@ -150,11 +133,7 @@ def apply_slippage(price, action, slippage_rate=Decimal("0")):
     SELL：成交價降低。
     保留 Decimal 精度，不在此處取整或對齊價格跳動單位。
     """
-    if (
-        not isinstance(price, Decimal)
-        or not price.is_finite()
-        or price <= 0
-    ):
+    if not isinstance(price, Decimal) or not price.is_finite() or price <= 0:
         raise ValueError("價格必須是大於零的有限 Decimal")
 
     if action not in ("BUY", "SELL"):
@@ -165,12 +144,9 @@ def apply_slippage(price, action, slippage_rate=Decimal("0")):
         or not slippage_rate.is_finite()
         or not Decimal("0") <= slippage_rate < Decimal("1")
     ):
-        raise ValueError(
-            "滑價率必須是介於 0（含）與 1（不含）的有限 Decimal"
-        )
+        raise ValueError("滑價率必須是介於 0（含）與 1（不含）的有限 Decimal")
 
     if action == "BUY":
         return price * (Decimal("1") + slippage_rate)
 
     return price * (Decimal("1") - slippage_rate)
-

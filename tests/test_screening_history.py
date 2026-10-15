@@ -24,11 +24,9 @@ class TestScreeningHistory(unittest.TestCase):
         return [
             {
                 "stock_id": stock_id,
-                "date": (
-                    start + timedelta(days=index)
-                ).isoformat(),
+                "date": (start + timedelta(days=index)).isoformat(),
                 "close": Decimal(str(price)),
-                "volume": 100 * (2 ** index),
+                "volume": 100 * (2**index),
             }
             for index, price in enumerate(prices)
         ]

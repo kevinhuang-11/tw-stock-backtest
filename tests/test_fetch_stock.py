@@ -21,9 +21,7 @@ class TestFetchMonth(unittest.TestCase):
 
     def make_response(self, payload):
         """建立可供 json.load 讀取的模擬回應。"""
-        return io.BytesIO(
-            json.dumps(payload).encode("utf-8")
-        )
+        return io.BytesIO(json.dumps(payload).encode("utf-8"))
 
     def fetch(self):
         return fetch_stock.fetch_month(

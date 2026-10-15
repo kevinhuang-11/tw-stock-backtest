@@ -3,11 +3,7 @@ from decimal import Decimal
 
 
 def _valid_price(value):
-    return (
-        isinstance(value, Decimal)
-        and value.is_finite()
-        and value > 0
-    )
+    return isinstance(value, Decimal) and value.is_finite() and value > 0
 
 
 def evaluate_forward_return(
@@ -27,24 +23,14 @@ def evaluate_forward_return(
     trading_dates 必須是共用、嚴格遞增的行情日期清單。
     本函式只評估價格，不包含費稅、滑價、股利或拆股。
     """
-    if (
-        isinstance(horizon, bool)
-        or not isinstance(horizon, int)
-        or horizon <= 0
-    ):
+    if isinstance(horizon, bool) or not isinstance(horizon, int) or horizon <= 0:
         raise ValueError("horizon 必須是正整數")
 
     signal = date.fromisoformat(signal_date)
 
-    calendar = [
-        date.fromisoformat(value)
-        for value in trading_dates
-    ]
+    calendar = [date.fromisoformat(value) for value in trading_dates]
 
-    if any(
-        current <= previous
-        for previous, current in zip(calendar, calendar[1:])
-    ):
+    if any(current <= previous for previous, current in zip(calendar, calendar[1:])):
         raise ValueError("行情日期必須嚴格遞增且不可重複")
 
     if signal not in calendar:
@@ -101,10 +87,7 @@ def evaluate_forward_return(
 
     entry_price = entry_record.get("open")
 
-    if (
-        entry_record.get("tradable") is False
-        or not _valid_price(entry_price)
-    ):
+    if entry_record.get("tradable") is False or not _valid_price(entry_price):
         result["reason"] = "unavailable_entry_price"
         return result
 
@@ -123,20 +106,16 @@ def evaluate_forward_return(
 
     exit_price = exit_record.get("close")
 
-    if (
-        exit_record.get("tradable") is False
-        or not _valid_price(exit_price)
-    ):
+    if exit_record.get("tradable") is False or not _valid_price(exit_price):
         result["reason"] = "unavailable_exit_price"
         return result
 
     result["exit_price"] = exit_price
-    result["price_return"] = (
-        exit_price / entry_price - Decimal("1")
-    )
+    result["price_return"] = exit_price / entry_price - Decimal("1")
     result["status"] = "ok"
 
     return result
+
 
 def evaluate_rankings(
     ranking_history,
@@ -158,9 +137,7 @@ def evaluate_rankings(
             not isinstance(values, (list, tuple))
             or not values
             or any(
-                isinstance(value, bool)
-                or not isinstance(value, int)
-                or value <= 0
+                isinstance(value, bool) or not isinstance(value, int) or value <= 0
                 for value in values
             )
             or len(set(values)) != len(values)
@@ -183,10 +160,7 @@ def evaluate_rankings(
             raise ValueError("排名日期必須嚴格遞增且不可重複")
         previous_date = current_date
 
-        ranked_ids = [
-            candidate["stock_id"]
-            for candidate in day["candidates"]
-        ]
+        ranked_ids = [candidate["stock_id"] for candidate in day["candidates"]]
 
         if len(set(ranked_ids)) != len(ranked_ids):
             raise ValueError("候選排名不可重複")
@@ -244,29 +218,23 @@ def evaluate_rankings(
 
                     else:
                         selected_return = sum(
-                            (
-                                forward[stock_id]["price_return"]
-                                for stock_id in selected
-                            ),
+                            (forward[stock_id]["price_return"] for stock_id in selected),
                             Decimal("0"),
                         ) / Decimal(len(selected))
 
                         universe_return = sum(
-                            (
-                                result["price_return"]
-                                for result in forward.values()
-                            ),
+                            (result["price_return"] for result in forward.values()),
                             Decimal("0"),
                         ) / Decimal(len(stocks))
 
-                        row.update({
-                            "status": "ok",
-                            "selected_return": selected_return,
-                            "universe_return": universe_return,
-                            "excess_return": (
-                                selected_return - universe_return
-                            ),
-                        })
+                        row.update(
+                            {
+                                "status": "ok",
+                                "selected_return": selected_return,
+                                "universe_return": universe_return,
+                                "excess_return": (selected_return - universe_return),
+                            }
+                        )
 
                 details.append(row)
 
@@ -274,23 +242,14 @@ def evaluate_rankings(
 
     for horizon in horizons:
         for top_n in top_ns:
-            group = [
-                row for row in details
-                if row["horizon"] == horizon
-                and row["top_n"] == top_n
-            ]
-            valid = [
-                row for row in group
-                if row["status"] == "ok"
-            ]
+            group = [row for row in details if row["horizon"] == horizon and row["top_n"] == top_n]
+            valid = [row for row in group if row["status"] == "ok"]
 
             reason_counts = {}
             for row in group:
                 if row["status"] != "ok":
                     reason = row["reason"]
-                    reason_counts[reason] = (
-                        reason_counts.get(reason, 0) + 1
-                    )
+                    reason_counts[reason] = reason_counts.get(reason, 0) + 1
 
             def average(key):
                 if not valid:
@@ -301,34 +260,33 @@ def evaluate_rankings(
                     Decimal("0"),
                 ) / Decimal(len(valid))
 
-            summaries.append({
-                "horizon": horizon,
-                "top_n": top_n,
-                "signal_days": len(group),
-                "evaluated_days": len(valid),
-                "unavailable_days": len(group) - len(valid),
-                "unavailable_reasons": reason_counts,
-                "average_selected_return": average("selected_return"),
-                "average_universe_return": average("universe_return"),
-                "average_excess_return": average("excess_return"),
-                "positive_return_ratio": (
-                    Decimal(sum(
-                        row["selected_return"] > 0
-                        for row in valid
-                    )) / Decimal(len(valid))
-                    if valid else None
-                ),
-                "outperform_ratio": (
-                    Decimal(sum(
-                        row["excess_return"] > 0
-                        for row in valid
-                    )) / Decimal(len(valid))
-                    if valid else None
-                ),
-            })
+            summaries.append(
+                {
+                    "horizon": horizon,
+                    "top_n": top_n,
+                    "signal_days": len(group),
+                    "evaluated_days": len(valid),
+                    "unavailable_days": len(group) - len(valid),
+                    "unavailable_reasons": reason_counts,
+                    "average_selected_return": average("selected_return"),
+                    "average_universe_return": average("universe_return"),
+                    "average_excess_return": average("excess_return"),
+                    "positive_return_ratio": (
+                        Decimal(sum(row["selected_return"] > 0 for row in valid))
+                        / Decimal(len(valid))
+                        if valid
+                        else None
+                    ),
+                    "outperform_ratio": (
+                        Decimal(sum(row["excess_return"] > 0 for row in valid))
+                        / Decimal(len(valid))
+                        if valid
+                        else None
+                    ),
+                }
+            )
 
     return {
         "details": details,
         "summaries": summaries,
     }
-

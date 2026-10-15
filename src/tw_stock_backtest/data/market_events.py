@@ -4,7 +4,6 @@ from datetime import date, timedelta
 from decimal import Decimal
 from importlib import resources
 
-
 MAX_HALT_DAYS = 400
 
 
@@ -16,7 +15,11 @@ def load_confirmed_halts(path=None):
     行情日會被查到，不影響結果。格式不符時直接失敗，不略過任何一筆。
     """
     if path is None:
-        text = resources.files(__package__).joinpath("confirmed_halts.json").read_text(encoding="utf-8")
+        text = (
+            resources.files(__package__)
+            .joinpath("confirmed_halts.json")
+            .read_text(encoding="utf-8")
+        )
     else:
         text = open(path, encoding="utf-8").read()
 
@@ -33,8 +36,11 @@ def load_confirmed_halts(path=None):
             raise ValueError(f"已確認停牌的股票代號無效：{stock_id!r}")
         if not isinstance(reason, str) or not reason.strip():
             raise ValueError(f"{stock_id} 的停牌原因不可為空")
-        if (not isinstance(sources, list) or not sources
-                or not all(isinstance(url, str) and url.startswith("https://") for url in sources)):
+        if (
+            not isinstance(sources, list)
+            or not sources
+            or not all(isinstance(url, str) and url.startswith("https://") for url in sources)
+        ):
             raise ValueError(f"{stock_id} 的停牌必須附上 https 來源")
 
         start = date.fromisoformat(entry.get("start", ""))
@@ -68,8 +74,10 @@ NO_PRICE_EVENT = {
 def market_event(record, confirmed_halts):
     """不可交易日的說明：已確認停牌附上來源，無成交價則說明原因未確認。"""
     if record["market_status"] == "CONFIRMED_HALT":
-        return {**confirmed_halts[(record["stock_id"], record["date"])],
-                "market_status": "CONFIRMED_HALT"}
+        return {
+            **confirmed_halts[(record["stock_id"], record["date"])],
+            "market_status": "CONFIRMED_HALT",
+        }
     return {**NO_PRICE_EVENT, "market_status": "NO_PRICE"}
 
 
@@ -114,11 +122,7 @@ def prepare_market_records(
             if field in record:
                 value = record[field]
 
-                if (
-                    isinstance(value, bool)
-                    or not isinstance(value, int)
-                    or value < 0
-                ):
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                     raise ValueError(f"{field} 必須是非負整數")
 
         is_halted = (
@@ -128,20 +132,16 @@ def prepare_market_records(
 
         # 來源有這一天，但四個價格都是空的；只有部分價格為空仍視為資料錯誤。
         no_price = not is_halted and all(
-            field in record and record[field] is None
-            for field in PRICE_FIELDS
+            field in record and record[field] is None for field in PRICE_FIELDS
         )
 
         if is_halted:
-            valid = (
-                all(
-                    field in record and record[field] is None
-                    for field in ("open", "high", "low", "close")
-                )
-                and all(
-                    field in record and record[field] == 0
-                    for field in ("volume", "turnover", "trade_count")
-                )
+            valid = all(
+                field in record and record[field] is None
+                for field in ("open", "high", "low", "close")
+            ) and all(
+                field in record and record[field] == 0
+                for field in ("volume", "turnover", "trade_count")
             )
 
             if not valid:
@@ -165,15 +165,8 @@ def prepare_market_records(
 
                 value = record[field]
 
-                if (
-                    not isinstance(value, Decimal)
-                    or not value.is_finite()
-                    or value <= 0
-                ):
-                    raise ValueError(
-                        f"{stock_id} / {record['date']} "
-                        "有無效價格，且未確認為停牌"
-                    )
+                if not isinstance(value, Decimal) or not value.is_finite() or value <= 0:
+                    raise ValueError(f"{stock_id} / {record['date']} 有無效價格，且未確認為停牌")
 
             if ("high" in record) != ("low" in record):
                 raise ValueError("high 與 low 必須一起提供")
@@ -193,9 +186,7 @@ def prepare_market_records(
                 "valuation_close": last_close,
                 "valuation_price_date": last_close_date,
                 "market_status": (
-                    "CONFIRMED_HALT" if is_halted
-                    else "NO_PRICE" if no_price
-                    else "NORMAL"
+                    "CONFIRMED_HALT" if is_halted else "NO_PRICE" if no_price else "NORMAL"
                 ),
             }
         )
@@ -203,6 +194,7 @@ def prepare_market_records(
         prepared.append(row)
 
     return prepared
+
 
 def prepare_backtest_market(
     records_by_stock,
@@ -223,19 +215,12 @@ def prepare_backtest_market(
             raise ValueError(f"{stock_id} 的行情混入其他股票")
 
         prepared = prepare_market_records(
-            [
-                record
-                for record in records
-                if date.fromisoformat(record["date"]) <= end
-            ],
+            [record for record in records if date.fromisoformat(record["date"]) <= end],
             confirmed_halts=confirmed_halts,
             allow_unpriced_halt=True,
         )
 
-        market[stock_id] = {
-            record["date"]: record
-            for record in prepared
-        }
+        market[stock_id] = {record["date"]: record for record in prepared}
 
         trading_dates.update(
             record["date"]
@@ -256,4 +241,3 @@ def prepare_backtest_market(
                 )
 
     return market, sorted(trading_dates)
-

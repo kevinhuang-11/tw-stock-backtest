@@ -3,9 +3,6 @@ from decimal import Decimal
 
 from tw_stock_backtest.analysis.forward_returns import (
     evaluate_forward_return,
-)
-from tw_stock_backtest.analysis.forward_returns import (
-    evaluate_forward_return,
     evaluate_rankings,
 )
 
@@ -80,11 +77,7 @@ class TestForwardReturn(unittest.TestCase):
 
     def test_missing_exit_does_not_shift_date(self):
         # 缺少第 2 日行情，但共用日期清單仍保留這一天。
-        self.records = [
-            row
-            for row in self.records
-            if row["date"] != "2024-01-04"
-        ]
+        self.records = [row for row in self.records if row["date"] != "2024-01-04"]
 
         result = self.evaluate(horizon=2)
 
@@ -141,6 +134,7 @@ class TestForwardReturn(unittest.TestCase):
                         horizon=5,
                     )
 
+
 class TestRankingEvaluation(unittest.TestCase):
     def setUp(self):
         self.dates = [
@@ -169,14 +163,16 @@ class TestRankingEvaluation(unittest.TestCase):
             )
         }
 
-        self.history = [{
-            "date": "2024-01-02",
-            "candidates": [
-                {"stock_id": "AAA"},
-                {"stock_id": "BBB"},
-            ],
-            "errors": {},
-        }]
+        self.history = [
+            {
+                "date": "2024-01-02",
+                "candidates": [
+                    {"stock_id": "AAA"},
+                    {"stock_id": "BBB"},
+                ],
+                "errors": {},
+            }
+        ]
 
     def evaluate(self, top_ns=(1, 2)):
         return evaluate_rankings(
@@ -191,24 +187,14 @@ class TestRankingEvaluation(unittest.TestCase):
         result = self.evaluate()
         first, second = result["summaries"]
 
-        self.assertEqual(
-            first["average_selected_return"], Decimal("0.2")
-        )
-        self.assertEqual(
-            first["average_universe_return"], Decimal("0.05")
-        )
-        self.assertEqual(
-            first["average_excess_return"], Decimal("0.15")
-        )
+        self.assertEqual(first["average_selected_return"], Decimal("0.2"))
+        self.assertEqual(first["average_universe_return"], Decimal("0.05"))
+        self.assertEqual(first["average_excess_return"], Decimal("0.15"))
         self.assertEqual(first["outperform_ratio"], Decimal("1"))
 
         # 前兩名等於整個兩檔股票池，報酬差應為零。
-        self.assertEqual(
-            second["average_selected_return"], Decimal("0.05")
-        )
-        self.assertEqual(
-            second["average_excess_return"], Decimal("0")
-        )
+        self.assertEqual(second["average_selected_return"], Decimal("0.05"))
+        self.assertEqual(second["average_excess_return"], Decimal("0"))
         self.assertEqual(second["outperform_ratio"], Decimal("0"))
 
     def test_insufficient_candidates_are_not_filled(self):
@@ -259,11 +245,13 @@ class TestRankingEvaluation(unittest.TestCase):
         )
 
     def test_tail_dates_are_excluded_from_average(self):
-        self.history.append({
-            "date": "2024-01-04",
-            "candidates": [{"stock_id": "AAA"}],
-            "errors": {},
-        })
+        self.history.append(
+            {
+                "date": "2024-01-04",
+                "candidates": [{"stock_id": "AAA"}],
+                "errors": {},
+            }
+        )
 
         result = self.evaluate(top_ns=(1,))
 
@@ -271,9 +259,8 @@ class TestRankingEvaluation(unittest.TestCase):
         self.assertEqual(summary["signal_days"], 2)
         self.assertEqual(summary["evaluated_days"], 1)
         self.assertEqual(summary["unavailable_days"], 1)
-        self.assertEqual(
-            summary["average_selected_return"], Decimal("0.2")
-        )
+        self.assertEqual(summary["average_selected_return"], Decimal("0.2"))
+
 
 if __name__ == "__main__":
     unittest.main()

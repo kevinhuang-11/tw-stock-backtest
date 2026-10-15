@@ -1,4 +1,5 @@
 """新版頁面：能開啟、內容正確、導覽不連到不存在的頁面。"""
+
 import json
 import re
 import unittest
@@ -6,6 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from test_end_to_end import TEST_CONFIG
+
 from tw_stock_backtest.strategies import from_settings
 from tw_stock_backtest.web_views import created_at, describe_report, report_list
 from tw_stock_backtest.workbench import Workbench, create_app
@@ -32,39 +34,91 @@ class PageCase(unittest.TestCase):
 
     def add_research(self, name="20260929T010000_000000Z_aaaaaaaa", day="2026-09-29"):
         folder = self.reports / name
-        write(folder, "summary.json", {
-            "report_complete": True, "status": "success", "analysis_date": day,
-            "strategy_snapshot": SNAPSHOT, "ranking_mode": "factors",
-            "counts": {"requested": 2, "evaluated": 2, "excluded": 0, "ranked": 2},
-            "ranking_population": ["2330", "2317"], "evaluations": [], "excluded": [],
-        })
-        write(folder, "rankings.json", [
-            {"rank": 1, "stock_id": "2330", "date": day, "score": "66.66666666666666666666666667",
-             "factors": {}, "factor_scores": {}},
-            {"rank": 2, "stock_id": "2317", "date": day, "score": "33.3", "factors": {}, "factor_scores": {}},
-        ])
-        write(folder, "universe.json", {"source": "stocks", "stocks": [
-            {"stock_id": "2330", "name": "測試甲", "industry": "測試"},
-            {"stock_id": "2317", "name": "測試乙", "industry": "測試"}]})
+        write(
+            folder,
+            "summary.json",
+            {
+                "report_complete": True,
+                "status": "success",
+                "analysis_date": day,
+                "strategy_snapshot": SNAPSHOT,
+                "ranking_mode": "factors",
+                "counts": {"requested": 2, "evaluated": 2, "excluded": 0, "ranked": 2},
+                "ranking_population": ["2330", "2317"],
+                "evaluations": [],
+                "excluded": [],
+            },
+        )
+        write(
+            folder,
+            "rankings.json",
+            [
+                {
+                    "rank": 1,
+                    "stock_id": "2330",
+                    "date": day,
+                    "score": "66.66666666666666666666666667",
+                    "factors": {},
+                    "factor_scores": {},
+                },
+                {
+                    "rank": 2,
+                    "stock_id": "2317",
+                    "date": day,
+                    "score": "33.3",
+                    "factors": {},
+                    "factor_scores": {},
+                },
+            ],
+        )
+        write(
+            folder,
+            "universe.json",
+            {
+                "source": "stocks",
+                "stocks": [
+                    {"stock_id": "2330", "name": "測試甲", "industry": "測試"},
+                    {"stock_id": "2317", "name": "測試乙", "industry": "測試"},
+                ],
+            },
+        )
         write(folder, "settings.json", {"settings": {}})
         return folder
 
     def add_backtest(self, name="20260930T020000_000000Z_bbbbbbbb", total="0.1076", events=None):
         folder = self.reports / name
-        performance = {"total_return": total, "max_drawdown": "0.0928",
-                       "invested_days": 18, "average_exposure": "0.76"}
-        write(folder, "settings.json", {"requested_start": "2026-09-01", "requested_end": "2026-09-29",
-                                        "strategy_snapshot": SNAPSHOT, "settings": {}})
+        performance = {
+            "total_return": total,
+            "max_drawdown": "0.0928",
+            "invested_days": 18,
+            "average_exposure": "0.76",
+        }
+        write(
+            folder,
+            "settings.json",
+            {
+                "requested_start": "2026-09-01",
+                "requested_end": "2026-09-29",
+                "strategy_snapshot": SNAPSHOT,
+                "settings": {},
+            },
+        )
         result = {"market_events": events} if events else {}
-        write(folder, "results.json", {"strategy": {"performance": performance, "result": result},
-                                       "benchmark": {"performance": {**performance, "total_return": "0.05"}}})
+        write(
+            folder,
+            "results.json",
+            {
+                "strategy": {"performance": performance, "result": result},
+                "benchmark": {"performance": {**performance, "total_return": "0.05"}},
+            },
+        )
         write(folder, "input_data.json", {})
         (folder / "trades.csv").write_text("", encoding="utf-8")
         (folder / "equity.csv").write_text("", encoding="utf-8")
         return folder
 
     def nav_links(self, text):
-        nav = text[text.index('<nav class="site-nav"'):text.index("</nav>")]
+        nav = text[text.index('<nav class="site-nav"') : text.index("</nav>")]
         return re.findall(r'<a href="([^"]+)"', nav)
 
     def assert_navigation_works(self, text):
@@ -120,7 +174,9 @@ class ReportListTests(PageCase):
         self.assertIn('action="/compare"', text)
         keys = re.findall(r'<option value="([0-9a-f]{24})"', text)
         self.assertEqual(len(set(keys)), 2)
-        self.assertEqual(self.client.get(f"/compare?left={keys[0]}&right={keys[1]}").status_code, 200)
+        self.assertEqual(
+            self.client.get(f"/compare?left={keys[0]}&right={keys[1]}").status_code, 200
+        )
 
     def test_falling_return_uses_green_and_missing_metric_shows_dash(self):
         self.add_backtest(total="-0.0321")
@@ -135,7 +191,9 @@ class NewResearchPageTests(PageCase):
         page = self.client.get("/new/research")
         self.assertEqual(page.status_code, 200)
         text = page.text
-        form = text[text.index('<form class="card" method="post" action="/jobs">'):text.index("</form>")]
+        form = text[
+            text.index('<form class="card" method="post" action="/jobs">') : text.index("</form>")
+        ]
         self.assertIn('name="kind" value="research"', form)
         for name in ("csrf", "strategy_id", "stocks", "as_of", "partial", "download"):
             with self.subTest(field=name):
@@ -146,10 +204,13 @@ class NewResearchPageTests(PageCase):
 
     def test_submitting_the_form_creates_a_research_job(self):
         from unittest.mock import Mock
+
         self.workbench.runner = Mock(return_value=Mock(returncode=0))
         text = self.client.get("/new/research").text
         token = re.search('name="csrf" value="([^"]+)"', text)[1]
-        response = self.client.post("/jobs", data={"csrf": token, "kind": "research", "stocks": "2330"})
+        response = self.client.post(
+            "/jobs", data={"csrf": token, "kind": "research", "stocks": "2330"}
+        )
         self.assertEqual(response.status_code, 302)
         self.workbench.pool.shutdown(wait=True)
         jobs = self.workbench.jobs()
@@ -174,11 +235,17 @@ class NewResearchPageTests(PageCase):
 class NewBacktestPageTests(PageCase):
     def add_strategies(self, *ids):
         for sid in ids:
-            self.workbench.library.save({**from_settings(self.workbench.settings), "id": sid, "name": sid})
+            self.workbench.library.save(
+                {**from_settings(self.workbench.settings), "id": sid, "name": sid}
+            )
 
     def forms(self, text):
-        return {re.search(r'name="kind" value="([a-z_]+)"', form)[1]: form
-                for form in re.findall(r'<form class="card" method="post" action="/jobs">.*?</form>', text, re.S)}
+        return {
+            re.search(r'name="kind" value="([a-z_]+)"', form)[1]: form
+            for form in re.findall(
+                r'<form class="card" method="post" action="/jobs">.*?</form>', text, re.S
+            )
+        }
 
     def test_three_forms_post_the_same_fields_as_before(self):
         self.add_strategies("first", "second")
@@ -187,8 +254,19 @@ class NewBacktestPageTests(PageCase):
         forms = self.forms(page.text)
         self.assertEqual(set(forms), {"backtest", "comparison", "period_comparison"})
         expected = {
-            "backtest": ("csrf", "strategy_id", "ranking", "stocks", "start", "end", "cash",
-                         "quantity", "max_positions", "sizing", "slippage_percent"),
+            "backtest": (
+                "csrf",
+                "strategy_id",
+                "ranking",
+                "stocks",
+                "start",
+                "end",
+                "cash",
+                "quantity",
+                "max_positions",
+                "sizing",
+                "slippage_percent",
+            ),
             "comparison": ("csrf", "strategies", "stocks", "start", "end"),
             "period_comparison": ("csrf", "strategies", "stocks", "periods"),
         }
@@ -209,19 +287,33 @@ class NewBacktestPageTests(PageCase):
                 self.assertNotIn("<select", forms[kind].split('name="strategies"')[0][-200:])
                 self.assertNotIn("multiple", forms[kind])
                 self.assertEqual(
-                    re.findall(r'<input type="checkbox" name="strategies" value="([a-z_]+)">', forms[kind]),
-                    ["first", "second"])
+                    re.findall(
+                        r'<input type="checkbox" name="strategies" value="([a-z_]+)">', forms[kind]
+                    ),
+                    ["first", "second"],
+                )
 
     def test_checkbox_selection_is_accepted_by_the_unchanged_backend(self):
         from unittest.mock import Mock
+
         self.add_strategies("first", "second")
         self.workbench.runner = Mock(return_value=Mock(returncode=0))
         token = re.search('name="csrf" value="([^"]+)"', self.client.get("/new/backtest").text)[1]
-        base = {"csrf": token, "kind": "comparison", "stocks": "2330",
-                "start": "2026-09-01", "end": "2026-09-29"}
+        base = {
+            "csrf": token,
+            "kind": "comparison",
+            "stocks": "2330",
+            "start": "2026-09-01",
+            "end": "2026-09-29",
+        }
         # 勾選框以多個同名欄位送出，與原本的多選清單相同。
-        self.assertEqual(self.client.post("/jobs", data={**base, "strategies": ["first", "second"]}).status_code, 302)
-        self.assertEqual(self.client.post("/jobs", data={**base, "strategies": ["first"]}).status_code, 400)
+        self.assertEqual(
+            self.client.post("/jobs", data={**base, "strategies": ["first", "second"]}).status_code,
+            302,
+        )
+        self.assertEqual(
+            self.client.post("/jobs", data={**base, "strategies": ["first"]}).status_code, 400
+        )
         self.workbench.pool.shutdown(wait=True)
         self.assertEqual([job["kind"] for job in self.workbench.jobs()], ["comparison"])
 
@@ -245,6 +337,7 @@ class HomePageTests(PageCase):
 
     def test_recent_reports_and_jobs_replace_the_getting_started_steps(self):
         from unittest.mock import Mock
+
         self.add_research()
         self.add_backtest()
         self.workbench.runner = Mock(return_value=Mock(returncode=0))
@@ -267,9 +360,19 @@ class HomePageTests(PageCase):
     def test_running_jobs_can_still_be_cancelled_from_the_home_page(self):
         directory = self.workbench.state / ("a" * 32)
         directory.mkdir(parents=True)
-        (directory / "job.json").write_text(json.dumps({
-            "run_id": "a" * 32, "kind": "backtest", "status": "running", "stocks": ["2330"],
-            "notification": "pending", "started_at": "2026-10-14T02:00:00+00:00"}), encoding="utf-8")
+        (directory / "job.json").write_text(
+            json.dumps(
+                {
+                    "run_id": "a" * 32,
+                    "kind": "backtest",
+                    "status": "running",
+                    "stocks": ["2330"],
+                    "notification": "pending",
+                    "started_at": "2026-10-14T02:00:00+00:00",
+                }
+            ),
+            encoding="utf-8",
+        )
         text = self.client.get("/").text
         self.assertIn(f'action="/jobs/{"a" * 32}/cancel"', text)
         self.assertIn('name="csrf"', text)
@@ -285,11 +388,16 @@ class ResearchReportPageTests(PageCase):
         key = self.key()
         text = self.client.get(f"/reports/{key}").text
         self.assertIn("候選股總覽", text)
-        self.assertIn(f'<a class="cell-main" href="/stocks/2330?report={key}">2330 測試甲</a>', text)
+        self.assertIn(
+            f'<a class="cell-main" href="/stocks/2330?report={key}">2330 測試甲</a>', text
+        )
         self.assertIn('<td class="num">66.67</td>', text)
         self.assertNotIn("66.66666666666666666666666667", text.split("原始資料")[0])
-        for href in (f"/reports/{key}/preview?top=10", f"/reports/{key}/csv",
-                     "/new/research?stocks=2317+2330&strategy_id=baseline"):
+        for href in (
+            f"/reports/{key}/preview?top=10",
+            f"/reports/{key}/csv",
+            "/new/research?stocks=2317+2330&strategy_id=baseline",
+        ):
             self.assertIn(f'href="{href}"', text)
         self.assertIn('aria-current="page"', text.split("</nav>")[0].split("報表</a>")[0][-200:])
         self.assert_navigation_works(text)
@@ -297,7 +405,9 @@ class ResearchReportPageTests(PageCase):
     def test_top_search_and_sort_still_work(self):
         self.add_research()
         key = self.key()
-        self.assertEqual(self.client.get(f"/reports/{key}?top=1").text.count('class="cell-main"'), 1)
+        self.assertEqual(
+            self.client.get(f"/reports/{key}?top=1").text.count('class="cell-main"'), 1
+        )
         self.assertEqual(self.client.get(f"/reports/{key}?top=99").status_code, 400)
         full = self.client.get(f"/reports/{key}?q=2317").text.split('id="rankings"')[1]
         self.assertIn('href="/stocks/2317', full)
@@ -326,7 +436,9 @@ class BacktestReportPageTests(PageCase):
             "source,stock_id,signal_date,date,action,price,quantity,amount,commission,tax,cash_change,cash_after\n"
             "strategy,2330,2026-09-01,2026-09-02,BUY,100.5,1000,100500,143,0,-100643,899357\n"
             "strategy,2330,2026-09-10,2026-09-11,SELL,110,1000,110000,156,330,109514,1008871\n"
-            "benchmark,2330,,2026-09-01,BUY,99,1000,99000,141,0,-99141,900859\n", encoding="utf-8-sig")
+            "benchmark,2330,,2026-09-01,BUY,99,1000,99000,141,0,-99141,900859\n",
+            encoding="utf-8-sig",
+        )
         text = self.client.get(f"/reports/{self.key()}").text
         self.assertIn("回測 · 基準示例", text)
         self.assertIn('<div class="stat-value num">+10.76%</div>', text)
@@ -341,10 +453,23 @@ class BacktestReportPageTests(PageCase):
 
     def test_halts_and_no_price_days_are_listed_separately(self):
         # 舊報表的停牌事件沒有 market_status，仍顯示為已確認停牌。
-        self.add_backtest(events=[
-            {"stock_id": "2317", "date": "2026-09-03", "reason": "重大訊息待公布，暫停交易", "source": "x"},
-            {"stock_id": "1213", "date": "2026-09-14", "reason": "無成交價（原因未確認，不認定為停牌）",
-             "source": "y", "market_status": "NO_PRICE"}])
+        self.add_backtest(
+            events=[
+                {
+                    "stock_id": "2317",
+                    "date": "2026-09-03",
+                    "reason": "重大訊息待公布，暫停交易",
+                    "source": "x",
+                },
+                {
+                    "stock_id": "1213",
+                    "date": "2026-09-14",
+                    "reason": "無成交價（原因未確認，不認定為停牌）",
+                    "source": "y",
+                    "market_status": "NO_PRICE",
+                },
+            ]
+        )
         text = self.client.get(f"/reports/{self.key()}").text
         self.assertIn("停牌與無成交價日", text)
         self.assertIn('<span class="badge badge-warn">已確認停牌</span>', text)
@@ -362,13 +487,34 @@ class BacktestReportPageTests(PageCase):
         self.assertIn('<span class="num down">−3.21%</span>', text)
 
     def test_comparison_lists_strategies_and_benchmark(self):
-        write(self.reports / "20260930T030000_000000Z_cmp", "comparison.json", {
-            "kind": "comparison", "report_complete": True, "note": "不選出最佳策略。",
-            "common": {"stocks": ["2330"], "start": "2026-09-01", "end": "2026-09-29"},
-            "strategies": [{"id": "a", "name": "甲策略", "total_return": "0.0115", "max_drawdown": "0.0003",
-                            "fees_and_taxes": "40", "trades": 2, "average_exposure": "0.0213",
-                            "no_candidate_days": 0, "unavailable_days": 32}],
-            "benchmark": {"total_return": "0.05", "max_drawdown": "0.01", "average_exposure": "0.9"}})
+        write(
+            self.reports / "20260930T030000_000000Z_cmp",
+            "comparison.json",
+            {
+                "kind": "comparison",
+                "report_complete": True,
+                "note": "不選出最佳策略。",
+                "common": {"stocks": ["2330"], "start": "2026-09-01", "end": "2026-09-29"},
+                "strategies": [
+                    {
+                        "id": "a",
+                        "name": "甲策略",
+                        "total_return": "0.0115",
+                        "max_drawdown": "0.0003",
+                        "fees_and_taxes": "40",
+                        "trades": 2,
+                        "average_exposure": "0.0213",
+                        "no_candidate_days": 0,
+                        "unavailable_days": 32,
+                    }
+                ],
+                "benchmark": {
+                    "total_return": "0.05",
+                    "max_drawdown": "0.01",
+                    "average_exposure": "0.9",
+                },
+            },
+        )
         text = self.client.get(f"/reports/{self.key()}").text
         self.assertIn("策略比較 · 1 份策略", text)
         self.assertIn('<span class="num up">+1.15%</span>', text)
@@ -381,6 +527,7 @@ class BacktestReportPageTests(PageCase):
 class WatchlistPageTests(PageCase):
     def notes(self):
         from tw_stock_backtest.stock_research import Watchlist
+
         return Watchlist(self.workbench.state / "private" / "watchlist.sqlite3")
 
     def test_empty_watchlist_points_to_stock_search(self):
@@ -394,16 +541,16 @@ class WatchlistPageTests(PageCase):
     def test_forms_keep_their_fields_and_notes_stay_out_of_the_table(self):
         self.notes().save("2330", "PRIVATE_NOTE_ONLY", 0)
         text = self.client.get("/watchlist").text
-        snapshot = text[text.index('action="/watchlist/snapshot"'):].split("</form>")[0]
+        snapshot = text[text.index('action="/watchlist/snapshot"') :].split("</form>")[0]
         for name in ("csrf", "strategy_id", "as_of"):
             self.assertIn(f'name="{name}"', snapshot)
-        update = text[text.index('action="/watchlist/update"'):].split("</form>")[0]
+        update = text[text.index('action="/watchlist/update"') :].split("</form>")[0]
         for name in ("csrf", "update_kind", "start", "end", "revenue_start", "revenue_end"):
             self.assertIn(f'name="{name}"', update)
-        note = text[text.index('action="/watchlist/2330"'):].split("</form>")[0]
+        note = text[text.index('action="/watchlist/2330"') :].split("</form>")[0]
         for name in ("csrf", "revision", "note", "action"):
             self.assertIn(f'name="{name}"', note)
-        table = text[text.index('<table'):text.index('</table>')]
+        table = text[text.index("<table") : text.index("</table>")]
         self.assertIn("2330", table)
         self.assertNotIn("PRIVATE_NOTE_ONLY", table)
         self.assertIn("PRIVATE_NOTE_ONLY</textarea>", text)
@@ -412,8 +559,14 @@ class WatchlistPageTests(PageCase):
 
 
 class StockPageTests(PageCase):
-    TABS = ("chart-panel", "conditions-panel", "supplemental-research", "history-panel",
-            "backtest-panel", "note-panel")
+    TABS = (
+        "chart-panel",
+        "conditions-panel",
+        "supplemental-research",
+        "history-panel",
+        "backtest-panel",
+        "note-panel",
+    )
 
     def test_page_and_fragment_share_the_tabbed_panel(self):
         page = self.client.get("/stocks/2330").text
@@ -424,19 +577,35 @@ class StockPageTests(PageCase):
             for panel in self.TABS:
                 self.assertIn(f'role="tabpanel" id="{panel}"', text)
             # 原有的區塊標題保留給螢幕閱讀器與既有檢查。
-            for title in ("價格、成交量與指標", "策略條件與指標原始值", "研究與排名歷史",
-                          "使用既有引擎回測", "私人自選與筆記", "目前取得的月營收與法人資料"):
+            for title in (
+                "價格、成交量與指標",
+                "策略條件與指標原始值",
+                "研究與排名歷史",
+                "使用既有引擎回測",
+                "私人自選與筆記",
+                "目前取得的月營收與法人資料",
+            ):
                 self.assertIn(title, text)
         self.assertIn('href="/new/research?stocks=2330"', page)
         self.assert_navigation_works(page)
 
     def test_forms_keep_their_actions_and_fields(self):
         text = self.client.get("/stocks/2330").text
-        backtest = text[text.index('action="/stocks/2330/backtest"'):].split("</form>")[0]
-        for name in ("csrf", "stocks", "strategy_id", "start", "end", "cash", "quantity",
-                     "max_positions", "sizing", "slippage_percent"):
+        backtest = text[text.index('action="/stocks/2330/backtest"') :].split("</form>")[0]
+        for name in (
+            "csrf",
+            "stocks",
+            "strategy_id",
+            "start",
+            "end",
+            "cash",
+            "quantity",
+            "max_positions",
+            "sizing",
+            "slippage_percent",
+        ):
             self.assertIn(f'name="{name}"', backtest)
-        note = text[text.index('action="/watchlist/2330"'):].split("</form>")[0]
+        note = text[text.index('action="/watchlist/2330"') :].split("</form>")[0]
         for name in ("csrf", "revision", "note", "action"):
             self.assertIn(f'name="{name}"', note)
         self.assertIn('id="query-form"', text)
@@ -448,17 +617,33 @@ class StrategyPageTests(PageCase):
         self.workbench.library.save(from_settings(self.workbench.settings))
         text = self.client.get("/strategies?id=baseline").text
         self.assertIn('href="/strategies?id=baseline" aria-current="page"', text)
-        form = text[text.index('class="strategy-form'):].split("</form>")[0]
-        for key in ("short_window", "long_window", "momentum_window", "volatility_window",
-                    "momentum_weight", "trend_weight", "volatility_weight", "top_n"):
+        form = text[text.index('class="strategy-form') :].split("</form>")[0]
+        for key in (
+            "short_window",
+            "long_window",
+            "momentum_window",
+            "volatility_window",
+            "momentum_weight",
+            "trend_weight",
+            "volatility_weight",
+            "top_n",
+        ):
             self.assertIn(f'name="factors.{key}"', form)
-        for key in ("short_window", "long_window", "momentum_window", "volume_window",
-                    "min_volume_ratio", "top_n"):
+        for key in (
+            "short_window",
+            "long_window",
+            "momentum_window",
+            "volume_window",
+            "min_volume_ratio",
+            "top_n",
+        ):
             self.assertIn(f'name="screening.{key}"', form)
         for name in ("csrf", "id", "name", "ranking_mode", "description", "conditions", "replace"):
             self.assertIn(f'name="{name}"', form)
         # 欄位依閱讀順序：短窗口在長窗口之前。
-        self.assertLess(form.index('name="factors.short_window"'), form.index('name="factors.long_window"'))
+        self.assertLess(
+            form.index('name="factors.short_window"'), form.index('name="factors.long_window"')
+        )
         self.assertIn('class="copy-form', text)
         self.assertIn('class="import-form', text)
         self.assert_navigation_works(text)
@@ -475,9 +660,20 @@ class SmallPageTests(PageCase):
         self.add_research()
         self.add_research("20260922T010000_000000Z_cccccccc", "2026-09-22")
         keys = sorted(self.workbench.catalog())
-        urls = ["/", "/new/research", "/new/backtest", "/reports", "/watchlist", "/stocks",
-                "/stocks?q=2330", "/stocks/2330", "/stocks/2330/supplemental", "/strategies",
-                f"/reports/{keys[0]}", f"/compare?left={keys[0]}&right={keys[1]}"]
+        urls = [
+            "/",
+            "/new/research",
+            "/new/backtest",
+            "/reports",
+            "/watchlist",
+            "/stocks",
+            "/stocks?q=2330",
+            "/stocks/2330",
+            "/stocks/2330/supplemental",
+            "/strategies",
+            f"/reports/{keys[0]}",
+            f"/compare?left={keys[0]}&right={keys[1]}",
+        ]
         for url in urls:
             with self.subTest(url=url):
                 page = self.client.get(url)
@@ -496,9 +692,11 @@ class SmallPageTests(PageCase):
         write(self.reports / "half-written", "progress.json", {"status": "running"})
         (self.reports / "half-written.incomplete").mkdir()
         write(self.reports / "half-written.incomplete", "progress.json", {"status": "running"})
-        expected = {"half-written": "這份報表尚未完成或無法辨識",
-                    # 未完成的研究目錄依研究報表顯示，說明沒有排名與目前狀態。
-                    "half-written.incomplete": "這份研究沒有可顯示的排名"}
+        expected = {
+            "half-written": "這份報表尚未完成或無法辨識",
+            # 未完成的研究目錄依研究報表顯示，說明沒有排名與目前狀態。
+            "half-written.incomplete": "這份研究沒有可顯示的排名",
+        }
         for key, entry in self.workbench.catalog().items():
             with self.subTest(path=entry["path"].name):
                 text = self.client.get(f"/reports/{key}").text
@@ -514,16 +712,29 @@ class ReportDescriptionTests(unittest.TestCase):
 
     def test_each_kind_gets_a_title(self):
         cases = {
-            "策略比較 · 2 份策略": {"kind": "comparison", "status": "complete",
-                              "strategies": [{"id": "a"}, {"id": "b"}],
-                              "common": {"start": "2026-09-01", "end": "2026-09-29"}},
-            "跨期間比較 · 2 份策略": {"kind": "period_comparison", "status": "partial",
-                               "strategies": [{"id": "a"}, {"id": "b"}, {"id": "a"}],
-                               "periods": [{}, {}, {}]},
-            "自選快照 · 基準示例": {"kind": "watchlist", "status": "complete",
-                              "strategy_snapshot": SNAPSHOT, "counts": {"requested": 3, "eligible": 2}},
-            "營收與法人更新": {"kind": "supplemental", "status": "success",
-                          "identity": {"stocks": ["2330"]}},
+            "策略比較 · 2 份策略": {
+                "kind": "comparison",
+                "status": "complete",
+                "strategies": [{"id": "a"}, {"id": "b"}],
+                "common": {"start": "2026-09-01", "end": "2026-09-29"},
+            },
+            "跨期間比較 · 2 份策略": {
+                "kind": "period_comparison",
+                "status": "partial",
+                "strategies": [{"id": "a"}, {"id": "b"}, {"id": "a"}],
+                "periods": [{}, {}, {}],
+            },
+            "自選快照 · 基準示例": {
+                "kind": "watchlist",
+                "status": "complete",
+                "strategy_snapshot": SNAPSHOT,
+                "counts": {"requested": 3, "eligible": 2},
+            },
+            "營收與法人更新": {
+                "kind": "supplemental",
+                "status": "success",
+                "identity": {"stocks": ["2330"]},
+            },
             "未知類型": {"kind": "unknown", "status": "unreadable"},
             "研究排名": {"kind": "research", "status": "incomplete"},
         }
@@ -531,7 +742,9 @@ class ReportDescriptionTests(unittest.TestCase):
             with self.subTest(title=title):
                 self.assertEqual(self.describe(details)["title"], title)
         self.assertEqual(self.describe(cases["跨期間比較 · 2 份策略"])["subtitle"], "3 個期間")
-        self.assertEqual(self.describe(cases["自選快照 · 基準示例"])["subtitle"], "3 檔 · 通過 2 檔")
+        self.assertEqual(
+            self.describe(cases["自選快照 · 基準示例"])["subtitle"], "3 檔 · 通過 2 檔"
+        )
 
     def test_created_time_comes_from_the_folder_name(self):
         with TemporaryDirectory() as directory:
@@ -549,9 +762,11 @@ class ReportDescriptionTests(unittest.TestCase):
     def test_list_is_newest_first_and_filterable(self):
         with TemporaryDirectory() as directory:
             catalog = {}
-            for key, name, kind in (("a", "20260901T000000_000000Z_x", "research"),
-                                    ("b", "20260903T000000_000000Z_y", "backtest"),
-                                    ("c", "20260902T000000_000000Z_z", "research")):
+            for key, name, kind in (
+                ("a", "20260901T000000_000000Z_x", "research"),
+                ("b", "20260903T000000_000000Z_y", "backtest"),
+                ("c", "20260902T000000_000000Z_z", "research"),
+            ):
                 path = Path(directory) / name
                 path.mkdir()
                 catalog[key] = {"path": path, "details": {"kind": kind, "status": "incomplete"}}

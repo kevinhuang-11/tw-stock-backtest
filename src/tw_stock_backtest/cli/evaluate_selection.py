@@ -2,26 +2,24 @@ import argparse
 import sqlite3
 from collections import Counter
 
+from tw_stock_backtest.analysis.factors import (
+    calculate_factor_row,
+    rank_factor_candidates,
+)
+from tw_stock_backtest.analysis.forward_returns import evaluate_rankings
+from tw_stock_backtest.analysis.screening import evaluate_stock
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config
-from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.data.database import load_records
 from tw_stock_backtest.data.market_events import (
     CONFIRMED_HALTS,
     not_tradable_reason,
     prepare_backtest_market,
 )
-from tw_stock_backtest.analysis.screening import evaluate_stock
-from tw_stock_backtest.analysis.factors import (
-    calculate_factor_row,
-    rank_factor_candidates,
-)
-from tw_stock_backtest.analysis.forward_returns import evaluate_rankings
+from tw_stock_backtest.date_range import parse_date_range
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="評估候選股排名的後續價格報酬"
-    )
+    parser = argparse.ArgumentParser(description="評估候選股排名的後續價格報酬")
     parser.add_argument(
         "--config",
         default=str(DEFAULT_CONFIG_PATH),
@@ -73,10 +71,7 @@ def main():
             ("horizons", args.horizons),
             ("top", args.top),
         ):
-            if (
-                any(value <= 0 for value in values)
-                or len(set(values)) != len(values)
-            ):
+            if any(value <= 0 for value in values) or len(set(values)) != len(values):
                 raise ValueError(f"{name} 必須是正整數且不可重複")
 
         stocks = settings["universe"]["stocks"]
@@ -104,18 +99,11 @@ def main():
         )
 
         # 保留停牌與無成交價的列，供後續評估判斷起訖日是否可交易。
-        records_by_stock = {
-            stock_id: list(prices.values())
-            for stock_id, prices in market.items()
-        }
+        records_by_stock = {stock_id: list(prices.values()) for stock_id, prices in market.items()}
 
         # 排名指標的暖機資料保留不可交易的列，與研究排名使用同一套規則。
         histories = {
-            stock_id: [
-                record
-                for record in records
-                if record["date"] < start.isoformat()
-            ]
+            stock_id: [record for record in records if record["date"] < start.isoformat()]
             for stock_id, records in records_by_stock.items()
         }
 
@@ -176,9 +164,7 @@ def main():
             if errors:
                 candidates = []
             elif args.ranking == "rules":
-                candidates = [
-                    row for row in evaluations if row["selected"]
-                ]
+                candidates = [row for row in evaluations if row["selected"]]
                 candidates.sort(
                     key=lambda row: (
                         -row["momentum"],
@@ -191,11 +177,13 @@ def main():
                     weights=weights,
                 )
 
-            ranking_history.append({
-                "date": signal_date,
-                "candidates": candidates,
-                "errors": errors,
-            })
+            ranking_history.append(
+                {
+                    "date": signal_date,
+                    "candidates": candidates,
+                    "errors": errors,
+                }
+            )
 
         # 排名全部建立後，才使用後續價格進行事後評分。
         report = evaluate_rankings(
@@ -239,47 +227,25 @@ def main():
         top_n = summary["top_n"]
 
         print(f"\n觀察 {horizon} 日／前 {top_n} 名")
-        print(
-            f"有效訊號日：{summary['evaluated_days']}"
-            f"／{summary['signal_days']}"
-        )
-        print(
-            f"候選股平均價格報酬："
-            f"{format_percent(summary['average_selected_return'])}"
-        )
-        print(
-            f"股票池平均價格報酬："
-            f"{format_percent(summary['average_universe_return'])}"
-        )
+        print(f"有效訊號日：{summary['evaluated_days']}／{summary['signal_days']}")
+        print(f"候選股平均價格報酬：{format_percent(summary['average_selected_return'])}")
+        print(f"股票池平均價格報酬：{format_percent(summary['average_universe_return'])}")
 
         excess = summary["average_excess_return"]
-        excess_text = (
-            "--" if excess is None
-            else f"{excess * 100:+.2f} 個百分點"
-        )
+        excess_text = "--" if excess is None else f"{excess * 100:+.2f} 個百分點"
         print(f"平均報酬差：{excess_text}")
-        print(
-            f"候選組合報酬為正的比例："
-            f"{format_percent(summary['positive_return_ratio'])}"
-        )
-        print(
-            f"候選組合勝過股票池的比例："
-            f"{format_percent(summary['outperform_ratio'])}"
-        )
+        print(f"候選組合報酬為正的比例：{format_percent(summary['positive_return_ratio'])}")
+        print(f"候選組合勝過股票池的比例：{format_percent(summary['outperform_ratio'])}")
 
         valid_rows = [
-            row for row in report["details"]
-            if row["horizon"] == horizon
-            and row["top_n"] == top_n
-            and row["status"] == "ok"
+            row
+            for row in report["details"]
+            if row["horizon"] == horizon and row["top_n"] == top_n and row["status"] == "ok"
         ]
-        counts = Counter(
-            row["selected_count"] for row in valid_rows
+        counts = Counter(row["selected_count"] for row in valid_rows)
+        counts_text = (
+            "、".join(f"{count} 檔：{days} 日" for count, days in sorted(counts.items())) or "無"
         )
-        counts_text = "、".join(
-            f"{count} 檔：{days} 日"
-            for count, days in sorted(counts.items())
-        ) or "無"
         print(f"有效樣本實際候選數：{counts_text}")
 
         for reason, count in summary["unavailable_reasons"].items():

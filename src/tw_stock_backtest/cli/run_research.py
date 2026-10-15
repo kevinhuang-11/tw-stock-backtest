@@ -1,16 +1,28 @@
 """一次完成增量更新、共同日期評分與研究報表。"""
+
 import argparse
 import json
+import sqlite3
 from datetime import date, datetime, timezone
 from pathlib import Path
-import sqlite3
 
-from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config, apply_overrides
-from tw_stock_backtest.data.universe import load_universe, is_synthetic, ensure_network_allowed, NetworkDisabled, universe_path_for
+from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, apply_overrides, load_config
+from tw_stock_backtest.data.universe import (
+    NetworkDisabled,
+    ensure_network_allowed,
+    is_synthetic,
+    load_universe,
+    universe_path_for,
+)
 from tw_stock_backtest.reporting import ResearchReport
 from tw_stock_backtest.research import (
-    taipei_today, program_version, update_stocks, evaluate_research,
-    build_update_plans, load_research_progress, job_identity,
+    build_update_plans,
+    evaluate_research,
+    job_identity,
+    load_research_progress,
+    program_version,
+    taipei_today,
+    update_stocks,
 )
 
 
@@ -62,52 +74,81 @@ def main(argv=None):
             raise ValueError("skip-download 不可搭配 start 或 resume")
         if args.limit is not None and (not args.universe or args.limit <= 0):
             raise ValueError("limit 必須為正整數且搭配 universe")
-        settings = apply_overrides(load_config(args.config), {
-            "universe": {"stocks": args.stocks},
-            "factors": {"top_n": args.top},
-            "storage": {"database_path": Path(args.database).resolve() if args.database else None},
-        })
+        settings = apply_overrides(
+            load_config(args.config),
+            {
+                "universe": {"stocks": args.stocks},
+                "factors": {"top_n": args.top},
+                "storage": {
+                    "database_path": Path(args.database).resolve() if args.database else None
+                },
+            },
+        )
         strategy = None
         if args.strategy:
-            from tw_stock_backtest.strategies import load_strategy, effective_settings
+            from tw_stock_backtest.strategies import effective_settings, load_strategy
+
             strategy = load_strategy(args.strategy)
             settings = effective_settings(settings, strategy, args.top)
             if args.top is not None:
-                strategy['factors']['top_n'] = strategy['screening']['top_n'] = args.top
+                strategy["factors"]["top_n"] = strategy["screening"]["top_n"] = args.top
         snapshot = load_universe(args.universe) if args.universe else None
         if not args.skip_download:
             # 合成示例（行情庫旁或指定的名單）不連網；在建立報表目錄前就停止。
             if snapshot and is_synthetic(snapshot):
-                raise NetworkDisabled('指定的名單是合成示例，不提供連網更新；請加 --skip-download')
+                raise NetworkDisabled("指定的名單是合成示例，不提供連網更新；請加 --skip-download")
             ensure_network_allowed(settings["storage"]["database_path"])
-        stocks = sorted(snapshot["stocks"], key=lambda s: s["stock_id"]) if snapshot else [
-            {"stock_id": sid, "name": "", "industry": ""} for sid in settings["universe"]["stocks"]]
-        stocks = [{k: s[k] for k in ("stock_id", "name", "industry", "listed_date") if k in s}
-                  for s in stocks]
+        stocks = (
+            sorted(snapshot["stocks"], key=lambda s: s["stock_id"])
+            if snapshot
+            else [
+                {"stock_id": sid, "name": "", "industry": ""}
+                for sid in settings["universe"]["stocks"]
+            ]
+        )
+        stocks = [
+            {k: s[k] for k in ("stock_id", "name", "industry", "listed_date") if k in s}
+            for s in stocks
+        ]
         if args.limit:
-            stocks = stocks[:args.limit]
+            stocks = stocks[: args.limit]
         if not stocks:
             raise ValueError("股票池不可為空")
         settings["universe"]["stocks"] = [s["stock_id"] for s in stocks]
         version = program_version()
-        job = {"cutoff": cutoff.isoformat(), "requested_as_of": args.as_of,
-               "start": args.start, "initial_days": args.initial_days,
-               "stocks": stocks, "settings": settings,
-               "allow_partial": args.allow_partial, "commit": version["commit"]}
+        job = {
+            "cutoff": cutoff.isoformat(),
+            "requested_as_of": args.as_of,
+            "start": args.start,
+            "initial_days": args.initial_days,
+            "stocks": stocks,
+            "settings": settings,
+            "allow_partial": args.allow_partial,
+            "commit": version["commit"],
+        }
         if strategy is not None:
             from tw_stock_backtest.strategies import snapshot as strategy_snapshot
-            job['strategy_snapshot'] = strategy_snapshot(strategy)
+
+            job["strategy_snapshot"] = strategy_snapshot(strategy)
         plans, previous = [], []
         if args.resume:
             plans, previous = load_research_progress(args.resume, job)
         elif not args.skip_download:
-            plans = build_update_plans(stocks, settings, cutoff, start=start,
-                                       initial_days=args.initial_days)
+            plans = build_update_plans(
+                stocks, settings, cutoff, start=start, initial_days=args.initial_days
+            )
         report = ResearchReport(args.output_dir)
-        report.write_json("settings.json", {
-            "settings": settings, "parameters": vars(args), "version": version, "run_id": report.run_id,
-            "started_at": started, "taipei_today": today,
-        })
+        report.write_json(
+            "settings.json",
+            {
+                "settings": settings,
+                "parameters": vars(args),
+                "version": version,
+                "run_id": report.run_id,
+                "started_at": started,
+                "taipei_today": today,
+            },
+        )
         # 以代號或設定檔指定股票池時沒有名稱；從行情庫旁的名單補上，只供報表顯示。
         # 不放進 job，避免改變 resume 的工作識別；名單不存在或無法讀取時維持空白。
         listed_names = {}
@@ -118,41 +159,88 @@ def main(argv=None):
                     listed_names = {s["stock_id"]: s for s in load_universe(listed)["stocks"]}
             except (ValueError, OSError):
                 listed_names = {}
+
         def described(stock):
-            row = {k: stock[k] for k in ("stock_id", "name", "industry", "listed_date") if k in stock}
+            row = {
+                k: stock[k] for k in ("stock_id", "name", "industry", "listed_date") if k in stock
+            }
             known = listed_names.get(stock["stock_id"], {})
             for key in ("name", "industry"):
                 if not row.get(key) and known.get(key):
                     row[key] = known[key]
             return row
+
         # 名單採白名單欄位，避免將來源檔的任意額外欄位寫入 artifacts。
-        report.write_json("universe.json", {
-            "source": (snapshot["source_url"] if is_synthetic(snapshot) else "universe_file") if snapshot else "stocks" if args.stocks else "config",
-            "downloaded_at": snapshot["downloaded_at"] if snapshot else None,
-            "stocks": [described(s) for s in stocks],
-        })
+        report.write_json(
+            "universe.json",
+            {
+                "source": (snapshot["source_url"] if is_synthetic(snapshot) else "universe_file")
+                if snapshot
+                else "stocks"
+                if args.stocks
+                else "config",
+                "downloaded_at": snapshot["downloaded_at"] if snapshot else None,
+                "stocks": [described(s) for s in stocks],
+            },
+        )
+
         def progress(rows, status="running"):
-            report.write_json("progress.json", {
-                "schema_version": 1, "kind": "research", "run_id": report.run_id,
-                "job": job, "job_id": job_identity(job), "plans": plans,
-                "status": status, "downloads": rows,
-            })
+            report.write_json(
+                "progress.json",
+                {
+                    "schema_version": 1,
+                    "kind": "research",
+                    "run_id": report.run_id,
+                    "job": job,
+                    "job_id": job_identity(job),
+                    "plans": plans,
+                    "status": status,
+                    "downloads": rows,
+                },
+            )
+
         progress(previous)
-        downloads = [] if args.skip_download else update_stocks(
-            stocks, settings, cutoff, start=start, initial_days=args.initial_days,
-            on_progress=progress, plans=plans, previous_results=previous,
+        downloads = (
+            []
+            if args.skip_download
+            else update_stocks(
+                stocks,
+                settings,
+                cutoff,
+                start=start,
+                initial_days=args.initial_days,
+                on_progress=progress,
+                plans=plans,
+                previous_results=previous,
+            )
         )
         result = evaluate_research(
-            stocks, settings, cutoff, as_of=args.as_of,
-            allow_partial=args.allow_partial, downloads=downloads, strategy=strategy,
+            stocks,
+            settings,
+            cutoff,
+            as_of=args.as_of,
+            allow_partial=args.allow_partial,
+            downloads=downloads,
+            strategy=strategy,
         )
         if strategy is None:
-            from tw_stock_backtest.strategies import from_settings, snapshot as strategy_snapshot
-            result['strategy_snapshot'] = strategy_snapshot(from_settings(settings))
-        result.update(run_id=report.run_id, version=version, requested_as_of=args.as_of,
-                      taipei_today=today, lag_from_today_days=(today-date.fromisoformat(result["analysis_date"])).days if result["analysis_date"] else None,
-                      started_at=started, finished_at=datetime.now(timezone.utc),
-                      downloads=downloads, skipped_download=args.skip_download)
+            from tw_stock_backtest.strategies import from_settings
+            from tw_stock_backtest.strategies import snapshot as strategy_snapshot
+
+            result["strategy_snapshot"] = strategy_snapshot(from_settings(settings))
+        result.update(
+            run_id=report.run_id,
+            version=version,
+            requested_as_of=args.as_of,
+            taipei_today=today,
+            lag_from_today_days=(today - date.fromisoformat(result["analysis_date"])).days
+            if result["analysis_date"]
+            else None,
+            started_at=started,
+            finished_at=datetime.now(timezone.utc),
+            downloads=downloads,
+            skipped_download=args.skip_download,
+        )
         progress(downloads, "finished")
         ranked = result["rankings"]
         output = report.finish(result)
@@ -162,7 +250,9 @@ def main(argv=None):
         print(f"評估統計：{result['counts']}")
         if result["analysis_date"] and result["analysis_date"] < today.isoformat():
             print("注意：使用歷史行情，並非今日分析。")
-        for row in ranked[:settings["factors" if result["ranking_mode"] == "factors" else "screening"]["top_n"]]:
+        for row in ranked[
+            : settings["factors" if result["ranking_mode"] == "factors" else "screening"]["top_n"]
+        ]:
             print(f"{row['rank']}. {row['stock_id']} {row['score']:.2f}")
         print(f"報表：{output}")
         return result["exit_code"]
@@ -174,11 +264,18 @@ def main(argv=None):
         print(f"研究流程失敗 ({type(error).__name__})")
         if report:
             try:
-                report.write_json("failure.json", {
-                    "status": "failed", "exit_code": 1, "report_complete": False,
-                    "error_type": type(error).__name__, "run_id": report.run_id, "started_at": started,
-                    "finished_at": datetime.now(timezone.utc),
-                })
+                report.write_json(
+                    "failure.json",
+                    {
+                        "status": "failed",
+                        "exit_code": 1,
+                        "report_complete": False,
+                        "error_type": type(error).__name__,
+                        "run_id": report.run_id,
+                        "started_at": started,
+                        "finished_at": datetime.now(timezone.utc),
+                    },
+                )
             except OSError:
                 pass
             print(f"未完成報表：{report.path}")

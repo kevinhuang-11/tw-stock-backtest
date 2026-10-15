@@ -4,7 +4,8 @@ from contextlib import closing
 from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from tw_stock_backtest.data.database import save_records, load_records
+
+from tw_stock_backtest.data.database import load_records, save_records
 
 
 class TestSaveRecords(unittest.TestCase):
@@ -44,17 +45,19 @@ class TestSaveRecords(unittest.TestCase):
         self.assertEqual(count, 1)
         self.assertEqual(
             self.read_rows(),
-            [(
-                "2330",
-                "2025-01-02",
-                "100.10",
-                "110.00",
-                "99.00",
-                "105.25",
-                1000,
-                105250,
-                10,
-            )],
+            [
+                (
+                    "2330",
+                    "2025-01-02",
+                    "100.10",
+                    "110.00",
+                    "99.00",
+                    "105.25",
+                    1000,
+                    105250,
+                    10,
+                )
+            ],
         )
 
     def test_repeated_save_does_not_duplicate(self):
@@ -188,6 +191,7 @@ class TestSaveRecords(unittest.TestCase):
         )
 
         self.assertEqual(result, [missing])
+
 
 if __name__ == "__main__":
     unittest.main()

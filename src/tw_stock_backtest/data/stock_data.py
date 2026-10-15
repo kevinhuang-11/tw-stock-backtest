@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
+
 def parse_twse_date(value):
     """將民國日期，例如 114/01/02，轉成 2025-01-02。"""
     roc_year, month, day = value.strip().split("/")
@@ -12,6 +13,7 @@ def parse_twse_date(value):
     )
 
     return result.isoformat()
+
 
 def parse_price(value):
     """將價格字串轉為 Decimal；無成交價格回傳 None。"""
@@ -45,6 +47,7 @@ def parse_nonnegative_integer(value):
 def parse_volume(value):
     """將成交股數字串轉為非負整數。"""
     return parse_nonnegative_integer(value)
+
 
 def normalize_row(stock_id, fields, row):
     """依欄位名稱，將證交所的一列行情轉成統一格式。"""

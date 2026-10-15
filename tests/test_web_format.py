@@ -1,4 +1,5 @@
 """顯示用格式化：只改畫面文字，缺值不當成零。"""
+
 import unittest
 from decimal import Decimal
 
@@ -38,8 +39,7 @@ class WebFormatTests(unittest.TestCase):
         self.assertEqual(fmt_signed("2.5", 1), "+2.5")
 
     def test_missing_or_invalid_values_are_not_shown_as_zero(self):
-        for value in (None, "", "None", "--", "abc", float("nan"),
-                      Decimal("Infinity"), True):
+        for value in (None, "", "None", "--", "abc", float("nan"), Decimal("Infinity"), True):
             with self.subTest(value=value):
                 self.assertEqual(fmt_number(value), MISSING)
                 self.assertEqual(fmt_percent(value), MISSING)
@@ -56,9 +56,7 @@ class WebFormatTests(unittest.TestCase):
             fmt_datetime("2026-10-14T02:41:38.905766+00:00"),
             "2026-10-14 10:41",
         )
-        self.assertEqual(
-            fmt_datetime("2026-10-14T10:41:38+08:00"), "2026-10-14 10:41"
-        )
+        self.assertEqual(fmt_datetime("2026-10-14T10:41:38+08:00"), "2026-10-14 10:41")
         self.assertEqual(fmt_datetime("2026-09-29"), "2026-09-29 00:00")
         self.assertEqual(fmt_datetime("not a date"), "not a date")
         self.assertEqual(fmt_datetime(None), MISSING)
@@ -78,6 +76,7 @@ class WebFormatTests(unittest.TestCase):
     def test_success_never_uses_the_falling_colour(self):
         # 下跌是綠色；成功與通過不能用 down 樣式，避免混淆。
         from tw_stock_backtest.web_format import STATUS
+
         self.assertNotIn("down", {kind for _, kind in STATUS.values()})
         self.assertNotIn("up", {kind for _, kind in STATUS.values()})
 

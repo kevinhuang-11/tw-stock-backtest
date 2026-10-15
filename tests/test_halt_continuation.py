@@ -17,10 +17,7 @@ class TestHaltContinuation(unittest.TestCase):
         }
 
         self.records = {
-            stock_id: [
-                self.normal(stock_id, day)
-                for day in range(1, 6)
-            ]
+            stock_id: [self.normal(stock_id, day) for day in range(1, 6)]
             for stock_id in ("AAA", "BBB")
         }
 
@@ -106,10 +103,7 @@ class TestHaltContinuation(unittest.TestCase):
             }
         )
 
-        actual = [
-            (trade["stock_id"], trade["action"], trade["date"])
-            for trade in result["trades"]
-        ]
+        actual = [(trade["stock_id"], trade["action"], trade["date"]) for trade in result["trades"]]
 
         self.assertEqual(
             actual,
@@ -134,17 +128,13 @@ class TestHaltContinuation(unittest.TestCase):
         resumed_calls = [
             call
             for call in mock_evaluate.call_args_list
-            if call.args[1] == "2026-01-04"
-            and call.args[0][-1]["stock_id"] == "AAA"
+            if call.args[1] == "2026-01-04" and call.args[0][-1]["stock_id"] == "AAA"
         ]
 
         self.assertEqual(len(resumed_calls), 1)
 
         # 停牌列保留在計算歷史中（不刪列），但不補價格；與研究排名同一套規則。
-        history = {
-            row["date"]: row
-            for row in resumed_calls[0].args[0]
-        }
+        history = {row["date"]: row for row in resumed_calls[0].args[0]}
         self.assertIn("2026-01-03", history)
         self.assertIsNone(history["2026-01-03"]["close"])
 
@@ -160,8 +150,7 @@ class TestHaltContinuation(unittest.TestCase):
         skipped = [
             order
             for order in result["skipped_orders"]
-            if order["date"] == "2026-01-03"
-            and order["stock_id"] == "BBB"
+            if order["date"] == "2026-01-03" and order["stock_id"] == "BBB"
         ]
 
         self.assertEqual(len(skipped), 1)
@@ -202,10 +191,7 @@ class TestHaltContinuation(unittest.TestCase):
             }
         )
 
-        actual = [
-            (trade["stock_id"], trade["action"], trade["date"])
-            for trade in result["trades"]
-        ]
+        actual = [(trade["stock_id"], trade["action"], trade["date"]) for trade in result["trades"]]
 
         self.assertEqual(
             actual,
@@ -243,10 +229,7 @@ class TestHaltContinuation(unittest.TestCase):
         )
 
         self.assertEqual(
-            [
-                (trade["stock_id"], trade["date"])
-                for trade in result["trades"]
-            ],
+            [(trade["stock_id"], trade["date"]) for trade in result["trades"]],
             [
                 ("BBB", "2026-01-03"),
                 ("AAA", "2026-01-04"),

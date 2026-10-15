@@ -4,11 +4,7 @@ from decimal import Decimal
 
 def summarize_performance(equity_curve, initial_cash):
     """根據每日收盤資產，計算基本績效統計。"""
-    if (
-        not isinstance(initial_cash, Decimal)
-        or not initial_cash.is_finite()
-        or initial_cash <= 0
-    ):
+    if not isinstance(initial_cash, Decimal) or not initial_cash.is_finite() or initial_cash <= 0:
         raise ValueError("初始資金必須是正值且有限的 Decimal")
 
     if not equity_curve:
@@ -32,30 +28,19 @@ def summarize_performance(equity_curve, initial_cash):
         equity = point["equity"]
         holdings = point["holdings"]
 
-        if (
-            previous_date is not None
-            and current_date <= previous_date
-        ):
+        if previous_date is not None and current_date <= previous_date:
             raise ValueError("資產紀錄日期必須遞增且不可重複")
 
         previous_date = current_date
 
-        if (
-            not isinstance(equity, Decimal)
-            or not equity.is_finite()
-            or equity < 0
-        ):
+        if not isinstance(equity, Decimal) or not equity.is_finite() or equity < 0:
             raise ValueError("總資產必須是非負且有限的 Decimal")
 
         if not isinstance(holdings, dict):
             raise ValueError("持股紀錄必須是字典")
 
         for quantity in holdings.values():
-            if (
-                isinstance(quantity, bool)
-                or not isinstance(quantity, int)
-                or quantity <= 0
-            ):
+            if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
                 raise ValueError("持股紀錄中的股數必須是正整數")
 
         if holdings:
@@ -71,9 +56,7 @@ def summarize_performance(equity_curve, initial_cash):
 
         running_peak = max(running_peak, equity)
 
-        drawdown = (
-            running_peak - equity
-        ) / running_peak
+        drawdown = (running_peak - equity) / running_peak
 
         max_drawdown = max(max_drawdown, drawdown)
 
@@ -90,10 +73,9 @@ def summarize_performance(equity_curve, initial_cash):
         "total_days": total_days,
         "invested_days": invested_days,
         "cash_only_days": total_days - invested_days,
-        "invested_day_ratio": (
-            Decimal(invested_days) / Decimal(total_days)
-        ),
+        "invested_day_ratio": (Decimal(invested_days) / Decimal(total_days)),
     }
+
 
 def summarize_exposure(equity_curve):
     """計算每日收盤持股市值占比，包含空手日。"""
@@ -110,29 +92,16 @@ def summarize_exposure(equity_curve):
             ("總資產", equity),
             ("持股市值", market_value),
         ):
-            if (
-                not isinstance(value, Decimal)
-                or not value.is_finite()
-                or value < 0
-            ):
-                raise ValueError(
-                    f"{name}必須是非負的有限 Decimal"
-                )
+            if not isinstance(value, Decimal) or not value.is_finite() or value < 0:
+                raise ValueError(f"{name}必須是非負的有限 Decimal")
 
         if market_value > equity:
             raise ValueError("持股市值不可超過總資產")
 
-        ratio = (
-            market_value / equity
-            if equity > 0
-            else Decimal("0")
-        )
+        ratio = market_value / equity if equity > 0 else Decimal("0")
         ratios.append(ratio)
 
     return {
-        "average_exposure": (
-            sum(ratios, Decimal("0")) / Decimal(len(ratios))
-        ),
+        "average_exposure": (sum(ratios, Decimal("0")) / Decimal(len(ratios))),
         "max_exposure": max(ratios),
     }
-

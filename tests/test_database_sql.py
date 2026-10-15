@@ -1,4 +1,5 @@
 """行情庫的索引與查詢計畫；全部使用臨時資料庫與合成資料。"""
+
 import contextlib
 import io
 import sqlite3
@@ -11,10 +12,16 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from test_end_to_end import TEST_CONFIG
+
 from tw_stock_backtest.cli import migrate_db
 from tw_stock_backtest.data import database
 from tw_stock_backtest.data.database import (
-    INDEXES, SCHEMA_VERSION, load_records, migrate_database, read_schema_version, save_records,
+    INDEXES,
+    SCHEMA_VERSION,
+    load_records,
+    migrate_database,
+    read_schema_version,
+    save_records,
 )
 
 # 舊版程式（schema 版本機制之前）建立行情表的原文；user_version 維持 0。
@@ -36,23 +43,41 @@ LEGACY_TABLE = """
 DATES = ("2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06")
 
 
-def synthetic_records(stocks=("2330", "2317", "1101"), dates=DATES, missing=(("1101", "2026-03-04"),)):
+def synthetic_records(
+    stocks=("2330", "2317", "1101"), dates=DATES, missing=(("1101", "2026-03-04"),)
+):
     records = []
     for stock_id in stocks:
         for day in dates:
             price = None if (stock_id, day) in missing else Decimal("10.5")
-            records.append({"stock_id": stock_id, "date": day, "open": price, "high": price,
-                            "low": price, "close": price, "volume": 100, "turnover": 1000,
-                            "trade_count": 3})
+            records.append(
+                {
+                    "stock_id": stock_id,
+                    "date": day,
+                    "open": price,
+                    "high": price,
+                    "low": price,
+                    "close": price,
+                    "volume": 100,
+                    "turnover": 1000,
+                    "trade_count": 3,
+                }
+            )
     return records
 
 
 # 依日期的查詢：行情日清單、某日之後的行情日數、某日的所有股票、缺價列。
 DATE_QUERIES = {
     "market_dates": ("SELECT DISTINCT date FROM stock_prices ORDER BY date", ()),
-    "market_days_after": ("SELECT COUNT(DISTINCT date) FROM stock_prices WHERE date > ?", ("2026-03-03",)),
+    "market_days_after": (
+        "SELECT COUNT(DISTINCT date) FROM stock_prices WHERE date > ?",
+        ("2026-03-03",),
+    ),
     "rows_on_date": ("SELECT stock_id, close FROM stock_prices WHERE date = ?", ("2026-03-04",)),
-    "missing_closes": ("SELECT stock_id, date FROM stock_prices WHERE close IS NULL ORDER BY stock_id, date", ()),
+    "missing_closes": (
+        "SELECT stock_id, date FROM stock_prices WHERE close IS NULL ORDER BY stock_id, date",
+        (),
+    ),
 }
 
 
@@ -74,14 +99,18 @@ class IndexTests(unittest.TestCase):
         # 刪除後要換新連線：sqlite3 模組會快取相同 SQL 的已編譯敘述，舊連線可能沿用舊計畫。
         with self.connect() as connection:
             for (name,) in connection.execute(
-                    "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_stock_prices_%'"
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_stock_prices_%'"
             ).fetchall():
                 connection.execute(f'DROP INDEX "{name}"')
 
     def test_save_creates_the_indexes(self):
         with self.connect() as connection:
-            names = {row[0] for row in connection.execute(
-                "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'stock_prices'")}
+            names = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'stock_prices'"
+                )
+            }
         self.assertTrue({"idx_stock_prices_date", "idx_stock_prices_missing_close"} <= names)
         self.assertEqual(len(INDEXES), 2)
 
@@ -100,22 +129,36 @@ class IndexTests(unittest.TestCase):
 
         self.assertIn("idx_stock_prices_date", indexed["market_dates"])
         self.assertNotIn("TEMP B-TREE", indexed["market_dates"])
-        self.assertIn("SEARCH stock_prices USING COVERING INDEX idx_stock_prices_date", indexed["market_days_after"])
-        self.assertIn("SEARCH stock_prices USING INDEX idx_stock_prices_date (date=?)", indexed["rows_on_date"])
+        self.assertIn(
+            "SEARCH stock_prices USING COVERING INDEX idx_stock_prices_date",
+            indexed["market_days_after"],
+        )
+        self.assertIn(
+            "SEARCH stock_prices USING INDEX idx_stock_prices_date (date=?)",
+            indexed["rows_on_date"],
+        )
         self.assertIn("idx_stock_prices_missing_close", indexed["missing_closes"])
 
     def test_queries_by_stock_keep_using_the_primary_key(self):
         with self.connect() as connection:
-            result = plan(connection, "SELECT * FROM stock_prices WHERE stock_id = ? AND date >= ? AND date <= ? "
-                                      "ORDER BY date", ("2330", DATES[0], DATES[-1]))
+            result = plan(
+                connection,
+                "SELECT * FROM stock_prices WHERE stock_id = ? AND date >= ? AND date <= ? "
+                "ORDER BY date",
+                ("2330", DATES[0], DATES[-1]),
+            )
         self.assertIn("SEARCH stock_prices USING INDEX sqlite_autoindex_stock_prices_1", result)
 
     def test_indexes_return_the_same_rows(self):
         with self.connect() as connection:
-            indexed = {name: connection.execute(*query).fetchall() for name, query in DATE_QUERIES.items()}
+            indexed = {
+                name: connection.execute(*query).fetchall() for name, query in DATE_QUERIES.items()
+            }
         self.drop_indexes()
         with self.connect() as connection:
-            plain = {name: connection.execute(*query).fetchall() for name, query in DATE_QUERIES.items()}
+            plain = {
+                name: connection.execute(*query).fetchall() for name, query in DATE_QUERIES.items()
+            }
         self.assertEqual(sorted(indexed["rows_on_date"]), sorted(plain["rows_on_date"]))
         for name in ("market_dates", "market_days_after", "missing_closes"):
             self.assertEqual(indexed[name], plain[name], name)
@@ -137,8 +180,12 @@ def all_rows(path):
 
 def index_names(path):
     with closing(sqlite3.connect(path)) as connection:
-        return sorted(row[0] for row in connection.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_stock_prices_%'"))
+        return sorted(
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_stock_prices_%'"
+            )
+        )
 
 
 class MigrationTests(unittest.TestCase):
@@ -154,8 +201,21 @@ class MigrationTests(unittest.TestCase):
             connection.execute(LEGACY_TABLE)
             connection.executemany(
                 "INSERT INTO stock_prices VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [(r["stock_id"], r["date"], *(None if r[k] is None else str(r[k]) for k in ("open", "high", "low", "close")),
-                  r["volume"], r["turnover"], r["trade_count"]) for r in synthetic_records()])
+                [
+                    (
+                        r["stock_id"],
+                        r["date"],
+                        *(
+                            None if r[k] is None else str(r[k])
+                            for k in ("open", "high", "low", "close")
+                        ),
+                        r["volume"],
+                        r["turnover"],
+                        r["trade_count"],
+                    )
+                    for r in synthetic_records()
+                ],
+            )
         return all_rows(self.db_path)
 
     def test_legacy_database_is_upgraded_without_changing_any_row(self):
@@ -165,7 +225,9 @@ class MigrationTests(unittest.TestCase):
 
         self.assertEqual(migrate_database(self.db_path), (0, SCHEMA_VERSION))
         self.assertEqual(all_rows(self.db_path), before)
-        self.assertEqual(index_names(self.db_path), ["idx_stock_prices_date", "idx_stock_prices_missing_close"])
+        self.assertEqual(
+            index_names(self.db_path), ["idx_stock_prices_date", "idx_stock_prices_missing_close"]
+        )
         with closing(sqlite3.connect(self.db_path)) as connection:
             self.assertEqual(connection.execute("PRAGMA integrity_check").fetchone()[0], "ok")
 
@@ -182,7 +244,9 @@ class MigrationTests(unittest.TestCase):
         save_records(extra, db_path=self.db_path)
         self.assertEqual(read_schema_version(self.db_path), SCHEMA_VERSION)
         self.assertEqual(len(all_rows(self.db_path)), len(before) + len(extra))
-        self.assertEqual(load_records("1101", DATES[0], DATES[-1], db_path=self.db_path)[2]["close"], None)
+        self.assertEqual(
+            load_records("1101", DATES[0], DATES[-1], db_path=self.db_path)[2]["close"], None
+        )
 
     def test_new_database_starts_at_the_current_version(self):
         save_records(synthetic_records(), db_path=self.db_path)
@@ -190,12 +254,19 @@ class MigrationTests(unittest.TestCase):
 
     def test_failed_step_rolls_back_and_keeps_the_old_version(self):
         before = self.make_legacy_database()
-        broken = database.MIGRATIONS + ((SCHEMA_VERSION + 1, (
-            "CREATE INDEX idx_stock_prices_extra ON stock_prices(volume)",
-            "THIS IS NOT SQL",
-        )),)
-        with patch.object(database, "MIGRATIONS", broken), \
-                patch.object(database, "SCHEMA_VERSION", SCHEMA_VERSION + 1):
+        broken = database.MIGRATIONS + (
+            (
+                SCHEMA_VERSION + 1,
+                (
+                    "CREATE INDEX idx_stock_prices_extra ON stock_prices(volume)",
+                    "THIS IS NOT SQL",
+                ),
+            ),
+        )
+        with (
+            patch.object(database, "MIGRATIONS", broken),
+            patch.object(database, "SCHEMA_VERSION", SCHEMA_VERSION + 1),
+        ):
             with self.assertRaises(sqlite3.Error):
                 migrate_database(self.db_path)
         # 已完成的版本保留；失敗的版本連同它建立的索引一起回滾。
@@ -218,8 +289,10 @@ class MigrationTests(unittest.TestCase):
         config = self.root / "config.toml"
         config.write_text(TEST_CONFIG, encoding="utf-8")
         output = io.StringIO()
-        with patch.object(sys, "argv", ["migrate_db", "--config", str(config), *arguments]), \
-                contextlib.redirect_stdout(output):
+        with (
+            patch.object(sys, "argv", ["migrate_db", "--config", str(config), *arguments]),
+            contextlib.redirect_stdout(output),
+        ):
             code = migrate_db.main()
         return code, output.getvalue()
 

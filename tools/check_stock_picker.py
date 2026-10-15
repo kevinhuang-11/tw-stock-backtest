@@ -6,6 +6,7 @@ CI 不執行 JavaScript，所以選擇器的互動由這支腳本驗證：打字
 貼上多個代號、上限、加入自選、手機觸控目標，以及沒有 JavaScript 時的退路。
 全程使用暫存目錄中的離線合成示例，不連網。
 """
+
 import re
 import subprocess
 import sys
@@ -34,8 +35,16 @@ def main():
 
     with tempfile.TemporaryDirectory(prefix="picker-check-") as temporary:
         root = Path(temporary) / "demo"
-        subprocess.run([sys.executable, str(shots.ROOT / "examples" / "prepare_demo.py"),
-                        "--output", str(root)], check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(
+            [
+                sys.executable,
+                str(shots.ROOT / "examples" / "prepare_demo.py"),
+                "--output",
+                str(root),
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+        )
         port = shots.free_port()
         base = f"http://127.0.0.1:{port}"
         server = shots.start_server(root, port, ["--dev"])
@@ -53,8 +62,11 @@ def main():
                 message = lambda: picker.locator(".sp-message").inner_text()  # noqa: E731
 
                 expect(value(), "9001 9002 9003", "預設值轉成標籤後欄位值不變")
-                expect(picker.locator(".sp-tag-text").first.inner_text(),
-                       "9001 示範股 A（合成）", "標籤顯示代號與名稱")
+                expect(
+                    picker.locator(".sp-tag-text").first.inner_text(),
+                    "9001 示範股 A（合成）",
+                    "標籤顯示代號與名稱",
+                )
                 picker.get_by_role("button", name="清除全部").click()
                 expect(value(), "", "清除全部")
 
@@ -95,17 +107,24 @@ def main():
                 expect(errors, [], "沒有 JavaScript 錯誤")
 
                 mobile = browser.new_context(
-                    locale="zh-TW", viewport={"width": 390, "height": 844},
-                    has_touch=True, is_mobile=True).new_page()
+                    locale="zh-TW",
+                    viewport={"width": 390, "height": 844},
+                    has_touch=True,
+                    is_mobile=True,
+                ).new_page()
                 mobile.goto(base + "/dev/components")
                 mobile.wait_for_load_state("networkidle")
                 small = mobile.locator(".stock-picker").first
                 small.get_by_role("button", name="清除全部").tap()
                 small.locator(".sp-input").tap()
                 heights = mobile.evaluate(
-                    "[...document.querySelectorAll('.sp-option')].map(e => e.getBoundingClientRect().height)")
-                expect(all(height >= 44 for height in heights) and len(heights) == 3, True,
-                       "手機上的建議項目高度至少 44px")
+                    "[...document.querySelectorAll('.sp-option')].map(e => e.getBoundingClientRect().height)"
+                )
+                expect(
+                    all(height >= 44 for height in heights) and len(heights) == 3,
+                    True,
+                    "手機上的建議項目高度至少 44px",
+                )
                 small.locator(".sp-option").first.tap()
                 expect(small.locator("input[name=stocks]").input_value(), "9001", "手機點一下加入")
 

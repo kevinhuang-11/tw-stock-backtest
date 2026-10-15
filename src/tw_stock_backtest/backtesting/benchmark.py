@@ -3,14 +3,14 @@ from decimal import Decimal
 
 from tw_stock_backtest.backtesting.costs import (
     CostSettings,
-    calculate_transaction,
     apply_slippage,
+    calculate_transaction,
 )
-from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.data.market_events import (
     CONFIRMED_HALTS,
     prepare_backtest_market,
 )
+from tw_stock_backtest.date_range import parse_date_range
 
 
 def affordable_quantity(price, budget, cost_settings):
@@ -50,16 +50,12 @@ def run_buy_and_hold(
 ):
     start, end = parse_date_range(start_text, end_text)
 
-    if (
-        not isinstance(initial_cash, Decimal)
-        or not initial_cash.is_finite()
-        or initial_cash <= 0
-    ):
+    if not isinstance(initial_cash, Decimal) or not initial_cash.is_finite() or initial_cash <= 0:
         raise ValueError("初始資金必須是正值且有限的 Decimal")
 
     if not isinstance(cost_settings, CostSettings):
         raise ValueError("必須提供 CostSettings")
-    
+
     # 即使沒有成交，也先驗證滑價率。
     apply_slippage(Decimal("1"), "BUY", slippage_rate)
 
@@ -72,9 +68,7 @@ def run_buy_and_hold(
         confirmed_halts=events,
     )
 
-    budget = (
-        initial_cash * 100 // len(market)
-    ) / Decimal("100")
+    budget = (initial_cash * 100 // len(market)) / Decimal("100")
 
     cash = initial_cash
     holdings = {}
@@ -136,8 +130,7 @@ def run_buy_and_hold(
 
         market_value = sum(
             (
-                market[stock_id][trading_date]["valuation_close"]
-                * quantity
+                market[stock_id][trading_date]["valuation_close"] * quantity
                 for stock_id, quantity in holdings.items()
             ),
             Decimal("0"),
@@ -151,9 +144,7 @@ def run_buy_and_hold(
                 "equity": cash + market_value,
                 "holdings": holdings.copy(),
                 "stale_prices": {
-                    stock_id: market[stock_id][trading_date][
-                        "valuation_price_date"
-                    ]
+                    stock_id: market[stock_id][trading_date]["valuation_price_date"]
                     for stock_id in holdings
                     if not market[stock_id][trading_date]["tradable"]
                 },
@@ -175,4 +166,4 @@ def run_buy_and_hold(
         "unbought": sorted(unbought),
         "unavailable_entire_period": sorted(waiting),
         "slippage_rate": slippage_rate,
-    }   
+    }

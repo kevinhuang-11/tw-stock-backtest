@@ -1,4 +1,5 @@
 """回測圖：有中文字型時用中文標籤，沒有時改用英文，任何情況都不能畫出方框。"""
+
 import copy
 import json
 import unittest
@@ -8,9 +9,9 @@ from unittest.mock import patch
 
 from matplotlib import font_manager
 from matplotlib.figure import Figure
-
 from test_end_to_end import TEST_CONFIG
 from test_strategy_library import records
+
 from tw_stock_backtest import chart_style
 from tw_stock_backtest.config import load_config
 from tw_stock_backtest.data.database import save_records
@@ -28,6 +29,7 @@ def visible_texts(figure):
 
 class Captured:
     """攔截 savefig，保留圖的文字內容，同時照常寫出檔案。"""
+
     def __init__(self):
         self.texts = []
         original = Figure.savefig
@@ -36,6 +38,7 @@ class Captured:
             figure.canvas.draw()
             self.texts.append(visible_texts(figure))
             return original(figure, *args, **kwargs)
+
         self.patcher = patch.object(Figure, "savefig", capture)
 
 
@@ -45,8 +48,10 @@ class ChartStyleTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
         config = self.root / "config.toml"
-        config.write_text(TEST_CONFIG.replace("AAA", "2330").replace("quantity = 10", "quantity = 1"),
-                          encoding="utf-8")
+        config.write_text(
+            TEST_CONFIG.replace("AAA", "2330").replace("quantity = 10", "quantity = 1"),
+            encoding="utf-8",
+        )
         self.settings = load_config(config)
         save_records(records(), db_path=self.settings["storage"]["database_path"])
         self.strategy = from_settings(self.settings)
@@ -57,10 +62,19 @@ class ChartStyleTests(unittest.TestCase):
         other = copy.deepcopy(self.strategy)
         other.update(id="rsi_demo", name="RSI 區間示例")
         captured = Captured()
-        with captured.patcher, patch.object(chart_style, "cjk_font", return_value=None) if english else patch.object(
-                chart_style, "cjk_font", wraps=chart_style.cjk_font):
-            output = compare_strategies(self.settings, [self.strategy, other], "2026-08-25", "2026-09-09",
-                                        self.root / ("en" if english else "auto"))
+        with (
+            captured.patcher,
+            patch.object(chart_style, "cjk_font", return_value=None)
+            if english
+            else patch.object(chart_style, "cjk_font", wraps=chart_style.cjk_font),
+        ):
+            output = compare_strategies(
+                self.settings,
+                [self.strategy, other],
+                "2026-08-25",
+                "2026-09-09",
+                self.root / ("en" if english else "auto"),
+            )
         self.assertTrue((output / "comparison.png").is_file())
         return output, captured.texts[-1]
 
@@ -84,14 +98,18 @@ class ChartStyleTests(unittest.TestCase):
         captured = Captured()
         with captured.patcher, patch.object(chart_style, "cjk_font", return_value=None):
             from tw_stock_backtest.plotting import plot_portfolio_report
+
             plot_portfolio_report(child)
         texts = captured.texts[-1]
         self.assertTrue(chart_style.renders(DEJAVU, "".join(texts)))
-        self.assertTrue(any(text.startswith("Portfolio backtest vs buy-and-hold benchmark") for text in texts))
+        self.assertTrue(
+            any(text.startswith("Portfolio backtest vs buy-and-hold benchmark") for text in texts)
+        )
         self.assertTrue((child / "performance.png").is_file())
 
     def test_footer_states_whether_slippage_was_included(self):
         from tw_stock_backtest.plotting import plot_portfolio_report
+
         output, _ = self.comparison_texts(english=True)
         child = next(output.rglob("results.json")).parent
         document = json.loads((child / "results.json").read_text(encoding="utf-8"))
@@ -102,7 +120,9 @@ class ChartStyleTests(unittest.TestCase):
                 captured = Captured()
                 with captured.patcher, patch.object(chart_style, "cjk_font", return_value=None):
                     plot_portfolio_report(child)
-                footer = next(text for text in captured.texts[-1] if text.startswith("Daily closing equity"))
+                footer = next(
+                    text for text in captured.texts[-1] if text.startswith("Daily closing equity")
+                )
                 self.assertIn(expected, footer)
 
     def test_detected_chinese_font_draws_every_label(self):

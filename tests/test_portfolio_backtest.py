@@ -2,6 +2,7 @@ import unittest
 from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import patch
+
 from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.backtesting.portfolio import (
     run_portfolio_backtest,
@@ -33,12 +34,10 @@ class TestPortfolioBacktest(unittest.TestCase):
         return [
             {
                 "stock_id": stock_id,
-                "date": (
-                    start + timedelta(days=index)
-                ).isoformat(),
+                "date": (start + timedelta(days=index)).isoformat(),
                 "open": Decimal(10 + index),
                 "close": Decimal(str(close)),
-                "volume": 100 * (2 ** index),
+                "volume": 100 * (2**index),
             }
             for index, close in enumerate(closes)
         ]
@@ -63,9 +62,7 @@ class TestPortfolioBacktest(unittest.TestCase):
         )
 
     def test_signal_executes_next_day_with_costs(self):
-        result = self.run_engine(
-            {"AAA": self.make_records("AAA", [10, 11, 12, 13])}
-        )
+        result = self.run_engine({"AAA": self.make_records("AAA", [10, 11, 12, 13])})
 
         # 1/3：Close 12 > SMA2 11.5 > SMA3 11。
         # 1/4：以開盤價 13 買進。
@@ -154,10 +151,7 @@ class TestPortfolioBacktest(unittest.TestCase):
         # 確認最後一天有成功評估，而非因評估錯誤而沒有交易。
         self.assertNotIn(
             "2026-01-03",
-            [
-                item["date"]
-                for item in result["skipped_rebalances"]
-            ],
+            [item["date"] for item in result["skipped_rebalances"]],
         )
 
     def test_shared_cash_is_used_in_rank_order(self):
@@ -188,6 +182,7 @@ class TestPortfolioBacktest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             self.run_engine(records)
+
 
 class TestPortfolioBudget(unittest.TestCase):
     def setUp(self):
@@ -256,18 +251,10 @@ class TestPortfolioBudget(unittest.TestCase):
                 initial_cash=initial_cash,
                 quantity=10,
                 max_positions=max_positions,
-                cost_settings=(
-                    self.cost_settings
-                    if cost_settings is None
-                    else cost_settings
-                ),
+                cost_settings=(self.cost_settings if cost_settings is None else cost_settings),
                 sizing_mode=sizing_mode,
                 slippage_rate=slippage_rate,
-                confirmed_halts=(
-                    {}
-                    if confirmed_halts is None
-                    else confirmed_halts
-                ),
+                confirmed_halts=({} if confirmed_halts is None else confirmed_halts),
             )
 
     def test_equal_budget_and_no_daily_resizing(self):
@@ -294,12 +281,7 @@ class TestPortfolioBudget(unittest.TestCase):
         self.assertEqual(len(result["trades"]), 2)
 
         # 第一日產生訊號，第二日成交。
-        self.assertTrue(
-            all(
-                trade["date"] == "2024-01-02"
-                for trade in result["trades"]
-            )
-        )
+        self.assertTrue(all(trade["date"] == "2024-01-02" for trade in result["trades"]))
 
         # 第三日 AAA 漲價，但不重新調整股數。
         self.assertEqual(result["final_equity"], Decimal("1500"))
@@ -353,10 +335,7 @@ class TestPortfolioBudget(unittest.TestCase):
         self.assertEqual(result["holdings"], {"BBB": 25})
         self.assertEqual(result["cash"], Decimal("0"))
         self.assertEqual(
-            [
-                (trade["stock_id"], trade["action"])
-                for trade in result["trades"]
-            ],
+            [(trade["stock_id"], trade["action"]) for trade in result["trades"]],
             [
                 ("AAA", "BUY"),
                 ("AAA", "SELL"),
@@ -378,10 +357,7 @@ class TestPortfolioBudget(unittest.TestCase):
         # 單檔預算 500，AAA 連一股都買不起。
         # BBB 仍正常買進；第三日依空候選名單賣出。
         self.assertEqual(
-            [
-                (trade["stock_id"], trade["action"])
-                for trade in result["trades"]
-            ],
+            [(trade["stock_id"], trade["action"]) for trade in result["trades"]],
             [("BBB", "BUY"), ("BBB", "SELL")],
         )
         self.assertEqual(result["skipped_orders"][0]["stock_id"], "AAA")
@@ -511,6 +487,7 @@ class TestPortfolioBudget(unittest.TestCase):
                 {},
                 slippage_rate=Decimal("-0.01"),
             )
+
 
 if __name__ == "__main__":
     unittest.main()

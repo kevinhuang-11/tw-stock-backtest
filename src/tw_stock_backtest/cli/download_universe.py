@@ -1,26 +1,24 @@
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-import os
 from tempfile import NamedTemporaryFile
+
+from tw_stock_backtest.cli.update_universe import DEFAULT_UNIVERSE_PATH
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config
-from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.data.universe import (
     NetworkDisabled,
     ensure_network_allowed,
     is_synthetic,
     load_universe,
 )
-from tw_stock_backtest.cli.update_universe import DEFAULT_UNIVERSE_PATH
+from tw_stock_backtest.date_range import parse_date_range
 
-
-DEFAULT_LOG_DIR = (
-    DEFAULT_CONFIG_PATH.parent / "data" / "download_logs"
-)
+DEFAULT_LOG_DIR = DEFAULT_CONFIG_PATH.parent / "data" / "download_logs"
 
 
 def download_batch(
@@ -105,10 +103,7 @@ def download_batch(
             else:
                 item.update(
                     status="failed",
-                    reason=(
-                        "下載命令執行失敗，退出碼："
-                        f"{completed.returncode}"
-                    ),
+                    reason=(f"下載命令執行失敗，退出碼：{completed.returncode}"),
                 )
 
         results.append(item)
@@ -125,6 +120,7 @@ def download_batch(
             time.sleep(interval_seconds)
 
     return results
+
 
 def save_progress(report, path):
     """完整寫入暫存檔後，才替換既有進度檔。"""
@@ -172,20 +168,14 @@ def load_progress(path, expected_job):
         raise ValueError("不支援的進度檔格式")
 
     if report.get("job") != expected_job:
-        raise ValueError(
-            "進度檔的日期、股票範圍或設定與本次不同，"
-            "請使用原本參數接續"
-        )
+        raise ValueError("進度檔的日期、股票範圍或設定與本次不同，請使用原本參數接續")
 
     results = report.get("results")
 
     if not isinstance(results, list):
         raise ValueError("進度檔缺少結果清單")
 
-    allowed_ids = {
-        stock["stock_id"]
-        for stock in expected_job["stocks"]
-    }
+    allowed_ids = {stock["stock_id"] for stock in expected_job["stocks"]}
     seen = set()
 
     for item in results:
@@ -194,11 +184,7 @@ def load_progress(path, expected_job):
 
         stock_id = item.get("stock_id")
 
-        if (
-            not isinstance(stock_id, str)
-            or stock_id not in allowed_ids
-            or stock_id in seen
-        ):
+        if not isinstance(stock_id, str) or stock_id not in allowed_ids or stock_id in seen:
             raise ValueError("進度檔包含未知或重複的股票")
 
         if item.get("status") not in (
@@ -216,21 +202,14 @@ def load_progress(path, expected_job):
 def select_pending_stocks(stocks, results):
     """成功與確定略過的不再執行；失敗或未執行的繼續處理。"""
     finished_ids = {
-        item["stock_id"]
-        for item in results
-        if item["status"] in ("completed", "skipped")
+        item["stock_id"] for item in results if item["status"] in ("completed", "skipped")
     }
 
-    return [
-        stock
-        for stock in stocks
-        if stock["stock_id"] not in finished_ids
-    ]
+    return [stock for stock in stocks if stock["stock_id"] not in finished_ids]
+
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="依上市股票名單批次下載行情"
-    )
+    parser = argparse.ArgumentParser(description="依上市股票名單批次下載行情")
 
     parser.add_argument(
         "--config",
@@ -291,9 +270,7 @@ def main():
 
         # 合成示例名單沒有可下載的官方行情。
         if is_synthetic(snapshot):
-            raise NetworkDisabled(
-                "指定的名單是合成示例，不提供連網下載"
-            )
+            raise NetworkDisabled("指定的名單是合成示例，不提供連網下載")
 
         ensure_network_allowed(settings["storage"]["database_path"])
 
@@ -302,17 +279,13 @@ def main():
             key=lambda stock: stock["stock_id"],
         )
 
-        stocks = all_stocks[
-            args.offset:args.offset + args.limit
-        ]
+        stocks = all_stocks[args.offset : args.offset + args.limit]
 
         if not stocks:
             raise ValueError("指定範圍內沒有股票")
 
         # 把 Decimal、Path 等設定轉成可保存的 JSON 資料。
-        settings_snapshot = json.loads(
-            json.dumps(settings, default=str)
-        )
+        settings_snapshot = json.loads(json.dumps(settings, default=str))
 
         job = {
             "start": start.isoformat(),
@@ -329,10 +302,7 @@ def main():
             report = load_progress(log_path, job)
 
         else:
-            log_path = (
-                args.log_dir
-                / (now.strftime("%Y%m%dT%H%M%S_%fZ") + ".json")
-            ).resolve()
+            log_path = (args.log_dir / (now.strftime("%Y%m%dT%H%M%S_%fZ") + ".json")).resolve()
 
             report = {
                 "schema_version": 1,
@@ -367,10 +337,7 @@ def main():
     print(f"資料庫位置：{settings['storage']['database_path']}")
     print(f"進度檔：{log_path}", flush=True)
 
-    results_by_id = {
-        item["stock_id"]: item
-        for item in report["results"]
-    }
+    results_by_id = {item["stock_id"]: item for item in report["results"]}
 
     def record_result(item):
         # 重試結果會替換該股票上一次的失敗結果。
@@ -391,26 +358,17 @@ def main():
             start.isoformat(),
             end.isoformat(),
             config_path=args.config,
-            interval_seconds=float(
-                settings["download"]["request_interval_seconds"]
-            ),
+            interval_seconds=float(settings["download"]["request_interval_seconds"]),
             on_result=record_result,
         )
 
         counts = {
-            status: sum(
-                item["status"] == status
-                for item in report["results"]
-            )
+            status: sum(item["status"] == status for item in report["results"])
             for status in ("completed", "failed", "skipped")
         }
 
         report["counts"] = counts
-        report["status"] = (
-            "finished_with_errors"
-            if counts["failed"]
-            else "finished"
-        )
+        report["status"] = "finished_with_errors" if counts["failed"] else "finished"
         report["finished_at"] = datetime.now(timezone.utc).isoformat()
         report["updated_at"] = report["finished_at"]
 
@@ -434,6 +392,7 @@ def main():
     print(f"進度檔：{log_path}")
 
     return 1 if counts["failed"] else 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
