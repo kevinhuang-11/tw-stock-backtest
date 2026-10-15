@@ -223,4 +223,14 @@ done
 .venv/bin/python -m pip wheel --no-deps --wheel-dir dist .
 ```
 
+排版與 lint 使用 [ruff](https://docs.astral.sh/ruff/)，設定在 `pyproject.toml`：行長 100，規則為 pycodestyle 錯誤、pyflakes、import 排序與 bugbear（E、F、I、B），行長由 formatter 處理而不另外檢查（E501）。ruff 版本鎖定在 dev 依賴，CI 使用同一版本。
+
+```bash
+.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/ruff format          # 排版；CI 執行 ruff format --check
+.venv/bin/ruff check --fix     # lint；CI 執行 ruff check
+```
+
+全專案的一次性排版記錄在 `.git-blame-ignore-revs`。GitHub 的 blame 會自動略過；本機執行 `git config blame.ignoreRevsFile .git-blame-ignore-revs` 後，`git blame` 也會略過。
+
 自動化測試涵蓋到 HTTP 層（以 Flask 測試用戶端請求頁面）。瀏覽器端的互動由 `tools/check_stock_picker.py`（Playwright）檢查，需安裝開發依賴後手動執行，不在 CI 中。

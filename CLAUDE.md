@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 常用指令
 
-一律使用專案的 `.venv/bin/python`（Python 3.12）。專案未設定 linter／formatter／型別檢查，測試框架是 `unittest`，不是 pytest。
+一律使用專案的 `.venv/bin/python`（Python 3.12）。排版與 lint 用 ruff（設定在 `pyproject.toml`，版本鎖定在 dev 依賴，CI 會檢查）；沒有型別檢查。測試框架是 `unittest`，不是 pytest。
 
 ```bash
 # 安裝（已有 .venv 不需重建）
@@ -27,6 +27,11 @@ python3.12 -m venv .venv && .venv/bin/python -m pip install -e .
 
 # 打包驗證
 .venv/bin/python -m pip wheel --no-deps --wheel-dir dist .
+
+# 排版與 lint（提交前執行；CI 跑的是 --check 與不帶 --fix 的版本）
+.venv/bin/python -m pip install -e '.[dev]'   # 第一次：安裝 ruff 與 playwright
+.venv/bin/ruff format
+.venv/bin/ruff check --fix
 ```
 
 所有 CLI 都是 `python -m tw_stock_backtest.cli.<name>`（沒有 console script）；各指令的參數與退出碼約定見 docs/OPERATIONS.md。研究類 CLI 的退出碼：0 完整成功、2 允許部分且仍有有效結果、1 失敗。

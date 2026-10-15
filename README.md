@@ -49,7 +49,7 @@ Windows：目前不支援在 Windows 上直接執行（工作台使用只有 Lin
 - **可追查的報表**：每份研究與回測都固定保存當時的設定、股票池、輸入資料與策略 SHA-256，之後修改策略或更新資料都不會改變舊報表。
 - **離線示範與連網防護**：合成示範名單會讓所有下載入口在發出請求前拒絕執行，測試以攔截網路函式確認（[test_offline_demo.py](tests/test_offline_demo.py)）。
 - **不依賴前端框架與 CDN**：Flask＋Jinja＋原生 JS，自繪 SVG 圖示、系統字型；可鍵盤操作的股票選擇器；台股慣例紅漲綠跌，狀態標籤刻意不用綠色以免與下跌混淆。
-- **工程流程**：離線單元與整合測試、CI 以安裝後的套件從乾淨目錄執行測試；Playwright 只在開發依賴，用來截圖與檢查瀏覽器互動（[tools/](tools/)）。
+- **工程流程**：離線單元與整合測試、CI 以安裝後的套件從乾淨目錄執行測試，並以 ruff 檢查排版與 lint；Playwright 只在開發依賴，用來截圖與檢查瀏覽器互動（[tools/](tools/)）。
 
 ## 開發方式
 
@@ -149,11 +149,15 @@ Private notes SQLite: workbench only; excluded from report exports
 
 # 只跑名稱符合的測試
 .venv/bin/python -m unittest discover -s tests -k future -v
+
+# 排版與 lint（ruff，需先安裝 dev 依賴：pip install -e '.[dev]'）
+.venv/bin/ruff format --check
+.venv/bin/ruff check
 ```
 
 測試全部離線執行，不需要網路或任何憑證。涵蓋範圍包含未來資料隔離、策略與交易成本、資料修訂、快照比較與安全邊界。
 
-CI 會在乾淨的 runner 上安裝套件，再執行同一組測試。另有一個研究 workflow 會取得行情並產出排名，只能在 GitHub Actions 頁面手動觸發，沒有排程。
+CI 以 ruff 檢查排版與 lint，並在乾淨的 runner 上安裝套件後執行同一組測試。另有一個研究 workflow 會取得行情並產出排名，只能在 GitHub Actions 頁面手動觸發，沒有排程。
 
 ## 專案結構
 
