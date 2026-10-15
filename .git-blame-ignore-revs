@@ -1,0 +1,6 @@
+# git blame 略過的大量排版 commit。
+# 本機啟用：git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub 的 blame 畫面會自動讀取這個檔案。
+
+# style: format with ruff and sort imports
+ae9dfa42088a838d1332a57d85c4376653661fd4
