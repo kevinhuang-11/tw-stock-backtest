@@ -196,4 +196,4 @@ done
 .venv/bin/python -m pip wheel --no-deps --wheel-dir dist .
 ```
 
-現有測試涵蓋到 HTTP 層（以 Flask 測試用戶端請求頁面），沒有瀏覽器端的自動化測試。
+自動化測試涵蓋到 HTTP 層（以 Flask 測試用戶端請求頁面）。瀏覽器端的互動由 `tools/check_stock_picker.py`（Playwright）檢查，需安裝開發依賴後手動執行，不在 CI 中。

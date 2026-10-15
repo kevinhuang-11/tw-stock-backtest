@@ -126,5 +126,5 @@
 ## 目前的限制
 
 - 工作台設計為單人本機使用，不適合公開部署。
-- 已有 HTTP 層的自動化測試，尚無瀏覽器端的自動化測試。
-- 其他限制見 [README 的 Limitations](../README.md#limitations)。
+- 自動化測試涵蓋到 HTTP 層；瀏覽器端的互動檢查（`tools/check_stock_picker.py`）需手動執行，不在 CI 中。
+- 其他限制見 [README 的限制](../README.md#限制)。

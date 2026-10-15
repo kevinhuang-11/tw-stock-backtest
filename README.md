@@ -1,5 +1,7 @@
 # 台股研究與回測工作台
 
+[![Tests](https://github.com/kevinhuang-11/tw-stock-backtest/actions/workflows/ci.yml/badge.svg)](https://github.com/kevinhuang-11/tw-stock-backtest/actions/workflows/ci.yml)
+
 以官方公開資料做台股選股排名、歷史回測與自選股追蹤的本機工具。Python 抓取證交所行情與營收法人資料存進 SQLite，依策略產生候選排名、模擬多股票回測並與買進持有比較，所有結果都保存成不可覆寫的報表。重點是**不偷看未來資料、計入台股費稅、資料不足時直接說明**。
 
 v1 版本供單人在本機使用；測試驗證的是軟體行為，不代表任何策略已證明能獲利。
@@ -26,7 +28,15 @@ Windows：目前不支援在 Windows 上直接執行（工作台使用只有 Lin
 
 要停止時，在執行指令的終端機按 `Ctrl+C`。再次執行最後一行會沿用已建立的示範資料。
 
-示範使用三檔合成股票，不需要網路、不讀取任何個人資料；示範環境中連網更新的按鈕會停用並說明原因。
+示範使用三檔合成股票，不需要網路、不讀取任何個人資料；示範環境中連網更新的按鈕會停用並說明原因。逐步走過自選總覽、個股頁、保存與比較快照、郵件預覽的導覽見 [操作導覽](docs/DEMO.md)。
+
+改用真實資料時，先依 [操作指南](docs/OPERATIONS.md#真實資料準備) 下載行情，再以根目錄的 `config.toml` 啟動工作台：
+
+```bash
+.venv/bin/python -m tw_stock_backtest.cli.serve_workbench --port 9000
+```
+
+工作台只監聽本機，不會自行下載；還沒有資料時，首頁會說明從哪裡開始。設定檔中的資料庫相對路徑以設定檔所在目錄為基準。
 
 ![總覽：資料狀態、最近的工作與報表](docs/images/overview.png)
 
@@ -73,7 +83,7 @@ Windows：目前不支援在 Windows 上直接執行（工作台使用只有 Lin
 - **共用報告內容**：HTML、純文字與郵件預覽共用摘要，CSV 不包含私人筆記。
 - **工程驗證**：離線單元／整合測試、安裝套件測試與 GitHub CI；不需真實 API 或寄信憑證。
 
-## Architecture
+## 架構
 
 ```text
 TWSE prices                    TWSE / IIH supplemental sources
@@ -111,29 +121,7 @@ Private notes SQLite: workbench only; excluded from report exports
 
 工作台與 CLI 呼叫共用核心，沒有另外實作一套交易模擬。
 
-## Quick Start
-
-WSL2 Ubuntu 24.04／Python 3.12。在專案根目錄執行；已有 `.venv` 不需重建：
-
-```bash
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -e .
-.venv/bin/python -m tw_stock_backtest.cli.serve_workbench --port 9000
-```
-
-開啟 `http://127.0.0.1:9000`。只有本機 loopback 監聽；無資料時首頁會說明從哪裡開始，不自動下載。上方導覽列可前往總覽、研究、回測、自選、個股、策略與報表。
-
-新環境可依 [DEMO](docs/DEMO.md) 建立**無網路、無私人資料的合成範例**；使用真實資料的準備方式見 [操作指南](docs/OPERATIONS.md#真實資料準備)。資料庫相對路徑以設定檔所在目錄為基準。
-
-## Demo
-
-完整的離線示範步驟見 [操作導覽](docs/DEMO.md)：啟動 → 自選總覽 → 個股頁 → 保存與比較快照 → HTML 與郵件預覽。
-
-下面是先前以真實歷史行情匯出的回測圖表，**不是合成範例的績效**；假設見圖注，只用來展示報表能力。
-
-![既有回測報表：策略與買進持有基準的資產及回撤](docs/demo-assets/performance.png)
-
-## Data Sources
+## 資料來源
 
 | 來源 | 用途與界線 |
 |---|---|
@@ -142,14 +130,14 @@ python3.12 -m venv .venv
 | [TWSE IIH](https://wwwc.twse.com.tw/IIH2/zh/company/financial.html?code=2330) | 滾動歷史月營收；原單位元，精確換算千元，不與其他來源拼接分母 |
 | [TWSE T86](https://www.twse.com.tw/zh/trading/foreign/t86.html) | 法人買進／賣出／淨額，單位股；依本機行情日期檢查累計覆蓋 |
 
-## Design Decisions
+## 設計決策
 
 1. **來源與修訂分開追查**：不同營收來源獨立保存；同一資料鍵的來源／單位衝突拒絕覆蓋，修訂保存舊值。
 2. **保存快照而非回查最新設定**：有效策略與數值隨報表保存；完成前使用 `.incomplete` 目錄，過去快照不因修改策略而改變。
 3. **隔離補充資料失敗**：營收或法人失敗仍可查看行情與策略；缺值不補零，更新結果與可用數值分開呈現。
 4. **共用摘要呈現**：網頁與郵件預覽使用同一份結構化摘要與呈現函式，避免兩套文字規則不一致。
 
-## Testing
+## 測試
 
 ```bash
 # 完整測試；結尾的 "Ran N tests" 會顯示實際執行的項數
@@ -166,7 +154,7 @@ python3.12 -m venv .venv
 
 CI 會在乾淨的 runner 上安裝套件，再執行同一組測試。另有一個研究 workflow 會取得行情並產出排名，只能在 GitHub Actions 頁面手動觸發，沒有排程。
 
-## Project Structure
+## 專案結構
 
 ```text
 src/tw_stock_backtest/
@@ -181,22 +169,23 @@ strategies/            少量示例策略
 examples/              隔離的離線展示準備
 tools/                 開發用：截圖與瀏覽器互動檢查（需 dev 依賴）
 tests/                單元、整合與安全測試
-docs/                 展示、操作與作品說明
+docs/                 操作導覽、操作與設計細節、README 截圖
 ```
 
 根目錄 `data/`、`reports/` 與私人 state 屬本機產物，不納入 Git；`src/.../data/` 是必要原始碼，會公開。
 
-## Limitations
+## 限制
 
 - 三檔 IIH 實測歷史為 **2025-09～2026-09，共 13 個月**；可展示最近 12 月，但不是任意年份歷史，年增率仍可能缺少精確對應期。
 - 缺少明確公告時間及完整口徑資訊；現在取得的修訂值不是完整的歷史當時可知資料（point-in-time）。
-- 法人 20 日示例只有 17 筆時如實顯示不足；沒有獨立交易日曆，不把日曆日落差當成缺漏交易日。
+- 法人累計的筆數不足時如實顯示不足，不把缺少的日子當成零（離線示範刻意只放 17 筆，用來呈現 20 日累計不足）；沒有獨立交易日曆，不把日曆日落差當成缺漏交易日。
 - 目前上市股票池存在倖存者偏差；價格未調整公司行動，成交為簡化模擬。
-- 已做 HTTP／整合驗證，**尚未完成瀏覽器桌面及窄螢幕 E2E**。工作台未設計為公開或多人服務。
+- 自動化測試涵蓋到 HTTP 層（Flask 測試用戶端）。瀏覽器端另有 Playwright 腳本，檢查股票選擇器的互動（含手機寬度與沒有 JavaScript 時的退路）並產生截圖；它需要開發依賴、手動執行，**不在 CI 中**，也沒有視覺回歸比對。
+- 工作台未設計為公開或多人服務。
 
-## Future Work
+## 後續方向
 
 - 補足可追查公告時間與修訂版本的歷史資料。
 - 加入交易日曆及公司行動資料，改善研究期間的完整性判定。
-- 建立瀏覽器操作與視覺回歸測試。
+- 把瀏覽器互動檢查納入 CI，並加入視覺回歸測試。
 - 視使用需求提供容器化的本機安裝方式。
