@@ -173,11 +173,10 @@ done
 
 真實寄送只有 CLI 明確 `--send` 才讀取 `GMAIL_ADDRESS` 與 `GMAIL_APP_PASSWORD`，寄件人／收件人同為自己。憑證由使用者自行在 shell 設定，不寫入設定檔、網頁、README 或 Git；用完 `unset GMAIL_ADDRESS GMAIL_APP_PASSWORD`。工作台沒有自動寄送的入口。
 
-## CI 與排程
+## CI 與研究工作流程
 
 - `.github/workflows/ci.yml`：push／pull request／手動觸發；Python 3.12、安裝套件後從乾淨目錄執行離線完整測試、Matplotlib Agg。
-- `.github/workflows/research.yml`：手動可指定 `as_of`、`stocks`、`allow_partial`；定時需 repository variable `RESEARCH_SCHEDULE_ENABLED=true` 才執行。未設定或非 true 即停用，不需 Gmail secret。
-- 排程為台灣平日 16:23；不保證準時，不是交易日曆。
+- `.github/workflows/research.yml`：只能在 Actions 頁面手動觸發（workflow_dispatch），可指定 `as_of`、`stocks`、`allow_partial`；沒有排程，也不需要任何 secret 或 repository variable。股票池最多 10 檔、請求間隔至少 3 秒，否則在發出請求前就停止。
 - cache 只保存 `data/research-cache.db`，每 run／attempt 有新 key，restore prefix 取先前版本；cache 可失效，空 cache 只有限初始化 90 日。
 - artifacts 保存明列研究摘要／排名／診斷，保留 14 天；不包括 SQLite、私人工作台筆記或郵件。資料與產物不 commit 回儲存庫。
 

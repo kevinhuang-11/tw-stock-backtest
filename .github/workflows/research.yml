@@ -14,8 +14,6 @@ on:
         description: '允許排除無法評估的股票'
         type: boolean
         default: false
-  schedule:
-    - cron: '23 8 * * 1-5' # UTC 08:23 = 台北平日 16:23
 permissions:
   contents: read
 concurrency:
@@ -23,7 +21,6 @@ concurrency:
   cancel-in-progress: false
 jobs:
   research:
-    if: github.event_name == 'workflow_dispatch' || vars.RESEARCH_SCHEDULE_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
