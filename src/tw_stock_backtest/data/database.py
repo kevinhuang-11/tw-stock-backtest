@@ -11,6 +11,38 @@ DEFAULT_DB_PATH = (
 )
 
 
+# 主鍵 (stock_id, date) 已涵蓋「單一股票＋日期範圍」的查詢；
+# 以下索引服務以日期為主的橫斷面查詢，以及找出缺價列。
+INDEXES = (
+    # 行情日清單、某日之後還有幾個行情日、某一天的所有股票。
+    "CREATE INDEX IF NOT EXISTS idx_stock_prices_date ON stock_prices(date)",
+    # 部分索引只收錄收盤價為 NULL 的列（全庫約 0.2%），找缺價時不必掃全表。
+    "CREATE INDEX IF NOT EXISTS idx_stock_prices_missing_close "
+    "ON stock_prices(stock_id, date) WHERE close IS NULL",
+)
+
+
+def create_schema(connection):
+    """建立行情表與索引；全部使用 IF NOT EXISTS，可重複執行。"""
+    connection.execute("""
+        CREATE TABLE IF NOT EXISTS stock_prices (
+            stock_id TEXT NOT NULL,
+            date TEXT NOT NULL,
+            open TEXT,
+            high TEXT,
+            low TEXT,
+            close TEXT,
+            volume INTEGER NOT NULL CHECK (volume >= 0),
+            turnover INTEGER NOT NULL CHECK (turnover >= 0),
+            trade_count INTEGER NOT NULL CHECK (trade_count >= 0),
+            PRIMARY KEY (stock_id, date)
+        )
+    """)
+
+    for statement in INDEXES:
+        connection.execute(statement)
+
+
 def save_records(records, db_path=DEFAULT_DB_PATH):
     """建立資料表，並新增或更新行情。"""
     db_path = Path(db_path)
@@ -42,20 +74,7 @@ def save_records(records, db_path=DEFAULT_DB_PATH):
     with closing(sqlite3.connect(db_path)) as connection:
         # 寫入成功時提交；失敗時回滾本次交易。
         with connection:
-            connection.execute("""
-                CREATE TABLE IF NOT EXISTS stock_prices (
-                    stock_id TEXT NOT NULL,
-                    date TEXT NOT NULL,
-                    open TEXT,
-                    high TEXT,
-                    low TEXT,
-                    close TEXT,
-                    volume INTEGER NOT NULL CHECK (volume >= 0),
-                    turnover INTEGER NOT NULL CHECK (turnover >= 0),
-                    trade_count INTEGER NOT NULL CHECK (trade_count >= 0),
-                    PRIMARY KEY (stock_id, date)
-                )
-            """)
+            create_schema(connection)
 
             connection.executemany("""
                 INSERT INTO stock_prices (
