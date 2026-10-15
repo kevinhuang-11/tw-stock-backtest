@@ -18,7 +18,6 @@ from tw_stock_backtest.analysis.indicators import (
 from tw_stock_backtest.config import load_config
 from tw_stock_backtest.data.database import save_records
 from tw_stock_backtest.stock_research import (
-    NoteConflict,
     Watchlist,
     chart_data,
     current_stock,
@@ -294,7 +293,7 @@ class StockResearchTests(unittest.TestCase):
             return Mock(returncode=0)
 
         self.wb.runner = running
-        first = self.wb.submit({"kind": "research"})
+        self.wb.submit({"kind": "research"})
         self.assertTrue(entered.wait(2))
         second = self.wb.submit({"kind": "research"})
         self.assertEqual(self.client.post("/jobs/" + second + "/cancel").status_code, 403)

@@ -4,7 +4,6 @@ No network, no user DB/config/notes read, no overwrite. Not market evidence.
 """
 
 import argparse
-import json
 from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path

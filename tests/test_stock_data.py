@@ -3,7 +3,6 @@ from decimal import Decimal
 
 from tw_stock_backtest.data.stock_data import (
     normalize_row,
-    parse_nonnegative_integer,
     parse_price,
     parse_twse_date,
     parse_volume,

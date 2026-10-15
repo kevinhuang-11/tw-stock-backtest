@@ -150,7 +150,7 @@ def relative_strength_index(prices, period=14):
     result = [None] * len(prices)
     if len(prices) <= period:
         return result
-    changes = [b - a for a, b in zip(prices, prices[1:])]
+    changes = [b - a for a, b in zip(prices, prices[1:], strict=False)]
     gains = [max(c, Decimal(0)) for c in changes]
     losses = [max(-c, Decimal(0)) for c in changes]
     gain = sum(gains[:period], Decimal(0)) / period

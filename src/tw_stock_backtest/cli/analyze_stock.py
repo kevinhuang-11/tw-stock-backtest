@@ -133,6 +133,7 @@ def main():
         short_ma,
         long_ma,
         signals,
+        strict=True,
     ):
         print(
             f"{record['date']:<12}"

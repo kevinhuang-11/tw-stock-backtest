@@ -116,9 +116,6 @@ def panel_context(wb, sid, cutoff, month_start=None, month_end=None):
 def register(app, wb, csrf):
     from tw_stock_backtest.stock_research import Watchlist, stock_id, today
 
-    market = Path(wb.settings["storage"]["database_path"])
-    database = market.with_name("supplemental.sqlite3")
-
     @app.get("/stocks/<sid>/supplemental")
     def supplemental_page(sid):
         try:

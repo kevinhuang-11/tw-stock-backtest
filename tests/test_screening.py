@@ -121,6 +121,7 @@ class TestScreening(unittest.TestCase):
         for record, volume in zip(
             records,
             [10, 20, 30, 40, 60, 100],
+            strict=True,
         ):
             record["volume"] = volume
 

@@ -5,7 +5,6 @@ import re
 import sqlite3
 from contextlib import closing
 from datetime import date, datetime
-from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
 from zoneinfo import ZoneInfo

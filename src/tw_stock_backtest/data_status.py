@@ -154,7 +154,7 @@ def stock_quality(db_path):
         if not _has_prices(db):
             return []
         columns = ("stock_id", "rows", "first_date", "last_date", "missing_close", "market_lag")
-        return [dict(zip(columns, row)) for row in db.execute(STOCK_QUALITY_SQL)]
+        return [dict(zip(columns, row, strict=True)) for row in db.execute(STOCK_QUALITY_SQL)]
 
 
 def price_gaps(db_path, stock_id=None, calendar_days=20):
@@ -171,7 +171,7 @@ def price_gaps(db_path, stock_id=None, calendar_days=20):
             return []
         columns = ("stock_id", "previous_date", "date", "missing_market_days", "calendar_days")
         return [
-            dict(zip(columns, row))
+            dict(zip(columns, row, strict=True))
             for row in db.execute(GAPS_SQL, {"stock_id": stock_id, "calendar_days": calendar_days})
         ]
 

@@ -223,6 +223,7 @@ def calculate_factor_row(records, as_of, *, factor_settings):
         for previous, current in zip(
             volatility_prices,
             volatility_prices[1:],
+            strict=False,
         )
     ]
 

@@ -54,7 +54,7 @@ def normalize_row(stock_id, fields, row):
     if len(fields) != len(row):
         raise ValueError("欄位數量與資料數量不一致")
 
-    raw = dict(zip(fields, row))
+    raw = dict(zip(fields, row, strict=True))
 
     required_fields = (
         "日期",

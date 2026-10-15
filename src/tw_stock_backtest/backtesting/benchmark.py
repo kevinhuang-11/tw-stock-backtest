@@ -1,4 +1,3 @@
-from datetime import date
 from decimal import Decimal
 
 from tw_stock_backtest.backtesting.costs import (

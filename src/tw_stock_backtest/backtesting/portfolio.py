@@ -2,14 +2,10 @@ from datetime import date
 from decimal import Decimal
 
 from tw_stock_backtest.analysis.factors import (
-    build_factor_history,
     calculate_factor_row,
     rank_factor_candidates,
 )
 from tw_stock_backtest.analysis.screening import evaluate_stock
-from tw_stock_backtest.analysis.screening_history import (
-    build_screening_history,
-)
 from tw_stock_backtest.backtesting.costs import (
     CostSettings,
     apply_slippage,

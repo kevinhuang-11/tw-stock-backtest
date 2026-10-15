@@ -16,7 +16,7 @@ from tw_stock_backtest.data.database import load_records
 from tw_stock_backtest.data.supplemental import timestamp
 from tw_stock_backtest.data.universe import NetworkDisabled
 from tw_stock_backtest.research import program_version
-from tw_stock_backtest.research_digest import load_digest, render_digest
+from tw_stock_backtest.research_digest import render_digest
 from tw_stock_backtest.security import public_data
 from tw_stock_backtest.stock_research import (
     CONDITION_LABELS,
@@ -461,7 +461,7 @@ def digest_lines(d):
 
 
 def register(app, wb, notes, token):
-    from flask import abort, redirect, request
+    from flask import redirect, request
 
     @app.post("/watchlist/snapshot")
     def watchlist_snapshot():

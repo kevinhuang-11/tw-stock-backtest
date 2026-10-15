@@ -147,7 +147,7 @@ def parse_revenue_history(payload, stock, fetched_at):
     if len(series) != 1 or len(chart["categories"]) != len(series[0]["data"]):
         raise ValueError("歷史營收欄位不符")
     values = {}
-    for period, value in zip(chart["categories"], series[0]["data"]):
+    for period, value in zip(chart["categories"], series[0]["data"], strict=True):
         if not re.fullmatch(r"\d{6}", period):
             raise ValueError("西元年月格式錯誤")
         month = date(int(period[:4]), int(period[4:]), 1).isoformat()[:7]
@@ -200,7 +200,7 @@ def parse_institution(payload, day, stocks, fetched_at):
     for values in payload["data"]:
         if len(values) != len(payload["fields"]):
             raise ValueError("法人欄位長度不符")
-        raw = dict(zip(payload["fields"], values))
+        raw = dict(zip(payload["fields"], values, strict=True))
         sid = raw["證券代號"].strip()
         if sid not in stocks:
             continue

@@ -14,7 +14,6 @@ from test_strategy_library import records
 from test_supplemental import revenue
 
 from tw_stock_backtest.cli.update_supplemental import update
-from tw_stock_backtest.config import load_config
 from tw_stock_backtest.data.database import save_records
 from tw_stock_backtest.data.supplemental import Store, parse_revenue, parse_revenue_history
 from tw_stock_backtest.data.universe import save_universe

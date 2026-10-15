@@ -23,7 +23,7 @@ def decimal_value(value, field, minimum=Decimal(0), maximum=None):
             raise ValueError()
         return parsed
     except (InvalidOperation, ValueError, TypeError):
-        raise FormErrors({field: "請輸入有效範圍內的有限數字"})
+        raise FormErrors({field: "請輸入有效範圍內的有限數字"}) from None
 
 
 def percent_ratio(value):
@@ -61,7 +61,7 @@ def job_form(source):
                 if date.fromisoformat(form[field]).isoformat() != form[field]:
                     raise ValueError()
             except (TypeError, ValueError):
-                raise FormErrors({field: "請選擇有效日期"})
+                raise FormErrors({field: "請選擇有效日期"}) from None
     if form.get("start") and form.get("end") and form["start"] > form["end"]:
         raise FormErrors({"end": "結束日期不可早於開始日期"})
     if form.get("slippage_percent") is not None:
@@ -91,7 +91,9 @@ def job_form(source):
         try:
             validate_periods(json.loads(form.get("periods", "[]")))
         except (ValueError, TypeError, KeyError):
-            raise FormErrors({"periods": "請檢查期間日期、用途及重複識別；最多 12 個期間"})
+            raise FormErrors(
+                {"periods": "請檢查期間日期、用途及重複識別；最多 12 個期間"}
+            ) from None
     return form
 
 
@@ -105,7 +107,7 @@ def strategy_form(source):
                 {
                     "strategy_json": "策略 JSON 不符合既有 schema：請檢查版本、全部欄位、數值與條件；未忽略任何欄位"
                 }
-            )
+            ) from None
     errors = {}
     for key, limit in (("name", 100), ("description", 1000)):
         if not source.get(key, "").strip() or len(source.get(key, "")) > limit:
@@ -156,4 +158,4 @@ def strategy_form(source):
         return validate_strategy(value)
     except ValueError as error:
         # Existing validation messages are fixed schema descriptions, never raw config.
-        raise FormErrors({"conditions": str(error)})
+        raise FormErrors({"conditions": str(error)}) from None

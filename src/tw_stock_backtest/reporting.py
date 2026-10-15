@@ -166,6 +166,7 @@ def export_portfolio_report(
         for strategy_point, benchmark_point in zip(
             strategy_curve,
             benchmark_curve,
+            strict=True,
         ):
             writer.writerow(
                 {

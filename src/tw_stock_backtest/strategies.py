@@ -320,7 +320,7 @@ def analyze_strategy(records_by_stock, as_of, strategy, *, indicator_records=Non
             # Validate identity/order even though indicators only see the eligible prefix.
             dates = [date.fromisoformat(r["date"]) for r in records]
             if any(r["stock_id"] != sid for r in records) or any(
-                a >= b for a, b in zip(dates, dates[1:])
+                a >= b for a, b in zip(dates, dates[1:], strict=False)
             ):
                 raise ValueError("行情股票或日期順序無效")
             if s["ranking_mode"] == "factors":

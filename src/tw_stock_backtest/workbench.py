@@ -30,8 +30,6 @@ from tw_stock_backtest.research_digest import (
 )
 from tw_stock_backtest.security import child_environment, public_data, safe_text
 from tw_stock_backtest.strategies import (
-    FACTOR_FIELDS,
-    RULE_FIELDS,
     StrategyLibrary,
     from_settings,
     snapshot,
@@ -134,9 +132,9 @@ class Workbench:
         self.lockfile = (self.state / ".lock").open("a")
         try:
             fcntl.flock(self.lockfile, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
+        except OSError as error:
             self.lockfile.close()
-            raise ValueError("同一工作目錄已有工作台執行中")
+            raise ValueError("同一工作目錄已有工作台執行中") from error
         self.pool = ThreadPoolExecutor(max_workers=1)
         self.lock = Lock()
         self.pending = 0
@@ -206,7 +204,7 @@ class Workbench:
         try:
             selected = self.library.load(form["strategy_id"]) if form.get("strategy_id") else None
         except (ValueError, OSError):
-            raise FormErrors({"strategy_id": "所選策略不存在或無法讀取"})
+            raise FormErrors({"strategy_id": "所選策略不存在或無法讀取"}) from None
         try:
             selected_many = (
                 [self.library.load(sid) for sid in form.get("strategies", "").split()]
@@ -214,7 +212,7 @@ class Workbench:
                 else []
             )
         except (ValueError, OSError):
-            raise FormErrors({"strategies": "所選策略不存在或無法讀取"})
+            raise FormErrors({"strategies": "所選策略不存在或無法讀取"}) from None
         if kind in ("comparison", "period_comparison") and (
             not 2 <= len(selected_many) <= 5
             or len({s["id"] for s in selected_many}) != len(selected_many)
@@ -766,7 +764,7 @@ def create_app(workbench, dev=False):
             return {"errors": error.errors}, 400
         except NetworkDisabled as error:
             return {"errors": {"_form": str(error) + "；未建立工作。"}}, 400
-        except (ValueError, OSError) as error:
+        except (ValueError, OSError):
             return {"errors": {"_form": "工作參數或檔案無法使用；未執行。請核對日期與策略。"}}, 400
         return redirect(url_for("index"))
 

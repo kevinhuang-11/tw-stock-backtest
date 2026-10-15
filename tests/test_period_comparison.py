@@ -1,4 +1,3 @@
-import copy
 import json
 import re
 import unittest
@@ -55,13 +54,13 @@ class PeriodTests(unittest.TestCase):
         batch, code = compare_periods(self.settings, self.strategies, ps, self.root / "batch")
         self.assertEqual(code, 0)
         data = self.read(batch / "comparison.json")
-        for p, output in zip(ps, data["periods"]):
+        for p, output in zip(ps, data["periods"], strict=True):
             single = compare_strategies(
                 self.settings, self.strategies, p["start"], p["end"], self.root / "single"
             )
             direct = self.read(single / "comparison.json")
             grouped = self.read(batch / output["report"] / "comparison.json")
-            for a, b in zip(direct["strategies"], grouped["strategies"]):
+            for a, b in zip(direct["strategies"], grouped["strategies"], strict=True):
                 self.assertEqual(
                     {k: v for k, v in a.items() if k != "report"},
                     {k: v for k, v in b.items() if k != "report"},

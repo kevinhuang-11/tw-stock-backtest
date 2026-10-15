@@ -6,7 +6,6 @@ import json
 import re
 from datetime import datetime, timezone
 from decimal import Decimal
-from pathlib import Path
 
 from tw_stock_backtest.backtesting.benchmark import run_buy_and_hold
 from tw_stock_backtest.backtesting.costs import CostSettings

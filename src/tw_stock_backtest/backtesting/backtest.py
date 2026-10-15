@@ -44,7 +44,7 @@ def run_backtest(
     previous_date = None
     stock_id = records[0]["stock_id"] if records else None
 
-    for record, signal in zip(records, signals):
+    for record, signal in zip(records, signals, strict=True):
         current_date = date.fromisoformat(record["date"])
 
         if previous_date is not None and current_date <= previous_date:

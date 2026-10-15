@@ -30,7 +30,7 @@ def evaluate_forward_return(
 
     calendar = [date.fromisoformat(value) for value in trading_dates]
 
-    if any(current <= previous for previous, current in zip(calendar, calendar[1:])):
+    if any(current <= previous for previous, current in zip(calendar, calendar[1:], strict=False)):
         raise ValueError("行情日期必須嚴格遞增且不可重複")
 
     if signal not in calendar:
@@ -115,6 +115,17 @@ def evaluate_forward_return(
     result["status"] = "ok"
 
     return result
+
+
+def _average(rows, key):
+    """有效資料列中某欄位的平均；沒有有效資料時為 None。"""
+    if not rows:
+        return None
+
+    return sum(
+        (row[key] for row in rows),
+        Decimal("0"),
+    ) / Decimal(len(rows))
 
 
 def evaluate_rankings(
@@ -251,15 +262,6 @@ def evaluate_rankings(
                     reason = row["reason"]
                     reason_counts[reason] = reason_counts.get(reason, 0) + 1
 
-            def average(key):
-                if not valid:
-                    return None
-
-                return sum(
-                    (row[key] for row in valid),
-                    Decimal("0"),
-                ) / Decimal(len(valid))
-
             summaries.append(
                 {
                     "horizon": horizon,
@@ -268,9 +270,9 @@ def evaluate_rankings(
                     "evaluated_days": len(valid),
                     "unavailable_days": len(group) - len(valid),
                     "unavailable_reasons": reason_counts,
-                    "average_selected_return": average("selected_return"),
-                    "average_universe_return": average("universe_return"),
-                    "average_excess_return": average("excess_return"),
+                    "average_selected_return": _average(valid, "selected_return"),
+                    "average_universe_return": _average(valid, "universe_return"),
+                    "average_excess_return": _average(valid, "excess_return"),
                     "positive_return_ratio": (
                         Decimal(sum(row["selected_return"] > 0 for row in valid))
                         / Decimal(len(valid))
