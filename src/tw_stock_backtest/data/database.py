@@ -2,6 +2,7 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 from decimal import Decimal
+from tw_stock_backtest.data.market_events import CONFIRMED_HALTS
 from tw_stock_backtest.date_range import parse_date_range
 
 
@@ -154,9 +155,22 @@ def save_records(records, db_path=DEFAULT_DB_PATH):
     return len(rows)
 
 
-def load_records(stock_id, start_text, end_text, db_path=DEFAULT_DB_PATH):
-    """讀取指定股票與日期區間的行情，依日期由舊到新排列。"""
+def load_records(
+    stock_id,
+    start_text,
+    end_text,
+    db_path=DEFAULT_DB_PATH,
+    confirmed_halts=None,
+):
+    """讀取指定股票與日期區間的行情，依日期由舊到新排列。
+
+    來源在停止買賣期間通常不提供該股的列。已確認停牌（附公開來源，見
+    confirmed_halts.json）的日子若是行情日（其他股票當天有行情）、這檔卻沒有列，
+    會補上一列停牌列：開高低收為 None、量值筆數為 0，不補任何價格。
+    研究、回測與個股圖都經過這裡，因此看到同一份序列。未確認的缺漏維持原狀。
+    """
     start, end = parse_date_range(start_text, end_text)
+    halts = CONFIRMED_HALTS if confirmed_halts is None else confirmed_halts
 
     db_path = Path(db_path).resolve()
 
@@ -182,6 +196,27 @@ def load_records(stock_id, start_text, end_text, db_path=DEFAULT_DB_PATH):
             end.isoformat(),
         )).fetchall()
 
+        existing = {row["date"] for row in rows}
+        halt_days = sorted(
+            day
+            for halted_stock, day in halts
+            if halted_stock == stock_id
+            and start.isoformat() <= day <= end.isoformat()
+            and day not in existing
+        )
+
+        # 只有其他股票當天有行情的日子才是行情日；週末與休市日不會補列。
+        market_days = set()
+        if halt_days:
+            placeholders = ", ".join("?" for _ in halt_days)
+            market_days = {
+                row[0]
+                for row in connection.execute(
+                    f"SELECT DISTINCT date FROM stock_prices WHERE date IN ({placeholders})",
+                    halt_days,
+                )
+            }
+
     records = []
 
     for row in rows:
@@ -193,6 +228,20 @@ def load_records(stock_id, start_text, end_text, db_path=DEFAULT_DB_PATH):
 
         records.append(record)
 
+    for day in sorted(market_days):
+        records.append({
+            "stock_id": stock_id,
+            "date": day,
+            "open": None,
+            "high": None,
+            "low": None,
+            "close": None,
+            "volume": 0,
+            "turnover": 0,
+            "trade_count": 0,
+        })
+
+    records.sort(key=lambda record: record["date"])
     return records
 
 

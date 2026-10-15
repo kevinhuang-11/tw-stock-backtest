@@ -3,7 +3,8 @@ import sqlite3
 from contextlib import closing
 
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config
-from tw_stock_backtest.data_status import price_gaps, stock_quality
+from tw_stock_backtest.data.market_events import CONFIRMED_HALTS
+from tw_stock_backtest.data_status import market_dates, price_gaps, stock_quality
 
 
 def parse_arguments():
@@ -94,6 +95,7 @@ def main():
             if args.gaps
             else None
         )
+        days = market_dates(db_path) if gaps else ()
 
     except (ValueError, sqlite3.Error, OSError) as error:
         print(f"資料庫檢視失敗：{error}")
@@ -127,6 +129,15 @@ def main():
                 if gap["missing_market_days"]
                 else "全庫都沒有行情"
             )
+            missing = [
+                day for day in days
+                if gap["previous_date"] < day < gap["date"]
+            ]
+            # 缺漏的行情日全部屬於已確認停牌時註明；讀取行情時會補上停牌列。
+            if missing and all(
+                (gap["stock_id"], day) in CONFIRMED_HALTS for day in missing
+            ):
+                reason += "（已確認停牌）"
             print(
                 f"{gap['stock_id']}：{gap['previous_date']} → {gap['date']}，"
                 f"相隔 {gap['calendar_days']} 個日曆日，{reason}"
