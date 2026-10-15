@@ -14,7 +14,7 @@ v1 版本供單人在本機使用；測試驗證的是軟體行為，不代表�
 python3.12 -m venv .venv && .venv/bin/python -m pip install -e . && .venv/bin/python examples/prepare_demo.py --serve
 ```
 
-開啟 **http://127.0.0.1:9000**。示範使用三檔合成股票，不需要網路、不讀取任何個人資料；示範環境中連網更新的按鈕會停用並說明原因。
+開啟 `http://127.0.0.1:9000`。示範使用三檔合成股票，不需要網路、不讀取任何個人資料；示範環境中連網更新的按鈕會停用並說明原因。
 
 ![總覽：資料狀態、最近的工作與報表](docs/images/overview.png)
 
@@ -106,7 +106,7 @@ python3.12 -m venv .venv
 .venv/bin/python -m tw_stock_backtest.cli.serve_workbench --port 9000
 ```
 
-開啟 **http://127.0.0.1:9000**。只有本機 loopback 監聽；無資料時首頁會說明從哪裡開始，不自動下載。上方導覽列可前往總覽、研究、回測、自選、個股、策略與報表。
+開啟 `http://127.0.0.1:9000`。只有本機 loopback 監聽；無資料時首頁會說明從哪裡開始，不自動下載。上方導覽列可前往總覽、研究、回測、自選、個股、策略與報表。
 
 新環境可依 [DEMO](docs/DEMO.md) 建立**無網路、無私人資料的合成範例**；使用真實資料的準備方式見 [操作指南](docs/OPERATIONS.md#真實資料準備)。資料庫相對路徑以設定檔所在目錄為基準。
 
