@@ -44,7 +44,7 @@ Windows：目前不支援在 Windows 上直接執行（工作台使用只有 Lin
 
 - **不使用未來資料**：訊號以當日收盤計算、下一個行情日開盤成交；指標只看分析日以前的資料，有專門測試確認加入未來行情不會改變過去結果（[portfolio.py](src/tw_stock_backtest/backtesting/portfolio.py)、[test_factors.py](tests/test_factors.py)）。
 - **計入台股成本**：手續費 0.1425%（最低 20 元、可設折扣）、賣出證交稅 0.3%、單邊滑價，全程以 `Decimal` 計算並依規則捨去（[costs.py](src/tw_stock_backtest/backtesting/costs.py)）。
-- **資料品質優先於結果好看**：缺價不補零、不刪列湊窗口，未確認的缺漏不當成停牌；介面標示每檔資料截至哪天、落後幾個行情日（[data_status.py](src/tw_stock_backtest/data_status.py)）。
+- **資料品質優先於結果好看**：缺價不補零、不刪列湊窗口，未確認的缺漏不當成停牌；遞迴指標在缺價後重新暖機，無成交價的日子當日不成交並在報表列出，而不是讓整次回測失敗；介面標示每檔資料截至哪天、落後幾個行情日（[data_status.py](src/tw_stock_backtest/data_status.py)、[market_events.py](src/tw_stock_backtest/data/market_events.py)）。
 - **可追查的報表**：每份研究與回測都固定保存當時的設定、股票池、輸入資料與策略 SHA-256，之後修改策略或更新資料都不會改變舊報表。
 - **離線示範與連網防護**：合成示範名單會讓所有下載入口在發出請求前拒絕執行，測試以攔截網路函式確認（[test_offline_demo.py](tests/test_offline_demo.py)）。
 - **不依賴前端框架與 CDN**：Flask＋Jinja＋原生 JS，自繪 SVG 圖示、系統字型；可鍵盤操作的股票選擇器；台股慣例紅漲綠跌，狀態標籤刻意不用綠色以免與下跌混淆。
