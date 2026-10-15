@@ -93,3 +93,14 @@ class PriceSource:
                 sid: [list(gap) for gap in gaps] for sid, gaps in sorted(self._gaps.items())
             },
         }
+
+
+def describe_prices(summary):
+    """價格口徑的一行說明，給 CLI 輸出與報表使用。"""
+    if summary.get("mode") != ADJUSTED:
+        return "價格：原始價格（未調整除權息、減資與變更面額）"
+    text = f"價格：截至分析日的還原價（套用 {len(summary['actions'])} 筆公司行動）"
+    gaps = summary.get("uncovered") or {}
+    if gaps:
+        text += f"；{len(gaps)} 檔有未下載公司行動資料的期間，這些期間無法調整"
+    return text

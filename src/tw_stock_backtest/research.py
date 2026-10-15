@@ -17,6 +17,7 @@ from tw_stock_backtest.data.database import load_records, save_records
 from tw_stock_backtest.data.stock_data import normalize_row
 from tw_stock_backtest.data.universe import ensure_network_allowed
 from tw_stock_backtest.date_range import filter_records, month_starts
+from tw_stock_backtest.prices import PriceSource
 from tw_stock_backtest.reporting import _json_default
 
 
@@ -291,12 +292,14 @@ def evaluate_research(
         if r["status"] != "success" and r.get("skip_reason") != "resumed_success"
     }
     rows, errors = [], []
+    prices = PriceSource(settings)
     if target and Path(settings["storage"]["database_path"]).exists():
         rows, errors = collect_factor_rows(
             stocks,
             target,
             db_path=settings["storage"]["database_path"],
             factor_settings=settings["factors"],
+            prices=prices,
         )
     else:
         errors = [{"stock_id": s["stock_id"], "reason": "沒有可用分析日期或行情"} for s in stocks]
@@ -337,6 +340,7 @@ def evaluate_research(
             }
         )
     return {
+        "price_adjustment": prices.describe(),
         "ranking_mode": "factors",
         "analysis_date": target,
         "cutoff": cutoff.isoformat(),
@@ -377,8 +381,16 @@ def evaluate_strategy_research(
         if r["status"] != "success" and r.get("skip_reason") != "resumed_success"
     }
     # Failed downloads are excluded before scoring, exactly as in the original research path.
+    # 計算用截至分析日的序列（依價格模式）；顯示用的收盤與資料範圍仍取原始行情。
+    prices = PriceSource(settings)
     analysis = analyze_strategy(
-        {sid: rows for sid, rows in histories.items() if sid not in bad_updates}, target, strategy
+        {
+            sid: prices.adjust(rows, sid, target)
+            for sid, rows in histories.items()
+            if sid not in bad_updates
+        },
+        target,
+        strategy,
     )
     errors = {
         **analysis["errors"],
@@ -420,6 +432,7 @@ def evaluate_strategy_research(
         "exit_code": {"success": 0, "partial": 2, "failed": 1}[status],
         "ranking_mode": strategy["ranking_mode"],
         "strategy_snapshot": snapshot(strategy),
+        "price_adjustment": prices.describe(),
         "rankings": rankings,
         "scored_rankings": analysis["rankings"] if status != "failed" else [],
         "ranking_population": analysis["ranking_population"],

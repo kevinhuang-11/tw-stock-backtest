@@ -15,6 +15,7 @@ from tw_stock_backtest.cli.download_universe import save_progress
 from tw_stock_backtest.data.database import load_records
 from tw_stock_backtest.data.supplemental import timestamp
 from tw_stock_backtest.data.universe import NetworkDisabled
+from tw_stock_backtest.prices import PriceSource
 from tw_stock_backtest.research import program_version
 from tw_stock_backtest.research_digest import render_digest
 from tw_stock_backtest.security import public_data
@@ -57,6 +58,7 @@ def observations(wb, stocks, strategy_id=None, as_of=None):
         names = {}
     bundles = report_bundles(wb)
     database = Path(wb.settings["storage"]["database_path"])
+    prices = PriceSource(wb.settings)
     rows = []
     for sid in stocks:
         row = {
@@ -95,7 +97,9 @@ def observations(wb, stocks, strategy_id=None, as_of=None):
                 if lag:
                     row["warnings"].append(f"行情距台灣今日 {lag} 個日曆日；不等於缺漏交易日")
             # Relative scores from this calculation are deliberately discarded.
-            diagnostic = analyze_strategy({sid: records}, target, strategy)["diagnostics"].get(sid)
+            # 條件依價格模式計算（adjusted 為截至分析日的還原價）；顯示的收盤仍是原始價格。
+            adjusted = prices.adjust(records, sid, target)
+            diagnostic = analyze_strategy({sid: adjusted}, target, strategy)["diagnostics"].get(sid)
             row.update(
                 diagnostic=diagnostic, status=(diagnostic or {}).get("status", "unavailable")
             )
@@ -171,6 +175,7 @@ def observations(wb, stocks, strategy_id=None, as_of=None):
         "requested_date": as_of,
         "specified_pool": stocks,
         "strategy_snapshot": strategy_snapshot,
+        "price_adjustment": prices.describe(),
         "rows": rows,
         "counts": {
             "requested": len(rows),

@@ -19,6 +19,7 @@ from tw_stock_backtest.analysis.indicators import (
 )
 from tw_stock_backtest.data.database import load_records
 from tw_stock_backtest.data.universe import load_universe
+from tw_stock_backtest.prices import PriceSource
 from tw_stock_backtest.research_digest import differences, load_bundle
 from tw_stock_backtest.security import public_data
 from tw_stock_backtest.strategies import analyze_strategy, from_settings, snapshot
@@ -314,7 +315,9 @@ def current_stock(wb, sid, args):
         if args.get("strategy_id")
         else from_settings(wb.settings)
     )
-    analysis = analyze_strategy({sid: records}, target, strategy)
+    # 條件與因子依價格模式計算（adjusted 為截至分析日的還原價）。
+    prices = PriceSource(wb.settings)
+    analysis = analyze_strategy({sid: prices.adjust(records, sid, target)}, target, strategy)
     scored = analysis["rankings"]
     return {
         "stock_id": sid,
@@ -328,6 +331,7 @@ def current_stock(wb, sid, args):
         "strategy_snapshot": snapshot(strategy),
         "diagnostic": analysis["diagnostics"].get(sid),
         "factors": scored[0].get("factors") if scored else None,
+        "price_adjustment": prices.describe(),
         "chart": chart_data(records, strategy, int(args.get("display", 120))),
         "ranking": None,
         "pool": None,
