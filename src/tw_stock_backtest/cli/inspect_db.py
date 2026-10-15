@@ -3,6 +3,7 @@ import sqlite3
 from contextlib import closing
 
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config
+from tw_stock_backtest.data_status import price_gaps, stock_quality
 
 
 def parse_arguments():
@@ -25,6 +26,17 @@ def parse_arguments():
         type=int,
         default=5,
         help="顯示最近幾筆行情，預設為 5",
+    )
+    parser.add_argument(
+        "--gaps",
+        action="store_true",
+        help="列出行情缺口：其他股票有行情、這檔卻沒有的日子，或超過 --gap-days 個日曆日的空白",
+    )
+    parser.add_argument(
+        "--gap-days",
+        type=int,
+        default=20,
+        help="日曆日間隔超過幾天也視為缺口，預設 20（涵蓋農曆年等長假）",
     )
 
     return parser.parse_args()
@@ -56,19 +68,6 @@ def main():
         with closing(
             sqlite3.connect(database_uri, uri=True)
         ) as connection:
-            summaries = connection.execute(
-                """
-                SELECT
-                    stock_id,
-                    COUNT(*),
-                    MIN(date),
-                    MAX(date)
-                FROM stock_prices
-                GROUP BY stock_id
-                ORDER BY stock_id
-                """
-            ).fetchall()
-
             recent_records = connection.execute(
                 """
                 SELECT
@@ -85,6 +84,17 @@ def main():
                 (stock_id, args.limit),
             ).fetchall()
 
+        if args.gap_days < 0:
+            raise ValueError("--gap-days 不可為負數")
+
+        # 筆數、起訖日、缺價與落後行情日數都由 SQL 分組與視窗函式計算。
+        summaries = stock_quality(db_path)
+        gaps = (
+            price_gaps(db_path, calendar_days=args.gap_days)
+            if args.gaps
+            else None
+        )
+
     except (ValueError, sqlite3.Error, OSError) as error:
         print(f"資料庫檢視失敗：{error}")
         return 1
@@ -96,10 +106,30 @@ def main():
     if not summaries:
         print("資料庫中尚無行情資料。")
     else:
-        for saved_stock_id, count, start, end in summaries:
+        for row in summaries:
+            notes = []
+            if row["missing_close"]:
+                notes.append(f"收盤價缺失 {row['missing_close']} 筆")
+            if row["market_lag"]:
+                notes.append(f"落後 {row['market_lag']} 個行情日")
             print(
-                f"{saved_stock_id}：{count} 筆，"
-                f"{start} ～ {end}"
+                f"{row['stock_id']}：{row['rows']} 筆，"
+                f"{row['first_date']} ～ {row['last_date']}"
+                + ("（" + "，".join(notes) + "）" if notes else "")
+            )
+
+    if gaps is not None:
+        print(f"\n行情缺口：{len(gaps)} 處")
+
+        for gap in gaps:
+            reason = (
+                f"其他股票有 {gap['missing_market_days']} 個行情日"
+                if gap["missing_market_days"]
+                else "全庫都沒有行情"
+            )
+            print(
+                f"{gap['stock_id']}：{gap['previous_date']} → {gap['date']}，"
+                f"相隔 {gap['calendar_days']} 個日曆日，{reason}"
             )
 
     print(f"\n{stock_id} 最近 {args.limit} 筆：")

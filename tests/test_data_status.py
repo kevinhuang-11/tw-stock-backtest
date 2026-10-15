@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from test_end_to_end import TEST_CONFIG
 from tw_stock_backtest.data.database import save_records
 from tw_stock_backtest.data.supplemental import Store
-from tw_stock_backtest.data_status import data_status, market_lag, price_summary
+from tw_stock_backtest.data_status import data_status, market_dates, market_lag
 from tw_stock_backtest.stock_research import Watchlist
 from tw_stock_backtest.workbench import Workbench, create_app
 
@@ -40,15 +40,13 @@ class StatusCase(unittest.TestCase):
 
 class DataStatusTests(StatusCase):
     def test_lag_counts_later_local_trading_days(self):
-        dates, latest = price_summary(self.db)
-        self.assertEqual(dates, DAYS)
-        self.assertEqual(latest, {"2330": "2026-10-14", "1101": "2026-10-12"})
-        self.assertEqual(market_lag("2026-10-14", dates), 0)
-        self.assertEqual(market_lag("2026-10-12", dates), 2)
+        self.assertEqual(market_dates(self.db), DAYS)
+        self.assertEqual(market_lag(self.db, "2026-10-14"), 0)
+        self.assertEqual(market_lag(self.db, "2026-10-12"), 2)
         # 週末等不在行情庫的日期，同樣以之後出現的行情日計算。
-        self.assertEqual(market_lag("2026-10-10", dates), 3)
-        self.assertIsNone(market_lag(None, dates))
-        self.assertIsNone(market_lag("2026-10-12", ()))
+        self.assertEqual(market_lag(self.db, "2026-10-10"), 3)
+        self.assertIsNone(market_lag(self.db, None))
+        self.assertIsNone(market_lag(self.root / "missing.db", "2026-10-12"))
 
     def test_summary_includes_listing_and_supplemental(self):
         Store(self.db.with_name("supplemental.sqlite3")).save("institution", [

@@ -92,14 +92,14 @@ def build_demo(root):
 def build_real(root, config, stocks):
     """真實行情：只讀行情庫，其餘產物都寫在 root。"""
     from tw_stock_backtest.config import load_config
-    from tw_stock_backtest.data_status import price_summary
+    from tw_stock_backtest.data_status import market_dates
     from tw_stock_backtest.stock_research import Watchlist
     from tw_stock_backtest.strategies import StrategyLibrary
     from tw_stock_backtest.watchlist_research import observations, save_snapshot
     from tw_stock_backtest.workbench import Workbench
 
     settings = load_config(config)
-    dates = price_summary(settings["storage"]["database_path"])[0]
+    dates = market_dates(settings["storage"]["database_path"])
     if len(dates) < 45:
         raise RuntimeError("行情庫的資料不足 45 個行情日，無法建立真實資料截圖")
     env = {"config": Path(config).resolve(), "reports": root / "reports",

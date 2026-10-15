@@ -373,12 +373,14 @@ def create_app(workbench, dev=False):
                 'nav_items': navigation(request.path)}
 
     def lag_for(day):
-        # 「落後幾個行情日」以本機行情庫的日期推算；同一次請求只讀一次行情庫。
+        # 「落後幾個行情日」以本機行情庫的日期推算，由 SQL 計數；同一次請求內相同日期只查一次。
         from flask import g
-        from tw_stock_backtest.data_status import market_lag, price_summary
-        if 'price_dates' not in g:
-            g.price_dates = price_summary(workbench.settings['storage']['database_path'])[0]
-        return market_lag(day, g.price_dates)
+        from tw_stock_backtest.data_status import market_lag
+        if 'market_lags' not in g:
+            g.market_lags = {}
+        if day not in g.market_lags:
+            g.market_lags[day] = market_lag(workbench.settings['storage']['database_path'], day)
+        return g.market_lags[day]
 
     # 以全域函式提供，匯入的巨集（_components.html）也能使用。
     app.jinja_env.globals['market_lag'] = lag_for
