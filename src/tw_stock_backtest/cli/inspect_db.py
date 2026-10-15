@@ -3,6 +3,7 @@ import sqlite3
 from contextlib import closing
 
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config
+from tw_stock_backtest.data.corporate_actions import summary as corporate_summary
 from tw_stock_backtest.data.market_events import CONFIRMED_HALTS
 from tw_stock_backtest.data_status import market_dates, price_gaps, stock_quality
 
@@ -86,6 +87,7 @@ def main():
         summaries = stock_quality(db_path)
         gaps = price_gaps(db_path, calendar_days=args.gap_days) if args.gaps else None
         days = market_dates(db_path) if gaps else ()
+        actions = corporate_summary(db_path)
 
     except (ValueError, sqlite3.Error, OSError) as error:
         print(f"資料庫檢視失敗：{error}")
@@ -109,6 +111,13 @@ def main():
                 f"{row['first_date']} ～ {row['last_date']}"
                 + ("（" + "，".join(notes) + "）" if notes else "")
             )
+
+    print(
+        f"\n公司行動：{actions['count']} 筆，最新生效日 {actions['latest']}，"
+        f"待人工確認 {actions['needs_review']} 筆"
+        if actions
+        else "\n公司行動：尚未下載（fetch_corporate_actions）"
+    )
 
     if gaps is not None:
         print(f"\n行情缺口：{len(gaps)} 處")
