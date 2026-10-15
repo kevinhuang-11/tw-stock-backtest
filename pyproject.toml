@@ -13,9 +13,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# 只供本機開發：產生工作台截圖。正式安裝與 CI 測試都不需要。
+# 只供本機開發：產生工作台截圖與程式碼檢查。正式安裝與 CI 測試都不需要 playwright。
 dev = [
     "playwright>=1.49,<2",
+    # 鎖定確切版本：不同版本的 ruff format 結果可能不同，本機與 CI 必須一致。
+    "ruff==0.17.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -24,3 +26,27 @@ include = ["tw_stock_backtest*"]
 
 [tool.setuptools.package-data]
 tw_stock_backtest = ["templates/*.html", "static/*.js", "static/*.css", "static/*.svg", "data/*.json"]
+
+[tool.ruff]
+target-version = "py312"
+# 100：比預設 88 多留一些空間給中文字串與註解（全形字以 2 欄計算），
+# 又不像 120 那樣放任過長的單行；以目前程式碼計，約 600 行需要重新換行。
+line-length = 100
+# 編輯器或 pre-commit 直接傳入檔案路徑時，仍套用排除規則。
+force-exclude = true
+
+[tool.ruff.format]
+# 只排版 Python 檔；文件中的程式碼片段刻意保留對齊的註解，不交給 formatter。
+exclude = ["*.md"]
+
+[tool.ruff.lint]
+# 保守的起點：pycodestyle 錯誤（E）、pyflakes（F）、import 排序（I）、bugbear（B）。
+select = ["E", "F", "I", "B"]
+ignore = [
+    # 行長由 ruff format 處理；剩下的超長行幾乎都是不可拆的中文字串、錯誤訊息或網址，
+    # 為了符合長度而拆字串會降低可讀性，也會讓搜尋訊息原文變得困難。
+    "E501",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["tw_stock_backtest"]
