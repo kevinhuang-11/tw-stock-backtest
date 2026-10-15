@@ -11,6 +11,21 @@ DEFAULT_DB_PATH = (
 )
 
 
+TABLE = """
+    CREATE TABLE IF NOT EXISTS stock_prices (
+        stock_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        open TEXT,
+        high TEXT,
+        low TEXT,
+        close TEXT,
+        volume INTEGER NOT NULL CHECK (volume >= 0),
+        turnover INTEGER NOT NULL CHECK (turnover >= 0),
+        trade_count INTEGER NOT NULL CHECK (trade_count >= 0),
+        PRIMARY KEY (stock_id, date)
+    )
+"""
+
 # 主鍵 (stock_id, date) 已涵蓋「單一股票＋日期範圍」的查詢；
 # 以下索引服務以日期為主的橫斷面查詢，以及找出缺價列。
 INDEXES = (
@@ -21,34 +36,78 @@ INDEXES = (
     "ON stock_prices(stock_id, date) WHERE close IS NULL",
 )
 
+# Schema 版本記在 PRAGMA user_version。每個版本只新增、不改寫既有資料，
+# 敘述都可重複執行；舊版程式建立的資料庫 user_version 為 0。
+MIGRATIONS = (
+    (1, (TABLE,)),      # 行情表；v1 程式建立的資料庫已有此表，這一步不會改動它
+    (2, INDEXES),       # 日期索引與缺價部分索引
+)
+SCHEMA_VERSION = MIGRATIONS[-1][0]
 
-def create_schema(connection):
-    """建立行情表與索引；全部使用 IF NOT EXISTS，可重複執行。"""
-    connection.execute("""
-        CREATE TABLE IF NOT EXISTS stock_prices (
-            stock_id TEXT NOT NULL,
-            date TEXT NOT NULL,
-            open TEXT,
-            high TEXT,
-            low TEXT,
-            close TEXT,
-            volume INTEGER NOT NULL CHECK (volume >= 0),
-            turnover INTEGER NOT NULL CHECK (turnover >= 0),
-            trade_count INTEGER NOT NULL CHECK (trade_count >= 0),
-            PRIMARY KEY (stock_id, date)
+
+def schema_version(connection):
+    return connection.execute("PRAGMA user_version").fetchone()[0]
+
+
+def migrate(connection):
+    """把資料庫升級到 SCHEMA_VERSION，回傳 (升級前版本, 升級後版本)。
+
+    每個版本在自己的 IMMEDIATE 交易中執行，連同 user_version 一起提交；
+    失敗時整個版本回滾。版本在取得寫入鎖之後才讀取，兩個程序同時升級時，
+    後到的會看到已完成的版本而略過。連線必須是自動提交模式（isolation_level=None）。
+    """
+    if connection.isolation_level is not None:
+        raise ValueError("遷移需要自動提交模式的連線")
+
+    before = schema_version(connection)
+    if before > SCHEMA_VERSION:
+        raise ValueError(
+            f"資料庫 schema 版本 {before} 比程式支援的 {SCHEMA_VERSION} 新，請更新程式"
         )
-    """)
 
-    for statement in INDEXES:
-        connection.execute(statement)
+    for version, statements in MIGRATIONS:
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            if schema_version(connection) >= version:
+                connection.execute("COMMIT")
+                continue
+            for statement in statements:
+                connection.execute(statement)
+            # PRAGMA 不支援參數綁定；version 是上面定義的整數常數，不來自外部輸入。
+            connection.execute(f"PRAGMA user_version = {int(version)}")
+            connection.execute("COMMIT")
+        except BaseException:
+            connection.execute("ROLLBACK")
+            raise
+
+    return before, schema_version(connection)
+
+
+def migrate_database(db_path=DEFAULT_DB_PATH):
+    """開啟（必要時建立）資料庫並升級 schema，回傳 (升級前版本, 升級後版本)。"""
+    db_path = Path(db_path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with closing(sqlite3.connect(db_path, isolation_level=None)) as connection:
+        return migrate(connection)
+
+
+def read_schema_version(db_path=DEFAULT_DB_PATH):
+    """唯讀查詢 schema 版本；資料庫不存在時回傳 None，不會建立檔案。"""
+    db_path = Path(db_path).resolve()
+    if not db_path.is_file():
+        return None
+
+    with closing(sqlite3.connect(db_path.as_uri() + "?mode=ro", uri=True)) as connection:
+        return schema_version(connection)
 
 
 def save_records(records, db_path=DEFAULT_DB_PATH):
-    """建立資料表，並新增或更新行情。"""
+    """新增或更新行情；寫入前先把資料庫升級到目前的 schema 版本。"""
     db_path = Path(db_path)
 
-    # data 資料夾不存在時，自動建立。
-    db_path.parent.mkdir(parents=True, exist_ok=True)
+    # 建立 data 資料夾與資料表，並套用尚未執行的遷移（例如舊資料庫補上索引）。
+    migrate_database(db_path)
 
     rows = []
 
@@ -74,8 +133,6 @@ def save_records(records, db_path=DEFAULT_DB_PATH):
     with closing(sqlite3.connect(db_path)) as connection:
         # 寫入成功時提交；失敗時回滾本次交易。
         with connection:
-            create_schema(connection)
-
             connection.executemany("""
                 INSERT INTO stock_prices (
                     stock_id, date, open, high, low, close,
