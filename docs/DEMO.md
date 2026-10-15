@@ -1,6 +1,6 @@
 # 操作導覽
 
-[README](../README.md) · [操作與設計細節](OPERATIONS.md)
+[README](../README.md) · [操作與設計細節](OPERATIONS.md) · [資料庫與 SQL](SQL.md)
 
 這份導覽帶你用一組離線的合成資料，把工作台的主要功能走一遍，大約 5 分鐘。
 過程不需要網路、不會下載行情，也不會寄信。

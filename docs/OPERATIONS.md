@@ -1,6 +1,6 @@
 # 操作與設計指南
 
-[README](../README.md) · [操作導覽](DEMO.md)
+[README](../README.md) · [操作導覽](DEMO.md) · [資料庫與 SQL](SQL.md)
 
 一般網頁操作使用選單與表單。以下 CLI 適合批次工作及追查；`<run_id>`／`<report_dir>` 為指令印出的實際目錄，不是可原樣執行的文字。
 
@@ -32,6 +32,15 @@ for stock_id in 2330 2317 2454; do
     --stock "$stock_id" --start 2026-07-01 --end 2026-09-29 || break
 done
 .venv/bin/python -m tw_stock_backtest.cli.inspect_db --stock 2330 --limit 5
+```
+
+`inspect_db` 的摘要會標出各股收盤價缺失的筆數與落後幾個行情日；加上 `--gaps` 會列出行情缺口（其他股票有行情、這檔卻沒有列的日子，或超過 `--gap-days` 個日曆日的空白，預設 20）。
+
+行情庫的 schema 版本記在 `PRAGMA user_version`，寫入行情時會自動升級。也可以單獨執行 `migrate_db`（`--check` 只顯示版本、不修改；需要升級時退出碼為 2）。細節見 [資料庫與 SQL](SQL.md)。
+
+```bash
+.venv/bin/python -m tw_stock_backtest.cli.migrate_db --config config.toml --check
+.venv/bin/python -m tw_stock_backtest.cli.migrate_db --config config.toml
 ```
 
 下載普通股名單不是下載全市場行情。逐檔確認資料範圍；來源無法取得時保留失敗，不補造數值。固定歷史示例的資料可用性仍取決於官方來源。
