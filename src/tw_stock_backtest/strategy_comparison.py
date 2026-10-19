@@ -57,6 +57,7 @@ def compare_strategies(
         initial_cash=backtest["initial_cash"],
         cost_settings=costs,
         slippage_rate=backtest["slippage_rate"],
+        corporate_actions=corporate_actions,
     )
     bench_performance = performance(benchmark)
     report = ResearchReport(output_root)

@@ -197,6 +197,7 @@ def main():
             initial_cash=backtest_settings["initial_cash"],
             cost_settings=cost_settings,
             slippage_rate=backtest_settings["slippage_rate"],
+            corporate_actions=corporate_actions,
         )
 
         benchmark_performance = summarize_performance(

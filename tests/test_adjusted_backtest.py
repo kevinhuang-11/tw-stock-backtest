@@ -11,6 +11,7 @@ from test_adjusted_research import DAYS, EVENT, reduction, rows
 from test_end_to_end import TEST_CONFIG
 
 from tw_stock_backtest.analysis.screening_history import build_screening_history
+from tw_stock_backtest.backtesting.benchmark import run_buy_and_hold
 from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.backtesting.portfolio import run_portfolio_backtest
 from tw_stock_backtest.config import load_config
@@ -220,3 +221,29 @@ class EngineAccountingTests(unittest.TestCase):
             self.equity(result, DAYS[45])["cash"],
             self.equity(result, DAYS[44])["cash"] + held // 2 + trades_on,
         )
+
+
+class BenchmarkAccountingTests(unittest.TestCase):
+    def test_buy_and_hold_gets_the_same_adjustments(self):
+        records = {"2330": rows("2330"), "2317": rows("2317")}
+
+        def run(actions):
+            return run_buy_and_hold(
+                records,
+                DAYS[40],
+                DAYS[-1],
+                initial_cash=D("200000"),
+                cost_settings=COSTS,
+                corporate_actions=actions,
+            )
+
+        def jump(result):
+            curve = {p["date"]: p for p in result["equity_curve"]}
+            return curve[EVENT]["equity"] / curve[DAYS[49]]["equity"] - 1
+
+        raw, adjusted = run(None), run({"2330": [reduction()]})
+        self.assertGreater(jump(raw), D("0.3"))  # 一半資金在 2330，帳面多出約四成
+        self.assertLess(abs(jump(adjusted)), D("0.01"))
+        event = adjusted["corporate_action_events"][0]
+        self.assertEqual((event["stock_id"], event["applied_on"]), ("2330", EVENT))
+        self.assertEqual(event["shares_after"], int(event["shares_before"] * D("0.555555556")))
