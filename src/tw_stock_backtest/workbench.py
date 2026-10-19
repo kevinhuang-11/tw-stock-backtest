@@ -20,6 +20,7 @@ from tw_stock_backtest.cli.download_universe import save_progress
 from tw_stock_backtest.config import apply_overrides, load_config
 from tw_stock_backtest.data.universe import NetworkDisabled, ensure_network_allowed, offline_reason
 from tw_stock_backtest.notifications import preview_message
+from tw_stock_backtest.prices import BACKTEST_NOTE, MODE_LABELS, RAW, report_price_mode
 from tw_stock_backtest.research import program_version
 from tw_stock_backtest.research_digest import (
     differences,
@@ -77,6 +78,12 @@ def report_details(path):
         rankings = read_json(path / "rankings.json")
         return {
             **summary,
+            "price_mode": report_price_mode(
+                summary,
+                (
+                    read_json(path / "settings.json") if (path / "settings.json").exists() else {}
+                ).get("settings"),
+            ),
             "kind": "research",
             "rankings": rankings,
             "configuration": read_json(path / "settings.json")
@@ -88,15 +95,29 @@ def report_details(path):
         for name in ("settings.json", "results.json", "input_data.json", "trades.csv", "equity.csv")
     ):
         result = read_json(path / "results.json")
+        configuration = (
+            read_json(path / "settings.json") if (path / "settings.json").exists() else {}
+        )
+        strategy_result = result["strategy"].get("result") or {}
         return {
             "kind": "backtest",
             "status": "complete",
             "strategy": result["strategy"]["performance"],
             "benchmark": result["benchmark"]["performance"],
-            "market_events": result["strategy"]["result"].get("market_events", []),
-            "configuration": read_json(path / "settings.json")
-            if (path / "settings.json").exists()
-            else {},
+            "market_events": strategy_result.get("market_events", []),
+            # 舊報表沒有價格口徑的紀錄，視為原始價格。
+            "price_mode": report_price_mode(strategy_result, configuration.get("settings")),
+            "corporate_action_events": [
+                {**event, "source": "strategy"}
+                for event in strategy_result.get("corporate_action_events", [])
+            ]
+            + [
+                {**event, "source": "benchmark"}
+                for event in (result["benchmark"].get("result") or {}).get(
+                    "corporate_action_events", []
+                )
+            ],
+            "configuration": configuration,
         }
     return {"kind": "unknown", "status": "incomplete"}
 
@@ -107,6 +128,11 @@ def compare_rankings(left, right):
         for x in (left, right)
     ):
         raise ValueError("只能比較已完成且有排名的研究報表")
+    modes = {
+        report_price_mode(x, (x.get("configuration") or {}).get("settings")) for x in (left, right)
+    }
+    if len(modes) > 1:
+        raise ValueError("兩份報表的價格口徑不同（還原價／原始價格），不比較名次")
     a = {row["stock_id"]: row for row in left["rankings"]}
     b = {row["stock_id"]: row for row in right["rankings"]}
     return [
@@ -580,6 +606,9 @@ def create_app(workbench, dev=False):
 
     # 以全域函式提供，匯入的巨集（_components.html）也能使用。
     app.jinja_env.globals["market_lag"] = lag_for
+    # 報表頁的價格口徑標籤與回測註明（與 CLI 輸出同一段文字）。
+    app.jinja_env.globals["price_mode_label"] = lambda mode: MODE_LABELS.get(mode, MODE_LABELS[RAW])
+    app.jinja_env.globals["backtest_price_note"] = BACKTEST_NOTE.lstrip("。")
 
     # 導覽列：(圖示, 標籤, 連結, 視為同一區域的路徑開頭)。只列出已註冊路由的項目，不會連到不存在的頁面。
     NAVIGATION = [

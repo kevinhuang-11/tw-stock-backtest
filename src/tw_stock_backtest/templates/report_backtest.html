@@ -11,6 +11,7 @@
     {% if kind == 'backtest' %}
       <h1>回測{% if strategy_name %} · {{ strategy_name }}{% endif %}</h1>
       <p>{{ config.get('requested_start', '—') }} 至 {{ config.get('requested_end', '—') }} · 每日排名、隔日開盤成交，與買進持有基準比較。</p>
+      <p class="small">價格口徑：{{ ui.badge(price_mode_label(detail.price_mode), 'info' if detail.price_mode == 'adjusted' else 'neutral') }}{% if detail.price_mode == 'adjusted' %} {{ backtest_price_note }}。{% else %} 未調整除權息、減資與變更面額，報酬不含股利。{% endif %}</p>
     {% elif kind == 'comparison' %}
       <h1>策略比較 · {{ detail.strategies | length }} 份策略</h1>
       <p>{{ detail.common.get('start', '—') }} 至 {{ detail.common.get('end', '—') }} · 股票池 {{ detail.common.get('stocks', []) | join('、') }}</p>
@@ -93,6 +94,23 @@
     {% if trades | length > 200 %}<div class="card-footer">只顯示前 200 筆，共 {{ trades | length }} 筆；完整紀錄在報表資料夾的 trades.csv。</div>{% endif %}
     {% else %}{{ ui.empty('這段期間沒有成交', '可能是沒有候選股，或資金不足以買進。', icon_name='empty') }}{% endif %}
   </section>
+
+  {% if detail.get('corporate_action_events') %}
+  <section class="card">
+    <div class="card-header"><div><h2>公司行動</h2><p>生效日開盤前依前一日收盤的持股調整；策略與買進持有基準套用同樣的規則。</p></div></div>
+    <div class="table-wrap"><table class="table table-compact">
+      <thead><tr><th>生效日</th><th>來源</th><th>股票</th><th>類型</th><th class="num">持股</th><th class="num">入帳現金</th></tr></thead>
+      <tbody>{% for e in detail.corporate_action_events %}<tr>
+        <td class="nowrap">{{ e.applied_on }}</td>
+        <td>{{ '策略' if e.source == 'strategy' else '基準' }}</td>
+        <td><a href="/stocks/{{ e.stock_id }}">{{ e.stock_id }}</a>{% if e.needs_review %} {{ ui.badge('待人工確認', 'warn') }}{% endif %}</td>
+        <td>{{ {'dividend': '除權息', 'capital_reduction': '減資', 'par_change': '變更面額'}.get(e.kind, e.kind) }}</td>
+        <td class="num">{{ e.shares_before | int }} → {{ e.shares_after | int }}</td>
+        <td class="num">{{ e.cash | int }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  {% endif %}
 
   {% if detail.get('market_events') %}
   <section class="card">

@@ -17,6 +17,17 @@ def price_mode(settings):
     return (settings.get("corporate_actions") or {}).get("mode", RAW)
 
 
+def report_price_mode(summary=None, settings=None):
+    """報表的價格口徑：結果中的 price_adjustment 優先，其次是設定；都沒有的舊報表視為 raw。"""
+    recorded = (summary or {}).get("price_adjustment")
+    if isinstance(recorded, dict) and recorded.get("mode") in (ADJUSTED, RAW):
+        return recorded["mode"]
+    return price_mode(settings or {})
+
+
+MODE_LABELS = {ADJUSTED: "還原價（adjusted）", RAW: "原始價格（raw）"}
+
+
 class PriceSource:
     def __init__(self, settings):
         self.db_path = settings["storage"]["database_path"]
