@@ -18,7 +18,13 @@ from tw_stock_backtest.analysis.indicators import (
     windowed_moving_average,
 )
 from tw_stock_backtest.data.database import load_records
+from tw_stock_backtest.data.market_events import (
+    CONFIRMED_DELISTINGS,
+    CONFIRMED_HALTS,
+    untradable_ranges,
+)
 from tw_stock_backtest.data.universe import load_universe
+from tw_stock_backtest.data_status import market_dates
 from tw_stock_backtest.prices import PriceSource
 from tw_stock_backtest.research_digest import differences, load_bundle
 from tw_stock_backtest.security import public_data
@@ -383,7 +389,22 @@ def current_stock(wb, sid, args):
         "ranking": None,
         "pool": None,
         "report_key": None,
+        "untradable": untradable_days(dbpath, sid, records, cutoff),
     }
+
+
+def untradable_days(dbpath, sid, records, cutoff):
+    """這檔從第一筆行情到分析日之間不可交易的區段（停牌、無成交價、缺列、終止上市）。"""
+    if not records:
+        return []
+    days = [d for d in market_dates(dbpath) if records[0]["date"] <= d <= cutoff]
+    return untradable_ranges(
+        sid,
+        records,
+        days,
+        confirmed_halts=CONFIRMED_HALTS,
+        delistings=CONFIRMED_DELISTINGS,
+    )
 
 
 def historic_stock(sid, key, bundle):

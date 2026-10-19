@@ -432,3 +432,57 @@ def unconfirmed_gaps(market):
                 {"stock_id": stock_id, "first": days[0], "last": days[-1], "days": len(days)}
             )
     return result
+
+
+UNTRADABLE_LABELS = {
+    "CONFIRMED_HALT": "已確認停牌",
+    "NO_PRICE": "無成交價（原因未確認）",
+    "MISSING_ROW": "缺少行情列（原因未確認）",
+    "DELISTED": "已終止上市",
+}
+
+
+def untradable_ranges(stock_id, records, market_days, *, confirmed_halts, delistings):
+    """個股頁用（docs/HALT-POLICY.md G11）：market_days 中這檔不可交易的日子，連續同狀態合併成區段。
+
+    records 是這檔截至分析日的行情（含 load_records 補的停牌列），market_days 是同期間
+    行情庫中任何股票有列的日期；兩者都只到分析日，不看之後的資料。
+    回傳 [{start, end, days, status, label, reason}]，由舊到新。
+    """
+    by_date = {record["date"]: record for record in records}
+    position = {day: index for index, day in enumerate(market_days)}
+    gone = (delistings.get(stock_id) or {}).get("effective")
+    ranges = []
+    for day in market_days:
+        record = by_date.get(day)
+        if gone and day >= gone:
+            status, reason = "DELISTED", delistings[stock_id]["reason"]
+        elif record is None:
+            status, reason = "MISSING_ROW", MISSING_ROW_EVENT["reason"]
+        elif (stock_id, day) in confirmed_halts:
+            status, reason = "CONFIRMED_HALT", confirmed_halts[(stock_id, day)]["reason"]
+        elif all(field in record and record[field] is None for field in PRICE_FIELDS):
+            status, reason = "NO_PRICE", NO_PRICE_EVENT["reason"]
+        else:
+            continue
+        last = ranges[-1] if ranges else None
+        if (
+            last
+            and last["status"] == status
+            and last["reason"] == reason
+            and position[last["end"]] == position[day] - 1
+        ):
+            last["end"] = day
+            last["days"] += 1
+        else:
+            ranges.append(
+                {
+                    "start": day,
+                    "end": day,
+                    "days": 1,
+                    "status": status,
+                    "label": UNTRADABLE_LABELS[status],
+                    "reason": reason,
+                }
+            )
+    return ranges

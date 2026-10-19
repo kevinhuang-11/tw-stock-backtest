@@ -75,6 +75,11 @@
       <ul class="small">{% for e in stock.chart.events %}<li>{{ e.date }} · {{ e.label }} · 前收 {{ e.previous_close|num }} → 參考價 {{ e.reference_price|num }}{% if e.needs_review %} {{ ui.badge('待人工確認', 'warn') }}{% endif %}</li>{% endfor %}</ul>
     </div>
     {% endif %}
+    {% if stock.untradable %}
+    <div class="card-body"><p class="small"><strong>不可交易的日子</strong>（停牌、無成交價、缺少行情列或已終止上市；這些日子不成交，指標把它們當成缺價）</p>
+      <ul class="small">{% for u in stock.untradable %}<li>{{ u.start }}{% if u.end != u.start %} ～ {{ u.end }}{% endif %}（{{ u.days }} 個行情日）· {{ ui.badge(u.label, 'warn' if u.status in ('CONFIRMED_HALT', 'DELISTED') else 'neutral') }} {{ u.reason }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
     <div class="card-footer">計算起點 {{ stock.chart.calculation_start }}，共 {{ stock.chart.calculation_rows }} 筆 · SMA／EMA {{ stock.chart.parameters.sma_ema }} · RSI {{ stock.chart.parameters.rsi }} · MACD {{ stock.chart.parameters.macd.fast }}／{{ stock.chart.parameters.macd.slow }}／{{ stock.chart.parameters.macd.signal }}。紅 K 為收盤高於開盤、綠 K 為收盤低於開盤；缺失 OHLC 不繪製，指標缺值不連線，不含交易訊號推測。</div>
     </div>
     {% endif %}
