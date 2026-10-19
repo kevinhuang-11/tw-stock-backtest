@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
+from tw_stock_backtest.analysis.adjustment import is_rights_offering
 from tw_stock_backtest.backtesting.corporate_actions import cash_per_share, share_ratio
 
 
@@ -121,6 +122,10 @@ def evaluate_forward_return(
     applied = []
     for action in sorted(corporate_actions, key=lambda a: a["effective_date"]):
         if entry_date.isoformat() < action["effective_date"] <= exit_date.isoformat():
+            if is_rights_offering(action):
+                # 不模擬認購或轉讓認股權；跨過現金增資的報酬不可靠，不計算。
+                result["reason"] = "rights_offering"
+                return result
             cash += shares * cash_per_share(action)
             shares *= share_ratio(action)
             applied.append(action["effective_date"])

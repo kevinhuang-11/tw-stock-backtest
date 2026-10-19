@@ -393,7 +393,10 @@ def evaluate_strategy_research(
         strategy,
     )
     errors = {
-        **analysis["errors"],
+        **{
+            sid: reason + prices.restart_note(sid, target)
+            for sid, reason in analysis["errors"].items()
+        },
         **{sid: "本次更新未完整：" + status for sid, status in bad_updates.items()},
     }
     valid_count = len(stocks) - len(errors)

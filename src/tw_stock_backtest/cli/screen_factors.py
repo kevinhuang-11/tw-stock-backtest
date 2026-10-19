@@ -118,11 +118,12 @@ def collect_factor_rows(
             factor_rows.append(row)
 
         except ValueError as error:
+            note = prices.restart_note(stock_id, as_of) if prices is not None else ""
             errors.append(
                 {
                     "stock_id": stock_id,
                     "name": stock.get("name", ""),
-                    "reason": str(error),
+                    "reason": str(error) + note,
                 }
             )
 

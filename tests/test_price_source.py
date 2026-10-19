@@ -139,7 +139,9 @@ class PriceSourceTests(unittest.TestCase):
         source = self.source(RAW)
         records = source.load("1441", "1900-01-01", DAYS[-1])
         self.assertEqual(records[2]["close"], D("8.72"))
-        self.assertEqual(source.describe(), {"mode": "raw", "actions": [], "uncovered": {}})
+        self.assertEqual(
+            source.describe(), {"mode": "raw", "actions": [], "uncovered": {}, "restarts": []}
+        )
 
     def test_adjusted_mode_applies_only_events_up_to_the_analysis_date(self):
         ca.save_actions(

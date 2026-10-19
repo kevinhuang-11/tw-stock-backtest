@@ -19,10 +19,30 @@ THOUSAND = Decimal("1000")
 ONE = Decimal("1")
 
 
+def is_rights_offering(action):
+    """含現金增資認購權的除權（原股東每千股可認購股數大於 0）。"""
+    return bool(action.get("rights_per_1000")) and action["rights_per_1000"] > 0
+
+
+def breaks(actions):
+    """含現金增資的生效日，由舊到新。
+
+    官方參考價假設依整個現金增資的比例認購，不符合任何實際持有人（不認購的人價格照市價、
+    認購的人另外付了認購款），所以不跨過這一天還原價格：序列從生效日重新起算，
+    之前的列不用於指標，窗口型指標在事件仍在窗口內時無法評估，遞迴指標重新暖機。
+    """
+    return sorted({a["effective_date"] for a in actions if is_rights_offering(a)})
+
+
 def events(actions):
-    """公司行動轉成 [(生效日, 價格因子, 股數比)]，依生效日排序；同一天的多筆合併相乘。"""
+    """公司行動轉成 [(生效日, 價格因子, 股數比)]，依生效日排序；同一天的多筆合併相乘。
+
+    含現金增資的事件不在這裡（見 breaks）。
+    """
     merged = {}
     for action in actions:
+        if is_rights_offering(action):
+            continue
         if action["previous_close"] is None or action["previous_close"] <= 0:
             raise ValueError(f"{action['stock_id']} {action['effective_date']} 缺少有效的官方前收")
         price = action["reference_price"] / action["previous_close"]
@@ -56,6 +76,9 @@ def adjust(records, actions, as_of=None):
         return [dict(r) for r in rows]
     cutoff = as_of or rows[-1]["date"]
     applicable = [e for e in events(actions) if e[0] <= cutoff]
+    restart = [day for day in breaks(actions) if day <= cutoff]
+    if restart:
+        rows = [r for r in rows if r["date"] >= restart[-1]]
     result = []
     for record in rows:
         price = shares = ONE
@@ -78,7 +101,9 @@ class AdjustedHistory:
 
     def __init__(self, actions=()):
         self._events = events(actions) if actions else []
+        self._breaks = breaks(actions) if actions else []
         self._next = 0
+        self._next_break = 0
         self.rows = []
 
     def advance(self, as_of):
@@ -86,6 +111,10 @@ class AdjustedHistory:
             day, price, shares = self._events[self._next]
             self.rows = [_scaled(r, price, shares) if r["date"] < day else r for r in self.rows]
             self._next += 1
+        while self._next_break < len(self._breaks) and self._breaks[self._next_break] <= as_of:
+            day = self._breaks[self._next_break]
+            self.rows = [r for r in self.rows if r["date"] >= day]
+            self._next_break += 1
 
     def append(self, record):
         if self.rows and record["date"] <= self.rows[-1]["date"]:

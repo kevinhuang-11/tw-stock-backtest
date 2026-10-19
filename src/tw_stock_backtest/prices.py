@@ -4,12 +4,16 @@ adjusted 模式會記錄實際用到的公司行動，以及分析期間中沒�
 沒有下載過的區間無法調整，只能如實列出，不能當成「沒有公司行動」。
 """
 
-from tw_stock_backtest.analysis.adjustment import AdjustedHistory, adjust
+from tw_stock_backtest.analysis.adjustment import AdjustedHistory, adjust, is_rights_offering
 from tw_stock_backtest.data.corporate_actions import load_actions, load_coverage, uncovered
 from tw_stock_backtest.data.database import load_records
 
 ADJUSTED = "adjusted"
 RAW = "raw"
+RIGHTS_REASON = (
+    "含現金增資：官方參考價假設依整個現金增資比例認購，不符合實際持有人，"
+    "還原價不跨過這一天；回測持有跨過這一天時拒絕計算"
+)
 
 
 def price_mode(settings):
@@ -40,6 +44,7 @@ class PriceSource:
             self._coverage = load_coverage(self.db_path)
         self._used = {}
         self._gaps = {}
+        self._restarts = {}
 
     def actions(self, stock_id, as_of=None):
         """這檔在 as_of 以前生效的公司行動；raw 模式為空。"""
@@ -56,6 +61,8 @@ class PriceSource:
             if action["effective_date"] > first:
                 key = (stock_id, action["effective_date"], action["kind"])
                 self._used[key] = action
+                if is_rights_offering(action):
+                    self._restarts[key] = action
         gaps = uncovered(self._coverage.get(stock_id, []), first, as_of)
         if gaps:
             known = self._gaps.setdefault(stock_id, [])
@@ -122,7 +129,19 @@ class PriceSource:
             "uncovered": {
                 sid: [list(gap) for gap in gaps] for sid, gaps in sorted(self._gaps.items())
             },
+            # 含現金增資的生效日：還原價不跨過這一天，序列從這一天重新起算。
+            "restarts": [
+                {"stock_id": sid, "effective_date": day, "reason": RIGHTS_REASON}
+                for (sid, day, _), _ in sorted(self._restarts.items())
+            ],
         }
+
+    def restart_note(self, stock_id, as_of):
+        """這檔在 as_of 以前最近一次含現金增資的生效日說明；沒有時為空字串。"""
+        days = [a["effective_date"] for a in self.actions(stock_id, as_of) if is_rights_offering(a)]
+        if self.mode != ADJUSTED or not days:
+            return ""
+        return f"（{max(days)} 含現金增資，還原價從這一天重新起算）"
 
 
 def describe_prices(summary, backtest=False):

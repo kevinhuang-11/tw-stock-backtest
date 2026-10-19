@@ -8,12 +8,14 @@
   不扣股利所得稅與二代健保補充保費。
 - 配股、減資換股、變更面額取整股；不足一股的部分依面額折發現金（元以下捨去）。
   面額預設 10 元；變更面額時用變更後的面額。
-- 現金增資不認購。
+- 現金增資不模擬認購或轉讓認股權。持有跨過含現金增資的生效日時拒絕計算：
+  不認購的報酬取決於認股權的處置，模擬成單純持有會產生看似正常、實際不可靠的數字。
 - 換股率無法確定（已列入人工確認）時拒絕計算，不自行推定。
 """
 
 from decimal import ROUND_DOWN, Decimal
 
+from tw_stock_backtest.analysis.adjustment import is_rights_offering
 from tw_stock_backtest.data.corporate_actions import CAPITAL_REDUCTION, DIVIDEND, PAR_CHANGE
 
 PAR_VALUE = Decimal("10")
@@ -70,6 +72,19 @@ def entitlement(shares, action):
     }
 
 
+class RightsOfferingHeld(ValueError):
+    """持有跨過含現金增資的生效日；這段報酬不計算。"""
+
+    def __init__(self, action):
+        super().__init__(
+            f"持有 {action['stock_id']} 跨過 {action['effective_date']} 的現金增資除權"
+            f"（原股東每千股可認購 {action['rights_per_1000'].normalize():f} 股、"
+            f"認購價 {action['rights_price'].normalize():f} 元）。本專案不模擬認購或轉讓認股權，"
+            "無法可靠計算這段報酬；請排除這檔、調整期間避開這一天，或改用 raw 模式（不計任何公司行動）"
+        )
+        self.action = action
+
+
 class Schedule:
     """依生效日排序的公司行動；due() 依序取出尚未套用、生效日不晚於指定日期的事件。"""
 
@@ -95,6 +110,8 @@ def apply_due(schedule, day, holdings):
         shares = holdings.get(action["stock_id"], 0)
         if not shares:
             continue
+        if is_rights_offering(action):
+            raise RightsOfferingHeld(action)
         detail = entitlement(shares, action)
         holdings[action["stock_id"]] = detail["shares_after"]
         if not detail["shares_after"]:
