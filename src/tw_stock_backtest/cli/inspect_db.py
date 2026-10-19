@@ -3,6 +3,7 @@ import sqlite3
 from contextlib import closing
 
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config
+from tw_stock_backtest.data.corporate_actions import REVIEW_LABELS, review_items
 from tw_stock_backtest.data.corporate_actions import summary as corporate_summary
 from tw_stock_backtest.data.market_events import CONFIRMED_HALTS
 from tw_stock_backtest.data_status import market_dates, price_gaps, stock_quality
@@ -31,6 +32,11 @@ def parse_arguments():
         "--gaps",
         action="store_true",
         help="列出行情缺口：其他股票有行情、這檔卻沒有的日子，或超過 --gap-days 個日曆日的空白",
+    )
+    parser.add_argument(
+        "--review",
+        action="store_true",
+        help="列出待人工確認的公司行動、原因與對計算的影響（依目前的解析規則重新檢查，不修改資料庫）",
     )
     parser.add_argument(
         "--gap-days",
@@ -88,6 +94,7 @@ def main():
         gaps = price_gaps(db_path, calendar_days=args.gap_days) if args.gaps else None
         days = market_dates(db_path) if gaps else ()
         actions = corporate_summary(db_path)
+        review = review_items(db_path, CONFIRMED_HALTS) if args.review or actions else []
 
     except (ValueError, sqlite3.Error, OSError) as error:
         print(f"資料庫檢視失敗：{error}")
@@ -112,12 +119,25 @@ def main():
                 + ("（" + "，".join(notes) + "）" if notes else "")
             )
 
+    counts = {status: sum(item["status"] == status for item in review) for status in REVIEW_LABELS}
     print(
-        f"\n公司行動：{actions['count']} 筆，最新生效日 {actions['latest']}，"
-        f"待人工確認 {actions['needs_review']} 筆"
+        f"\n公司行動：{actions['count']} 筆，最新生效日 {actions['latest']}；"
+        + "，".join(f"{REVIEW_LABELS[s]} {n} 筆" for s, n in counts.items())
+        + ("" if args.review else "（--review 列出明細）")
         if actions
         else "\n公司行動：尚未下載（fetch_corporate_actions）"
     )
+    if args.review:
+        kinds = {"dividend": "除權息", "capital_reduction": "減資", "par_change": "變更面額"}
+        for item in review:
+            print(
+                f"{item['effective_date']} | {item['stock_id']} | {kinds[item['kind']]} | "
+                f"{REVIEW_LABELS[item['status']]}"
+            )
+            label = "已儲存的原因" if item["status"] == "cleared" else "原因"
+            for reason in item["reasons"]:
+                print(f"    {label}：{reason}")
+            print(f"    影響：{item['impact']}")
 
     if gaps is not None:
         print(f"\n行情缺口：{len(gaps)} 處")

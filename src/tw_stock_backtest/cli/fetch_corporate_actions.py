@@ -155,12 +155,41 @@ def collect(client, stocks, start, end):
     return ca.check_halts(actions, CONFIRMED_HALTS)
 
 
+def recheck_stored(args):
+    """以目前規則重新檢查已儲存的公司行動，只更新 needs_review 與 review_notes。"""
+    try:
+        settings = load_config(args.config)
+        db_path = settings["storage"]["database_path"]
+        changed = []
+        for action in ca.load_actions(db_path):
+            fresh = ca.recheck(action, CONFIRMED_HALTS)
+            if (fresh["needs_review"], fresh["review_notes"]) != (
+                action["needs_review"],
+                action["review_notes"],
+            ):
+                changed.append(fresh)
+        ca.update_review(changed, db_path)
+    except (ValueError, sqlite3.Error, OSError) as error:
+        print(f"重新檢查失敗：{error}")
+        return 1
+    print(f"重新檢查完成；更新 {len(changed)} 筆待人工確認的標記")
+    for action in changed:
+        state = "待人工確認" if action["needs_review"] else "不需確認"
+        print(f"{action['effective_date']} | {action['stock_id']} | {state}")
+    return 0
+
+
 def parse_arguments(argv=None):
     parser = argparse.ArgumentParser(description="下載股票池在指定期間的除權息、減資與變更面額資料")
     parser.add_argument("--config", default=str(DEFAULT_CONFIG_PATH), help="設定檔位置")
     parser.add_argument("--stocks", nargs="+", help="股票代號；未指定時使用設定檔的股票池")
-    parser.add_argument("--start", required=True, help="開始日期，例如 2026-01-01")
-    parser.add_argument("--end", required=True, help="結束日期，例如 2026-10-15")
+    parser.add_argument("--start", help="開始日期，例如 2026-01-01")
+    parser.add_argument("--end", help="結束日期，例如 2026-10-15")
+    parser.add_argument(
+        "--recheck",
+        action="store_true",
+        help="不連網：以目前的解析規則重新檢查已儲存的公司行動，更新待人工確認的標記與原因",
+    )
     parser.add_argument("--max-requests", type=int, default=50, help="請求上限（含重試），預設 50")
     parser.add_argument("--plan", action="store_true", help="只列出要送的請求，不連網、不寫入")
     return parser.parse_args(argv)
@@ -168,8 +197,12 @@ def parse_arguments(argv=None):
 
 def main(argv=None):
     args = parse_arguments(argv)
+    if args.recheck:
+        return recheck_stored(args)
     try:
         settings = load_config(args.config)
+        if not args.start or not args.end:
+            raise ValueError("下載需要 --start 與 --end")
         start, end = parse_date_range(args.start, args.end)
         stocks = args.stocks or settings["universe"]["stocks"]
         if not stocks or any(not re.fullmatch(r"\d{4}", s) for s in stocks):

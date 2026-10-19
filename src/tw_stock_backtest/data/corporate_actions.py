@@ -238,7 +238,7 @@ def parse_dividend(row, detail=None, *, list_url):
     if action["rights_per_1000"] > 0:
         _review(
             action,
-            "含現金增資認購權：指標依官方參考價還原；本專案不模擬認購或轉讓認股權，"
+            "含現金增資認購權：還原價不跨過生效日；本專案不模擬認購或轉讓認股權，"
             "回測持有跨過生效日時拒絕計算",
         )
     return action
@@ -487,6 +487,28 @@ def uncovered(ranges, start, end):
     return gaps
 
 
+def update_review(actions, db_path):
+    """只更新待人工確認的標記與原因；其餘欄位（金額、來源、原始列）不變。"""
+    if not actions:
+        return 0
+    with closing(sqlite3.connect(db_path)) as connection, connection:
+        connection.executemany(
+            "UPDATE corporate_actions SET needs_review = ?, review_notes = ? "
+            "WHERE stock_id = ? AND effective_date = ? AND kind = ?",
+            [
+                (
+                    int(a["needs_review"]),
+                    json.dumps(a["review_notes"], ensure_ascii=False, sort_keys=True),
+                    a["stock_id"],
+                    a["effective_date"],
+                    a["kind"],
+                )
+                for a in actions
+            ],
+        )
+    return len(actions)
+
+
 def load_actions(db_path, stock_id=None, start=None, end=None):
     """依生效日排序讀出公司行動；資料庫或表不存在時回傳空清單，不建立檔案。"""
     path = Path(db_path).resolve()
@@ -532,3 +554,109 @@ def summary(db_path):
             "SELECT COUNT(*), MAX(effective_date), COALESCE(SUM(needs_review), 0) FROM corporate_actions"
         ).fetchone()
     return {"count": count, "latest": latest, "needs_review": review} if count else None
+
+
+# ---------- 待人工確認清單 ----------
+
+PENDING = "pending"
+NOT_APPLICABLE = "not_applicable"
+CLEARED = "cleared"
+REVIEW_LABELS = {PENDING: "待確認", NOT_APPLICABLE: "不適用", CLEARED: "依目前規則已解除"}
+
+
+def recheck(action, confirmed_halts):
+    """以目前的解析規則重新檢查已儲存的公司行動（只用儲存的原始列，不連網）。
+
+    除權息依儲存的列表列與詳細資料重新解析；減資與變更面額的金額不變，只重新檢查與已確認
+    停牌清單的一致性。減資表注意事項中的併案股利沒有存在原始列裡，沿用已儲存的金額與說明。
+    """
+    raw = action["raw"]
+    if action["kind"] == DIVIDEND:
+        detail = raw.get("detail")
+        payload = (
+            {"stat": "ok", "fields": list(detail), "data": [list(detail.values())]}
+            if detail
+            else None
+        )
+        fresh = parse_dividend(raw["list"], payload, list_url=action["sources"][0])
+        return {
+            **action,
+            "needs_review": fresh["needs_review"],
+            "review_notes": fresh["review_notes"],
+        }
+    notes = [n for n in action["review_notes"] if "不在已確認停牌清單中" not in n]
+    fresh = {**action, "review_notes": notes, "needs_review": bool(notes)}
+    return check_halts([fresh], confirmed_halts)[0]
+
+
+def _first_dates(db_path):
+    path = Path(db_path).resolve()
+    if not path.is_file():
+        return {}
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as connection:
+        if not connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'stock_prices'"
+        ).fetchone():
+            return {}
+        return dict(
+            connection.execute("SELECT stock_id, MIN(date) FROM stock_prices GROUP BY stock_id")
+        )
+
+
+def _impact(action):
+    """這筆公司行動目前對計算的影響（依 adjusted 模式的規則）。"""
+    if action.get("rights_per_1000") and action["rights_per_1000"] > 0:
+        return (
+            "指標：還原價不跨過生效日，序列從這一天重新起算；回測：持有跨過生效日時拒絕計算；"
+            "前瞻報酬：跨過時不評估"
+        )
+    if action["kind"] == CAPITAL_REDUCTION:
+        cash = action["cash_dividend"] + action["cash_return"]
+        return (
+            f"指標：依官方參考價 {action['reference_price']}／前收 {action['previous_close']} 還原；"
+            f"回測：恢復買賣日每股入帳 {cash.normalize():f} 元"
+            f"（股利 {action['cash_dividend'].normalize():f}、退還股款 {action['cash_return'].normalize():f}），"
+            f"持股依每千股換發 {action['shares_per_1000'].normalize():f} 股調整"
+        )
+    if action["kind"] == PAR_CHANGE and not action["shares_per_1000"]:
+        return "指標：只依官方參考價調整價格；回測：換股率不明，持有跨過生效日時拒絕計算"
+    return (
+        "指標：依官方參考價還原；回測：依公告的現金股利與配股入帳，"
+        "與官方參考價反推不一致時兩者可能有差距"
+    )
+
+
+def review_items(db_path, confirmed_halts):
+    """所有曾被標為待確認、或依目前規則需要確認的公司行動，附狀態、原因與對計算的影響。"""
+    first = _first_dates(db_path)
+    items = []
+    for action in load_actions(db_path):
+        fresh = recheck(action, confirmed_halts)
+        if not (action["needs_review"] or fresh["needs_review"]):
+            continue
+        local_first = first.get(action["stock_id"])
+        if not fresh["needs_review"]:
+            status, impact = (
+                CLEARED,
+                "依目前規則不需確認；已儲存的標記可用 fetch_corporate_actions --recheck 更新",
+            )
+        elif local_first is None or action["effective_date"] <= local_first:
+            status = NOT_APPLICABLE
+            impact = (
+                f"生效日不晚於本機這檔的第一筆行情（{local_first or '無行情'}），"
+                "指標、回測與前瞻報酬都不會用到這筆事件"
+            )
+        else:
+            status, impact = PENDING, _impact(fresh)
+        items.append(
+            {
+                "stock_id": action["stock_id"],
+                "effective_date": action["effective_date"],
+                "kind": action["kind"],
+                "status": status,
+                "reasons": fresh["review_notes"] or action["review_notes"],
+                "stored_needs_review": action["needs_review"],
+                "impact": impact,
+            }
+        )
+    return items

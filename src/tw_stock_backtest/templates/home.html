@@ -49,6 +49,8 @@
       {% for kind, label in [('revenue_history','月營收（歷史）'),('revenue','月營收（最新快照）'),('institution','法人買賣超')] %}{% set s = status.supplemental.get(kind) %}
       <dt>{{ label }}</dt><dd>{% if s %}{{ s.latest }} <span class="subtle">· {{ s.stocks }} 檔</span>{% else %}<span class="subtle">尚未取得</span>{% endif %}</dd>
       {% endfor %}
+      {% set ca = status.corporate_actions %}
+      <dt>公司行動</dt><dd>{% if ca %}{{ ca.count }} 筆 · 最新 {{ ca.latest }}{% if ca.pending %} · {{ ui.badge('待人工確認 ' ~ ca.pending ~ ' 筆', 'warn') }}<span class="hint">明細：inspect_db --review</span>{% endif %}{% else %}<span class="subtle">尚未下載</span>{% endif %}</dd>
     </dl>
     <div class="stack-sm small">
       {% if offline_reason %}
