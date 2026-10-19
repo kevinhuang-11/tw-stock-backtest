@@ -77,6 +77,9 @@
     </section>
   </div>
 
+  {% set coverage = detail.get('restriction_coverage') %}
+  <p class="muted small">處置與全額交割（只標示，不改變成交）：{% if coverage %}{% if coverage.full_delivery %}全額交割名單 {{ coverage.full_delivery.first }} ～ {{ coverage.full_delivery.last }}（{{ coverage.full_delivery.days }} 個行情日）{% endif %}{% for c in coverage.disposition %}；處置公告 {{ c[0] }} ～ {{ c[1] }}{% endfor %}。其他期間沒有下載，不能當成沒有限制。{% else %}沒有下載資料，未標示。{% endif %}</p>
+
   <section class="card">
     <div class="card-header"><div><h2>成交紀錄</h2><p>訊號在收盤後產生，下一個行情日開盤成交。</p></div></div>
     {% if trades %}
@@ -85,7 +88,7 @@
       <tbody>{% for t in trades[:200] %}<tr>
         <td class="nowrap">{{ t.date }}<span class="cell-sub">訊號 {{ t.signal_date or '—' }}</span></td>
         <td>{{ '策略' if t.source == 'strategy' else '基準' }}</td>
-        <td><a href="/stocks/{{ t.stock_id }}">{{ t.stock_id }}</a></td>
+        <td><a href="/stocks/{{ t.stock_id }}">{{ t.stock_id }}</a>{% for r in t.restrictions or [] %} {{ ui.badge(r, 'warn') }}{% endfor %}</td>
         <td>{{ ui.badge('買進', 'info') if t.action == 'BUY' else ui.badge('賣出', 'neutral') }}</td>
         <td class="num">{{ t.price | num }}</td><td class="num">{{ t.quantity | int }}</td>
         <td class="num">{{ t.commission | int }}</td><td class="num">{{ t.tax | int }}</td><td class="num">{{ t.cash_after | int }}</td>
@@ -158,7 +161,7 @@
         <td>{{ ui.badge(p.status_label, 'neutral' if p.status == 'NORMAL' else 'warn') }}</td>
         <td class="num">{{ p.price | num }}</td><td class="nowrap">{{ p.price_date }}</td>
         <td class="num">{{ p.value | int }}</td>
-        <td>{% if p.delisting_announced %}{{ p.delisting_announced.announced }} 公告、{{ p.delisting_announced.effective }} 終止上市{% endif %}</td>
+        <td>{% if p.delisting_announced %}{{ p.delisting_announced.announced }} 公告、{{ p.delisting_announced.effective }} 終止上市{% endif %}{% for r in p.restrictions or [] %} {{ ui.badge(r, 'warn') }}{% endfor %}</td>
       </tr>{% endfor %}{% for p in detail.get('benchmark_positions', []) %}<tr>
         <td>基準</td>
         <td><a href="/stocks/{{ p.stock_id }}">{{ p.stock_id }}</a></td>
@@ -166,7 +169,7 @@
         <td>{{ ui.badge(p.status_label, 'warn') }}</td>
         <td class="num">{{ p.price | num }}</td><td class="nowrap">{{ p.price_date }}</td>
         <td class="num">{{ p.value | int }}</td>
-        <td>{% if p.delisting_announced %}{{ p.delisting_announced.announced }} 公告、{{ p.delisting_announced.effective }} 終止上市{% endif %}</td>
+        <td>{% if p.delisting_announced %}{{ p.delisting_announced.announced }} 公告、{{ p.delisting_announced.effective }} 終止上市{% endif %}{% for r in p.restrictions or [] %} {{ ui.badge(r, 'warn') }}{% endfor %}</td>
       </tr>{% endfor %}</tbody>
     </table></div>
   </section>

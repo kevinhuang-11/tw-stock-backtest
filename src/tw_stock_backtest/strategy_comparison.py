@@ -12,6 +12,11 @@ from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.backtesting.metrics import summarize_exposure, summarize_performance
 from tw_stock_backtest.backtesting.portfolio import run_portfolio_backtest
 from tw_stock_backtest.data.database import load_records
+from tw_stock_backtest.data.restrictions import (
+    annotate_backtest,
+    coverage_summary,
+    load_restrictions,
+)
 from tw_stock_backtest.data.universe import listing_exclusions
 from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.plotting import prepare_series
@@ -66,6 +71,9 @@ def compare_strategies(
         corporate_actions=corporate_actions,
         delisted_valuation=settings["halts"]["delisted_valuation"],
     )
+    # 處置與全額交割只標示，不改變數字（docs/HALT-POLICY.md 3.17）。
+    restrictions = load_restrictions(settings["storage"]["database_path"])
+    annotate_backtest(benchmark, restrictions)
     bench_performance = performance(benchmark)
     report = ResearchReport(output_root)
     common = {
@@ -103,6 +111,8 @@ def compare_strategies(
                 delisted_valuation=settings["halts"]["delisted_valuation"],
             )
             result["universe_exclusions"] = listing_excluded
+            annotate_backtest(result, restrictions)
+            result["restriction_coverage"] = coverage_summary(settings["storage"]["database_path"])
             if [p["date"] for p in result["equity_curve"]] != [
                 p["date"] for p in benchmark["equity_curve"]
             ]:

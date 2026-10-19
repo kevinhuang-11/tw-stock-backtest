@@ -20,6 +20,11 @@ from tw_stock_backtest.config import (
     load_config,
 )
 from tw_stock_backtest.data.database import load_records
+from tw_stock_backtest.data.restrictions import (
+    annotate_backtest,
+    coverage_summary,
+    load_restrictions,
+)
 from tw_stock_backtest.data.universe import listing_exclusions
 from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.prices import PriceSource, describe_prices
@@ -225,6 +230,12 @@ def main():
             corporate_actions=corporate_actions,
             delisted_valuation=settings["halts"]["delisted_valuation"],
         )
+
+        # 處置與全額交割：只標示成交與期末持股，不改變任何數字（docs/HALT-POLICY.md 3.17）。
+        restrictions = load_restrictions(db_path)
+        for data in (result, benchmark):
+            annotate_backtest(data, restrictions)
+        result["restriction_coverage"] = coverage_summary(db_path)
 
         benchmark_performance = summarize_performance(
             benchmark["equity_curve"],

@@ -128,7 +128,7 @@
     {% if visible_rankings %}
     <div class="table-wrap"><table class="table table-compact">
       <thead><tr><th class="num">名次</th><th>股票</th><th class="num">總分</th><th>日期</th></tr></thead>
-      <tbody>{% for row in visible_rankings %}<tr><td class="num">{{ row.rank }}</td><td><a href="/stocks/{{ row.stock_id }}?report={{ report_key }}">{{ row.stock_id }}</a></td><td class="num">{{ row.score | score_text }}</td><td class="nowrap">{{ row.date }}</td></tr>{% endfor %}</tbody>
+      <tbody>{% for row in visible_rankings %}<tr><td class="num">{{ row.rank }}</td><td><a href="/stocks/{{ row.stock_id }}?report={{ report_key }}">{{ row.stock_id }}</a>{% for r in row.restrictions or [] %} {{ ui.badge(r, 'warn') }}{% endfor %}</td><td class="num">{{ row.score | score_text }}</td><td class="nowrap">{{ row.date }}</td></tr>{% endfor %}</tbody>
     </table></div>
     {% else %}{{ ui.empty('沒有符合的股票', '換一個代號再搜尋。', icon_name='search') }}{% endif %}
   </section>

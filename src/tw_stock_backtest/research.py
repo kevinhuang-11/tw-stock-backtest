@@ -14,6 +14,7 @@ from tw_stock_backtest.analysis.factors import rank_factor_candidates
 from tw_stock_backtest.cli.fetch_stock import NoMarketData, fetch_month_with_retry
 from tw_stock_backtest.cli.screen_factors import collect_factor_rows
 from tw_stock_backtest.data.database import load_records, save_records
+from tw_stock_backtest.data.restrictions import annotate_rankings, load_restrictions
 from tw_stock_backtest.data.stock_data import normalize_row
 from tw_stock_backtest.data.universe import ensure_network_allowed
 from tw_stock_backtest.date_range import filter_records, month_starts
@@ -339,6 +340,9 @@ def evaluate_research(
                 "factors": by_id.get(sid),
             }
         )
+    # 處置與全額交割只標示在排名旁，不排除、不改變名次（docs/HALT-POLICY.md 3.17）。
+    if target:
+        annotate_rankings(ranked, load_restrictions(settings["storage"]["database_path"]), target)
     return {
         "price_adjustment": prices.describe(),
         "ranking_mode": "factors",
@@ -426,6 +430,7 @@ def evaluate_strategy_research(
                 "reason": errors.get(sid),
             }
         )
+    annotate_rankings(rankings, load_restrictions(settings["storage"]["database_path"]), target)
     return {
         "analysis_date": target,
         "cutoff": str(cutoff),

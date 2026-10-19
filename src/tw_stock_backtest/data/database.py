@@ -80,11 +80,41 @@ CORPORATE_ACTION_COVERAGE = (
     """,
 )
 
+# 處置與全額交割（變更交易方法）的期間，見 data/restrictions.py；只用於標示，不影響成交。
+# 全額交割逐日下載，每天一筆（start_date = end_date），讀取時合併成連續期間。
+TRADING_RESTRICTIONS = (
+    """
+    CREATE TABLE IF NOT EXISTS trading_restrictions (
+        stock_id TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('disposition', 'full_delivery')),
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL CHECK (end_date >= start_date),
+        announced TEXT,                        -- 處置公布日；全額交割為 NULL
+        measure TEXT NOT NULL,                 -- 處置措施，或變更交易方法（含分盤集合競價）
+        detail TEXT NOT NULL,                  -- JSON：名稱、處置條件與內容
+        source TEXT NOT NULL,                  -- https 網址
+        fetched_at TEXT NOT NULL,
+        PRIMARY KEY (stock_id, kind, start_date)
+    )
+    """,
+    # 已下載的範圍：沒有限制與「沒有下載過」要能分辨。
+    """
+    CREATE TABLE IF NOT EXISTS trading_restriction_coverage (
+        kind TEXT NOT NULL CHECK (kind IN ('disposition', 'full_delivery')),
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL CHECK (end_date >= start_date),
+        fetched_at TEXT NOT NULL,
+        PRIMARY KEY (kind, start_date, end_date)
+    )
+    """,
+)
+
 MIGRATIONS = (
     (1, (TABLE,)),  # 行情表；v1 程式建立的資料庫已有此表，這一步不會改動它
     (2, INDEXES),  # 日期索引與缺價部分索引
     (3, CORPORATE_ACTIONS),  # 公司行動表
     (4, CORPORATE_ACTION_COVERAGE),  # 公司行動已下載的期間
+    (5, TRADING_RESTRICTIONS),  # 處置與全額交割的期間
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 

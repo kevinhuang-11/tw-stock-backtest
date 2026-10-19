@@ -138,6 +138,18 @@ def report_details(path):
                 "unavailable_entire_period", []
             ),
             "delisted_valuation": strategy_result.get("delisted_valuation", "last_close"),
+            # 處置與全額交割已下載的範圍；舊報表沒有這個欄位（None）。
+            "restriction_coverage": strategy_result.get("restriction_coverage"),
+            # 成交旁的處置／全額交割標示：trades.csv 不含這一欄，從 results.json 對回。
+            "trade_restrictions": {
+                trade_key(source, trade): trade["restrictions"]
+                for source, data in (
+                    ("strategy", strategy_result),
+                    ("benchmark", result["benchmark"].get("result") or {}),
+                )
+                for trade in data.get("trades", [])
+                if trade.get("restrictions")
+            },
             # 舊報表沒有價格口徑的紀錄，視為原始價格；沒有現金增資處理方式時視為 refuse。
             "price_mode": report_price_mode(strategy_result, configuration.get("settings")),
             "rights_mode": report_price_basis(strategy_result, configuration.get("settings"))[1],
@@ -151,6 +163,11 @@ def report_details(path):
             "configuration": configuration,
         }
     return {"kind": "unknown", "status": "incomplete"}
+
+
+def trade_key(source, trade):
+    """成交的識別字串：來源、股票、成交日與買賣方向。"""
+    return "|".join((source, trade["stock_id"], trade["date"], trade["action"]))
 
 
 def compare_rankings(left, right):
@@ -930,6 +947,9 @@ def create_app(workbench, dev=False):
                         except InvalidOperation:
                             pass
                 trades = [row for row in trades if row.get("source") in ("strategy", "benchmark")]
+                labels = entry["details"].get("trade_restrictions") or {}
+                for row in trades:
+                    row["restrictions"] = labels.get(trade_key(row["source"], row), [])
             return render_template(
                 "report_backtest.html",
                 detail=entry["details"],
