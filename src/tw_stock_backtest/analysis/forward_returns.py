@@ -16,6 +16,7 @@ def evaluate_forward_return(
     *,
     horizon,
     corporate_actions=(),
+    delisted_valuation="last_close",
 ):
     """
     計算訊號日之後的報酬。
@@ -29,6 +30,10 @@ def evaluate_forward_return(
     公司行動（與回測相同：進場日開盤買進拿不到當天生效的權利）：
     報酬 =（出場收盤 × 累計股數比 ＋ 每 1 股原始持股累計收到的現金）÷ 進場價 − 1。
     這裡是單位報酬，股數比不取整、不做零股折現。沒有提供時只計價格報酬。
+
+    出場日不可交易（停牌、無成交價、缺列、終止上市）時，以最近一筆有效收盤估值，
+    標示 stale_exit 與價格日期，和回測的持股估值一致（docs/HALT-POLICY.md 3.22）；
+    終止上市且 delisted_valuation 為 zero 時以 0 估值。進場日不可交易則無法評估。
     """
     if isinstance(horizon, bool) or not isinstance(horizon, int) or horizon <= 0:
         raise ValueError("horizon 必須是正整數")
@@ -112,8 +117,20 @@ def evaluate_forward_return(
         return result
 
     exit_price = exit_record.get("close")
+    stale = exit_record.get("tradable") is False
 
-    if exit_record.get("tradable") is False or not _valid_price(exit_price):
+    if stale:
+        if exit_record.get("market_status") == "DELISTED" and delisted_valuation == "zero":
+            exit_price = Decimal("0")
+        else:
+            exit_price = exit_record.get("valuation_close")
+        if exit_price != Decimal("0") and not _valid_price(exit_price):
+            result["reason"] = "unavailable_exit_price"
+            return result
+        result["stale_exit"] = True
+        result["exit_price_date"] = exit_record.get("valuation_price_date")
+        result["exit_status"] = exit_record.get("market_status")
+    elif not _valid_price(exit_price):
         result["reason"] = "unavailable_exit_price"
         return result
 
@@ -157,6 +174,7 @@ def evaluate_rankings(
     horizons=(5, 20, 60),
     top_ns=(1, 2),
     corporate_actions=None,
+    delisted_valuation="last_close",
 ):
     """比較每日候選股與股票池的等權平均後續價格報酬。"""
     if not records_by_stock:
@@ -212,6 +230,7 @@ def evaluate_rankings(
                         trading_dates,
                         horizon=horizon,
                         corporate_actions=(corporate_actions or {}).get(stock_id, ()),
+                        delisted_valuation=delisted_valuation,
                     )
                     for stock_id in stocks
                 }
@@ -228,6 +247,8 @@ def evaluate_rankings(
                     "status": "unavailable",
                     "reason": None,
                     "unavailable_stocks": {},
+                    # 出場日不可交易、以最近收盤估值的股票（3.22）。
+                    "stale_exit_stocks": [],
                     "selected_return": None,
                     "universe_return": None,
                     "excess_return": None,
@@ -264,6 +285,11 @@ def evaluate_rankings(
                         row.update(
                             {
                                 "status": "ok",
+                                "stale_exit_stocks": sorted(
+                                    stock_id
+                                    for stock_id, result in forward.items()
+                                    if result.get("stale_exit")
+                                ),
                                 "selected_return": selected_return,
                                 "universe_return": universe_return,
                                 "excess_return": (selected_return - universe_return),
@@ -293,6 +319,8 @@ def evaluate_rankings(
                     "evaluated_days": len(valid),
                     "unavailable_days": len(group) - len(valid),
                     "unavailable_reasons": reason_counts,
+                    # 有效樣本中，出場日以最近收盤估值的「股票 × 訊號日」筆數。
+                    "stale_exits": sum(len(row["stale_exit_stocks"]) for row in valid),
                     "average_selected_return": _average(valid, "selected_return"),
                     "average_universe_return": _average(valid, "universe_return"),
                     "average_excess_return": _average(valid, "excess_return"),

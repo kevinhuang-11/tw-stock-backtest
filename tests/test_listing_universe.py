@@ -164,6 +164,29 @@ class ListingUniverseTests(unittest.TestCase):
         self.assertEqual(code, 2, output.getvalue())
         self.assertIn("原因未確認的缺列：3054 | 2026-08-10 ～ 2026-08-19", output.getvalue())
 
+    def test_selection_evaluation_leaves_out_late_listings(self):
+        from tw_stock_backtest.cli import evaluate_selection
+
+        self.write_listing()
+        output = io.StringIO()
+        argv = [
+            "evaluate_selection",
+            "--config",
+            str(self.config),
+            "--start",
+            "2026-08-10",
+            "--end",
+            "2026-09-05",
+            "--horizons",
+            "1",
+            "--top",
+            "1",
+        ]
+        with patch.object(sys, "argv", argv), redirect_stdout(output):
+            code = evaluate_selection.main()
+        self.assertEqual(code, 0, output.getvalue())
+        self.assertIn("未納入股票池：3054（2026-08-20 上市", output.getvalue())
+
     def test_synthetic_listing_has_no_dates_and_excludes_nothing(self):
         stock = {"stock_id": "3054", "name": "合成", "market": "合成示例", "industry": "示例"}
         save_synthetic_universe(

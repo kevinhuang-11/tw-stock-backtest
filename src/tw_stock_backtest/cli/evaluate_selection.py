@@ -17,6 +17,7 @@ from tw_stock_backtest.data.market_events import (
     prepare_backtest_market,
     unconfirmed_gaps,
 )
+from tw_stock_backtest.data.universe import listing_exclusions
 from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.prices import PriceSource, describe_prices
 
@@ -79,6 +80,13 @@ def main():
 
         stocks = settings["universe"]["stocks"]
         db_path = settings["storage"]["database_path"]
+
+        # 開始日還沒上市或已終止上市的股票不納入股票池（docs/HALT-POLICY.md 3.9、3.10）。
+        excluded = listing_exclusions(stocks, db_path, start)
+        excluded_ids = {item["stock_id"] for item in excluded}
+        stocks = [stock_id for stock_id in stocks if stock_id not in excluded_ids]
+        if not stocks:
+            raise ValueError("股票池在開始日都還沒上市或已終止上市")
 
         if max(args.top) > len(stocks):
             raise ValueError("評估名次不可超過股票池檔數")
@@ -202,6 +210,7 @@ def main():
             horizons=tuple(args.horizons),
             top_ns=tuple(args.top),
             corporate_actions=corporate_actions,
+            delisted_valuation=settings["halts"]["delisted_valuation"],
         )
 
     except (ValueError, sqlite3.Error, OSError) as error:
@@ -212,6 +221,8 @@ def main():
     print("進場日算第 1 日；未計費稅、滑價、股利與拆股")
     print("每日樣本可能重疊；平均報酬不是累積帳戶報酬")
     print(f"\n股票池：{', '.join(stocks)}")
+    for item in excluded:
+        print(f"未納入股票池：{item['stock_id']}（{item['reason']}）")
     print(f"排名模式：{args.ranking}")
     print(f"指定訊號期間：{start} ～ {end}")
     print(f"實際訊號期間：{trading_dates[0]} ～ {trading_dates[-1]}")
@@ -267,6 +278,11 @@ def main():
             "、".join(f"{count} 檔：{days} 日" for count, days in sorted(counts.items())) or "無"
         )
         print(f"有效樣本實際候選數：{counts_text}")
+        if summary["stale_exits"]:
+            print(
+                f"出場日不可交易、以最近收盤估值：{summary['stale_exits']} 筆股票案例"
+                "（docs/HALT-POLICY.md 3.22）"
+            )
 
         for reason, count in summary["unavailable_reasons"].items():
             label = reason_labels.get(reason, reason)
