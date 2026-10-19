@@ -607,8 +607,9 @@ def _impact(action):
     """這筆公司行動目前對計算的影響（依 adjusted 模式的規則）。"""
     if action.get("rights_per_1000") and action["rights_per_1000"] > 0:
         return (
-            "指標：還原價不跨過生效日，序列從這一天重新起算；回測：持有跨過生效日時拒絕計算；"
-            "前瞻報酬：跨過時不評估"
+            "依 corporate_actions.rights：refuse（預設）時指標不跨過生效日、序列從這一天重新起算，"
+            "回測持有跨過時拒絕計算，前瞻報酬跨過時不評估；decline（放棄認購）時指標只依減除股利參考價"
+            "還原，回測與前瞻報酬只計現金股利與無償配股，並列出稀釋損失"
         )
     if action["kind"] == CAPITAL_REDUCTION:
         cash = action["cash_dividend"] + action["cash_return"]

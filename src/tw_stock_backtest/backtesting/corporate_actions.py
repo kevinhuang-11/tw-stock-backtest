@@ -8,14 +8,21 @@
   不扣股利所得稅與二代健保補充保費。
 - 配股、減資換股、變更面額取整股；不足一股的部分依面額折發現金（元以下捨去）。
   面額預設 10 元；變更面額時用變更後的面額。
-- 現金增資不模擬認購或轉讓認股權。持有跨過含現金增資的生效日時拒絕計算：
-  不認購的報酬取決於認股權的處置，模擬成單純持有會產生看似正常、實際不可靠的數字。
+- 現金增資依設定 corporate_actions.rights：
+  - refuse（預設）：持有跨過含現金增資的生效日時拒絕計算。
+  - decline（放棄認購）：股數不因認購增加、不付認購款，認股權不賣出、直接放棄；
+    同一筆的現金股利與無償配股照常計入。放棄的代價（稀釋損失）已反映在除權後的市價，
+    不另外扣除，只在明細列出：持股 ×（1 ＋ 配股率）×（減除股利參考價 − 官方參考價）。
 - 換股率無法確定（已列入人工確認）時拒絕計算，不自行推定。
 """
 
 from decimal import ROUND_DOWN, Decimal
 
-from tw_stock_backtest.analysis.adjustment import is_rights_offering
+from tw_stock_backtest.analysis.adjustment import (
+    ex_dividend_reference,
+    is_rights_offering,
+    refuses_rights,
+)
 from tw_stock_backtest.data.corporate_actions import CAPITAL_REDUCTION, DIVIDEND, PAR_CHANGE
 
 PAR_VALUE = Decimal("10")
@@ -69,7 +76,50 @@ def entitlement(shares, action):
         "fraction_cash": fraction,
         "cash": dividend + refund + fraction,
         "needs_review": action.get("needs_review", False),
+        **(
+            declined_rights(shares, action)
+            if is_rights_offering(action) and not refuses_rights(action)
+            else {}
+        ),
     }
+
+
+def declined_rights(shares, action):
+    """放棄認購的明細：可認購股數、認購價與稀釋損失（元以下捨去；已反映在市價，不另外扣除）。
+
+    稀釋損失 = 持股 ×（1 ＋ 配股率）×（減除股利參考價 − 官方參考價），也就是除權後部位
+    依官方參考價計算，比沒有現金增資時少的價值；認購價高於參考價時為負值。
+    """
+    stock_ratio = 1 + action["stock_dividend_per_1000"] / THOUSAND
+    loss = (
+        Decimal(shares) * stock_ratio * (ex_dividend_reference(action) - action["reference_price"])
+    )
+    return {
+        "rights": "decline",
+        "rights_shares": Decimal(shares) * action["rights_per_1000"] / THOUSAND,
+        "rights_price": action["rights_price"],
+        "ex_dividend_reference": ex_dividend_reference(action),
+        "reference_price": action["reference_price"],
+        "dilution_loss": _yuan(loss),
+    }
+
+
+def declined_text(event):
+    """CLI 輸出用：放棄認購的說明；不是放棄認購的事件回傳空字串。"""
+    if event.get("rights") != "decline":
+        return ""
+    return (
+        f"｜放棄認購 {Decimal(str(event['rights_shares'])).normalize():f} 股"
+        f"（認購價 {Decimal(str(event['rights_price'])).normalize():f} 元），"
+        f"稀釋損失 {event['dilution_loss']} 元（已反映在市價，不另外扣除）"
+    )
+
+
+def dilution_total(events):
+    """放棄認購的稀釋損失合計。"""
+    return sum(
+        (Decimal(str(e["dilution_loss"])) for e in events if e.get("rights") == "decline"), ZERO
+    )
 
 
 class RightsOfferingHeld(ValueError):
@@ -80,7 +130,8 @@ class RightsOfferingHeld(ValueError):
             f"持有 {action['stock_id']} 跨過 {action['effective_date']} 的現金增資除權"
             f"（原股東每千股可認購 {action['rights_per_1000'].normalize():f} 股、"
             f"認購價 {action['rights_price'].normalize():f} 元）。本專案不模擬認購或轉讓認股權，"
-            "無法可靠計算這段報酬；請排除這檔、調整期間避開這一天，或改用 raw 模式（不計任何公司行動）"
+            "無法可靠計算這段報酬；請排除這檔、調整期間避開這一天、設定"
+            ' corporate_actions.rights = "decline"（放棄認購），或改用 raw 模式（不計任何公司行動）'
         )
         self.action = action
 
@@ -110,7 +161,7 @@ def apply_due(schedule, day, holdings):
         shares = holdings.get(action["stock_id"], 0)
         if not shares:
             continue
-        if is_rights_offering(action):
+        if refuses_rights(action):
             raise RightsOfferingHeld(action)
         detail = entitlement(shares, action)
         holdings[action["stock_id"]] = detail["shares_after"]

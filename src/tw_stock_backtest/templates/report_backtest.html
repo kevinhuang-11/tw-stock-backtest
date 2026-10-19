@@ -11,7 +11,7 @@
     {% if kind == 'backtest' %}
       <h1>回測{% if strategy_name %} · {{ strategy_name }}{% endif %}</h1>
       <p>{{ config.get('requested_start', '—') }} 至 {{ config.get('requested_end', '—') }} · 每日排名、隔日開盤成交，與買進持有基準比較。</p>
-      <p class="small">價格口徑：{{ ui.badge(price_mode_label(detail.price_mode), 'info' if detail.price_mode == 'adjusted' else 'neutral') }}{% if detail.price_mode == 'adjusted' %} {{ backtest_price_note }}。{% else %} 未調整除權息、減資與變更面額，報酬不含股利。{% endif %}</p>
+      <p class="small">價格口徑：{{ ui.badge(price_mode_label(detail.price_mode), 'info' if detail.price_mode == 'adjusted' else 'neutral') }}{% if detail.price_mode == 'adjusted' %} {{ ui.badge(rights_mode_label(detail.rights_mode), 'info') }} {{ backtest_price_note(detail.rights_mode) }}。{% else %} 未調整除權息、減資與變更面額，報酬不含股利。{% endif %}</p>
     {% elif kind == 'comparison' %}
       <h1>策略比較 · {{ detail.strategies | length }} 份策略</h1>
       <p>{{ detail.common.get('start', '—') }} 至 {{ detail.common.get('end', '—') }} · 股票池 {{ detail.common.get('stocks', []) | join('、') }}</p>
@@ -104,9 +104,29 @@
         <td class="nowrap">{{ e.applied_on }}</td>
         <td>{{ '策略' if e.source == 'strategy' else '基準' }}</td>
         <td><a href="/stocks/{{ e.stock_id }}">{{ e.stock_id }}</a>{% if e.needs_review %} {{ ui.badge('待人工確認', 'warn') }}{% endif %}</td>
-        <td>{{ {'dividend': '除權息', 'capital_reduction': '減資', 'par_change': '變更面額'}.get(e.kind, e.kind) }}</td>
+        <td>{{ {'dividend': '除權息', 'capital_reduction': '減資', 'par_change': '變更面額'}.get(e.kind, e.kind) }}{% if e.rights == 'decline' %}（含現金增資，放棄認購）{% endif %}</td>
         <td class="num">{{ e.shares_before | int }} → {{ e.shares_after | int }}</td>
         <td class="num">{{ e.cash | int }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  {% endif %}
+
+  {% if detail.get('declined_rights') %}
+  <section class="card">
+    <div class="card-header"><div><h2>放棄認購的稀釋損失</h2><p>現金增資一律放棄認購：股數不因認購增加、不付認購款、不賣出認股權。稀釋損失 = 持股 ×（1 ＋ 配股率）×（減除股利參考價 − 官方參考價），已反映在除權後的市價與資產中，這裡只列出、不另外扣除。策略合計 {{ detail.dilution_totals.strategy | int }} 元，基準合計 {{ detail.dilution_totals.benchmark | int }} 元。</p></div></div>
+    <div class="table-wrap"><table class="table table-compact">
+      <thead><tr><th>生效日</th><th>來源</th><th>股票</th><th class="num">持股</th><th class="num">可認購股數</th><th class="num">認購價</th><th class="num">減除股利參考價</th><th class="num">官方參考價</th><th class="num">稀釋損失</th></tr></thead>
+      <tbody>{% for e in detail.declined_rights %}<tr>
+        <td class="nowrap">{{ e.applied_on }}</td>
+        <td>{{ '策略' if e.source == 'strategy' else '基準' }}</td>
+        <td><a href="/stocks/{{ e.stock_id }}">{{ e.stock_id }}</a></td>
+        <td class="num">{{ e.shares_before | int }}</td>
+        <td class="num">{{ e.rights_shares | num }}</td>
+        <td class="num">{{ e.rights_price | num }}</td>
+        <td class="num">{{ e.ex_dividend_reference | num }}</td>
+        <td class="num">{{ e.reference_price | num }}</td>
+        <td class="num">{{ e.dilution_loss | int }}</td>
       </tr>{% endfor %}</tbody>
     </table></div>
   </section>

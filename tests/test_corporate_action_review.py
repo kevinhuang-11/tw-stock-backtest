@@ -129,7 +129,8 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(items["1459"]["status"], ca.NOT_APPLICABLE)
         self.assertIn("第一筆行情（2026-08-03）", items["1459"]["impact"])
         self.assertEqual(items["6225"]["status"], ca.PENDING)
-        self.assertIn("持有跨過生效日時拒絕計算", items["6225"]["impact"])
+        self.assertIn("回測持有跨過時拒絕計算", items["6225"]["impact"])
+        self.assertIn("decline（放棄認購）", items["6225"]["impact"])
 
     def test_inspect_db_lists_the_review_items(self):
         output = io.StringIO()

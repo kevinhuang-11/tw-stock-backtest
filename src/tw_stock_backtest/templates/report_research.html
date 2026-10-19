@@ -8,7 +8,7 @@
     <div class="eyebrow"><a href="/reports">報表</a>{{ ui.icon('chevron-right') }}研究排名</div>
     <h1>研究排名{% if strategy.name %} · {{ strategy.name }}{% endif %}</h1>
     {% if digest %}<p>{{ digest.title }}</p>{% endif %}
-    {% if detail %}<p class="small">價格口徑：{{ ui.badge(price_mode_label(detail.price_mode), 'info' if detail.price_mode == 'adjusted' else 'neutral') }}</p>{% endif %}
+    {% if detail %}<p class="small">價格口徑：{{ ui.badge(price_mode_label(detail.price_mode), 'info' if detail.price_mode == 'adjusted' else 'neutral') }}{% if detail.price_mode == 'adjusted' %} {{ ui.badge(rights_mode_label(detail.rights_mode), 'info') }}{% endif %}</p>{% endif %}
   </div>
   {% if digest %}
   <div class="page-actions">

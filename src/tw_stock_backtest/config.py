@@ -59,9 +59,11 @@ REQUIRED_FIELDS = {
 # 整個區段可以省略的設定及其預設值。
 OPTIONAL_SECTIONS = {
     # 公司行動：adjusted 依截至分析日的還原價計算指標；raw 使用原始價格，可重現舊報表。
-    "corporate_actions": {"mode": "adjusted"},
+    # rights 是 adjusted 模式下現金增資的處理方式：refuse 拒絕跨過計算，decline 放棄認購。
+    "corporate_actions": {"mode": "adjusted", "rights": "refuse"},
 }
 PRICE_MODES = ("adjusted", "raw")
+RIGHTS_MODES = ("refuse", "decline")
 
 # 選填欄位及其預設值。
 OPTIONAL_DEFAULTS = {
@@ -161,6 +163,8 @@ def validate_settings(settings):
 
     if result["corporate_actions"]["mode"] not in PRICE_MODES:
         raise ValueError("corporate_actions.mode 必須是 adjusted 或 raw")
+    if result["corporate_actions"]["rights"] not in RIGHTS_MODES:
+        raise ValueError("corporate_actions.rights 必須是 refuse 或 decline")
     sizing_mode = result["backtest"]["sizing_mode"]
 
     if sizing_mode not in ("fixed_quantity", "fixed_budget"):

@@ -5,6 +5,7 @@ from tw_stock_backtest.analysis.adjustment import point_in_time
 from tw_stock_backtest.analysis.indicators import windowed_moving_average
 from tw_stock_backtest.analysis.strategies import moving_average_crossover
 from tw_stock_backtest.backtesting.backtest import run_backtest
+from tw_stock_backtest.backtesting.corporate_actions import declined_text
 from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.config import (
     DEFAULT_CONFIG_PATH,
@@ -213,7 +214,7 @@ def main():
     for event in result["corporate_action_events"]:
         print(
             f"公司行動 {event['applied_on']}：持股 {event['shares_before']} → {event['shares_after']}，"
-            f"入帳 {event['cash']} 元"
+            f"入帳 {event['cash']} 元{declined_text(event)}"
         )
 
     print("\n成交紀錄：")

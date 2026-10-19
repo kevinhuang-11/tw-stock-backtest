@@ -132,7 +132,8 @@ class AdjustedResearchTests(ReductionFixture):
         raw = evaluate_research(stocks, self.with_mode("raw"), cutoff, as_of=self.as_of)
         adjusted = evaluate_research(stocks, self.with_mode("adjusted"), cutoff, as_of=self.as_of)
         self.assertEqual(
-            raw["price_adjustment"], {"mode": "raw", "actions": [], "uncovered": {}, "restarts": []}
+            raw["price_adjustment"],
+            {"mode": "raw", "rights": None, "actions": [], "uncovered": {}, "restarts": []},
         )
         self.assertEqual(
             [(a["stock_id"], a["effective_date"]) for a in adjusted["price_adjustment"]["actions"]],

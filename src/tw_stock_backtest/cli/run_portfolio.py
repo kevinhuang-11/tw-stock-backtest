@@ -5,6 +5,7 @@ from pathlib import Path
 from tw_stock_backtest.backtesting.benchmark import (
     run_buy_and_hold,
 )
+from tw_stock_backtest.backtesting.corporate_actions import declined_text, dilution_total
 from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.backtesting.metrics import (
     summarize_exposure,
@@ -236,7 +237,13 @@ def main():
     for event in result["corporate_action_events"]:
         print(
             f"公司行動 {event['applied_on']} | {event['stock_id']} | 持股 {event['shares_before']}"
-            f" → {event['shares_after']} | 入帳 {event['cash']} 元"
+            f" → {event['shares_after']} | 入帳 {event['cash']} 元{declined_text(event)}"
+        )
+    if result.get("price_adjustment", {}).get("rights") == "decline":
+        print(
+            "放棄認購的稀釋損失合計（已反映在市價）："
+            f"策略 {dilution_total(result['corporate_action_events'])} 元"
+            f" | 基準 {dilution_total(benchmark['corporate_action_events'])} 元"
         )
 
     if args.ranking == "rules":

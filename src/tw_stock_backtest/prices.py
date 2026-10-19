@@ -4,7 +4,14 @@ adjusted 模式會記錄實際用到的公司行動，以及分析期間中沒�
 沒有下載過的區間無法調整，只能如實列出，不能當成「沒有公司行動」。
 """
 
-from tw_stock_backtest.analysis.adjustment import AdjustedHistory, adjust, is_rights_offering
+from tw_stock_backtest.analysis.adjustment import (
+    DECLINE,
+    REFUSE,
+    AdjustedHistory,
+    adjust,
+    is_rights_offering,
+    refuses_rights,
+)
 from tw_stock_backtest.data.corporate_actions import load_actions, load_coverage, uncovered
 from tw_stock_backtest.data.database import load_records
 
@@ -21,6 +28,11 @@ def price_mode(settings):
     return (settings.get("corporate_actions") or {}).get("mode", RAW)
 
 
+def rights_mode(settings):
+    """現金增資的處理方式；舊設定沒有這個欄位，當時只有 refuse。"""
+    return (settings.get("corporate_actions") or {}).get("rights", REFUSE)
+
+
 def report_price_mode(summary=None, settings=None):
     """報表的價格口徑：結果中的 price_adjustment 優先，其次是設定；都沒有的舊報表視為 raw。"""
     recorded = (summary or {}).get("price_adjustment")
@@ -29,17 +41,45 @@ def report_price_mode(summary=None, settings=None):
     return price_mode(settings or {})
 
 
+def report_price_basis(summary=None, settings=None):
+    """報表的價格口徑與現金增資處理方式 (mode, rights)；raw 不調整公司行動，rights 為 None。
+
+    舊報表沒有記錄 rights，當時的行為就是 refuse。
+    """
+    mode = report_price_mode(summary, settings)
+    if mode != ADJUSTED:
+        return mode, None
+    recorded = (summary or {}).get("price_adjustment")
+    if isinstance(recorded, dict) and recorded.get("rights") in (REFUSE, DECLINE):
+        return mode, recorded["rights"]
+    return mode, rights_mode(settings or {})
+
+
+def basis_mismatch(left, right):
+    """兩個 (mode, rights) 不同時回傳原因（不含結尾），相同時回傳 None。"""
+    if left[0] != right[0]:
+        return "價格口徑不同（還原價／原始價格）"
+    if left[1] != right[1]:
+        return "現金增資處理方式不同（拒絕計算／放棄認購）"
+    return None
+
+
 MODE_LABELS = {ADJUSTED: "還原價（adjusted）", RAW: "原始價格（raw）"}
+RIGHTS_LABELS = {REFUSE: "現金增資：拒絕計算（refuse）", DECLINE: "現金增資：放棄認購（decline）"}
 
 
 class PriceSource:
     def __init__(self, settings):
         self.db_path = settings["storage"]["database_path"]
         self.mode = price_mode(settings)
+        self.rights = rights_mode(settings)
         self._actions = {}
         self._coverage = {}
         if self.mode == ADJUSTED:
             for action in load_actions(self.db_path):
+                # 現金增資標上處理方式，指標、回測與前瞻報酬都依這個欄位。
+                if is_rights_offering(action):
+                    action = {**action, "rights": self.rights}
                 self._actions.setdefault(action["stock_id"], []).append(action)
             self._coverage = load_coverage(self.db_path)
         self._used = {}
@@ -61,7 +101,7 @@ class PriceSource:
             if action["effective_date"] > first:
                 key = (stock_id, action["effective_date"], action["kind"])
                 self._used[key] = action
-                if is_rights_offering(action):
+                if refuses_rights(action):
                     self._restarts[key] = action
         gaps = uncovered(self._coverage.get(stock_id, []), first, as_of)
         if gaps:
@@ -114,6 +154,8 @@ class PriceSource:
         """寫入報表的摘要：模式、用到的公司行動、沒有公司行動資料的區間。"""
         return {
             "mode": self.mode,
+            # 現金增資的處理方式；raw 模式不調整任何公司行動，不記錄。
+            "rights": self.rights if self.mode == ADJUSTED else None,
             "actions": [
                 {
                     "stock_id": sid,
@@ -138,7 +180,7 @@ class PriceSource:
 
     def restart_note(self, stock_id, as_of):
         """這檔在 as_of 以前最近一次含現金增資的生效日說明；沒有時為空字串。"""
-        days = [a["effective_date"] for a in self.actions(stock_id, as_of) if is_rights_offering(a)]
+        days = [a["effective_date"] for a in self.actions(stock_id, as_of) if refuses_rights(a)]
         if self.mode != ADJUSTED or not days:
             return ""
         return f"（{max(days)} 含現金增資，還原價從這一天重新起算）"
@@ -149,17 +191,34 @@ def describe_prices(summary, backtest=False):
     if summary.get("mode") != ADJUSTED:
         text = "價格：原始價格（未調整除權息、減資與變更面額）"
         return text + "；回測不計股利與股數變動" if backtest else text
-    text = f"價格：截至分析日的還原價（套用 {len(summary['actions'])} 筆公司行動）"
+    rights = summary.get("rights") or REFUSE
+    text = (
+        f"價格：截至分析日的還原價（套用 {len(summary['actions'])} 筆公司行動；"
+        f"{RIGHTS_LABELS[rights]}）"
+    )
     gaps = summary.get("uncovered") or {}
     if gaps:
         text += f"；{len(gaps)} 檔有未下載公司行動資料的期間，這些期間無法調整"
     if backtest:
-        text += BACKTEST_NOTE
+        text += backtest_note(rights)
     return text
 
 
-# 回測報表與 CLI 共用的註明。
+def backtest_note(rights=REFUSE):
+    """回測報表與 CLI 共用的註明，依現金增資的處理方式說明。"""
+    return BACKTEST_NOTE + (
+        RIGHTS_NOTES[rights] if rights in RIGHTS_NOTES else RIGHTS_NOTES[REFUSE]
+    )
+
+
 BACKTEST_NOTE = (
     "。成交與估值使用原始價格；現金股利與減資退還股款於生效日入帳（簡化，實際發放日通常較晚），"
-    "未扣股利所得稅與二代健保補充保費；配股與減資換股不足一股依面額折發現金；持有跨過含現金增資的除權時拒絕計算"
+    "未扣股利所得稅與二代健保補充保費；配股與減資換股不足一股依面額折發現金；"
 )
+RIGHTS_NOTES = {
+    REFUSE: "持有跨過含現金增資的除權時拒絕計算",
+    DECLINE: (
+        "含現金增資的除權一律放棄認購：股數不因認購增加、不付認購款、不賣出認股權，"
+        "稀釋損失已反映在市價，另列明細不重複扣除"
+    ),
+}
