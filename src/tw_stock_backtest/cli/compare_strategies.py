@@ -35,8 +35,11 @@ def main(argv=None):
             return code
         if not args.start or not args.end:
             raise ValueError("需提供 start/end 或 periods")
-        print(compare_strategies(settings, strategies, args.start, args.end, args.output_dir))
-        return 0
+        path = compare_strategies(settings, strategies, args.start, args.end, args.output_dir)
+        print(path)
+        common = json.loads((path / "comparison.json").read_text(encoding="utf-8"))["common"]
+        # 有原因未確認的缺列時結果不完整，退出碼 2。
+        return 2 if common.get("unconfirmed_gaps") else 0
     except Exception as error:
         print(f"策略比較失敗（{type(error).__name__}）；未完成產物保留 .incomplete")
         return 1

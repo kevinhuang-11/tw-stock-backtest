@@ -19,6 +19,7 @@ from tw_stock_backtest.data.market_events import (
     market_event,
     not_tradable_reason,
     prepare_backtest_market,
+    unconfirmed_gaps,
 )
 from tw_stock_backtest.date_range import parse_date_range
 
@@ -432,6 +433,8 @@ def run_portfolio_backtest(
         "skipped_orders": skipped_orders,
         "skipped_rebalances": skipped_rebalances,
         "market_events": market_events,
+        # 原因未確認的缺列（MISSING_ROW）；有的話這次結果不完整（docs/HALT-POLICY.md 3.6）。
+        "unconfirmed_gaps": unconfirmed_gaps(market),
         "corporate_action_events": corporate_action_events,
         "slippage_rate": slippage_rate,
     }

@@ -200,23 +200,25 @@ class HaltRowsTests(unittest.TestCase):
         events = [(e["stock_id"], e["date"], e["market_status"]) for e in result["market_events"]]
         self.assertEqual(events, [("1111", day, "CONFIRMED_HALT") for day in GAP])
         self.assertEqual(result["equity_curve"][-1]["date"], DAYS[-1])
-        # 沒有已確認停牌時，同樣的資料仍因缺少行情列而失敗。
+        # 沒有已確認停牌時，同樣的缺口是原因未確認的缺列，不認定為停牌。
         plain = {
             sid: load_records(sid, DAYS[0], DAYS[-1], db_path=self.db, confirmed_halts={})
             for sid in ("1111", "2222")
         }
-        with self.assertRaisesRegex(ValueError, "1111 缺少 2026-03-(05|06|09|10) 的行情列"):
-            run_portfolio_backtest(
-                plain,
-                DAYS[3],
-                DAYS[-1],
-                screening_settings=settings,
-                initial_cash=Decimal("100000"),
-                quantity=10,
-                max_positions=2,
-                cost_settings=costs,
-                confirmed_halts={},
-            )
+        result = run_portfolio_backtest(
+            plain,
+            DAYS[3],
+            DAYS[-1],
+            screening_settings=settings,
+            initial_cash=Decimal("100000"),
+            quantity=10,
+            max_positions=2,
+            cost_settings=costs,
+            confirmed_halts={},
+        )
+        events = [(e["stock_id"], e["date"], e["market_status"]) for e in result["market_events"]]
+        self.assertEqual(events, [("1111", day, "MISSING_ROW") for day in GAP])
+        self.assertEqual(result["unconfirmed_gaps"][0]["days"], len(GAP))
 
     def test_inspect_db_marks_gaps_covered_by_confirmed_halts(self):
         config = self.root / "config.toml"

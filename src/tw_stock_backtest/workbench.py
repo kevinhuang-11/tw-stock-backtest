@@ -125,6 +125,7 @@ def report_details(path):
             "benchmark": result["benchmark"]["performance"],
             "market_events": strategy_result.get("market_events", []),
             "universe_exclusions": strategy_result.get("universe_exclusions", []),
+            "unconfirmed_gaps": strategy_result.get("unconfirmed_gaps", []),
             # 舊報表沒有價格口徑的紀錄，視為原始價格；沒有現金增資處理方式時視為 refuse。
             "price_mode": report_price_mode(strategy_result, configuration.get("settings")),
             "rights_mode": report_price_basis(strategy_result, configuration.get("settings"))[1],

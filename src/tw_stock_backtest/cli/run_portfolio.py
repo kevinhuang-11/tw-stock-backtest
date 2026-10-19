@@ -382,11 +382,21 @@ def main():
         )
 
     print(
-        f"\n停牌與無成交價日：{len(result['market_events'])} 筆（當日不成交，持股沿用最近收盤估值）"
+        f"\n停牌、無成交價與缺列日：{len(result['market_events'])} 筆"
+        "（當日不成交，持股沿用最近收盤估值）"
     )
 
     for event in result["market_events"]:
         print(f"{event['date']} | {event['stock_id']} | {event['reason']}")
+
+    gaps = result["unconfirmed_gaps"]
+    if gaps:
+        print(
+            f"\n原因未確認的缺列：{len(gaps)} 檔（視為不可交易、沿用最近收盤估值；"
+            "結果不完整，退出碼 2）"
+        )
+        for gap in gaps:
+            print(f"{gap['stock_id']} | {gap['first']} ～ {gap['last']} | {gap['days']} 個行情日")
 
     print(f"\n有個別股票未更新訊號的日期：{len(result['skipped_rebalances'])} 日")
 
@@ -442,7 +452,8 @@ def main():
 
         print(f"\n報表已匯出：{report_dir}")
 
-    return 0
+    # 有原因未確認的缺列時結果不完整：沿用研究類 CLI 的約定，退出碼 2。
+    return 2 if gaps else 0
 
 
 if __name__ == "__main__":

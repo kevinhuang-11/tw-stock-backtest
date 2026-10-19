@@ -15,6 +15,7 @@ from tw_stock_backtest.data.market_events import (
     CONFIRMED_HALTS,
     not_tradable_reason,
     prepare_backtest_market,
+    unconfirmed_gaps,
 )
 from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.prices import PriceSource, describe_prices
@@ -221,6 +222,12 @@ def main():
         + ("；前瞻報酬計入股利與股數變動" if prices.mode == "adjusted" else "；前瞻報酬只計價格")
     )
     print("評估名次使用 --top，不使用設定檔的 top_n")
+    gaps = unconfirmed_gaps(market)
+    for gap in gaps:
+        print(
+            f"原因未確認的缺列：{gap['stock_id']} | {gap['first']} ～ {gap['last']}"
+            f" | {gap['days']} 個行情日（視為不可交易；結果不完整，退出碼 2）"
+        )
 
     reason_labels = {
         "ranking_incomplete": "排名不完整",
@@ -276,7 +283,7 @@ def main():
             label = detail_labels.get(reason, reason)
             print(f"  {label}：{count} 筆股票案例")
 
-    return 0
+    return 2 if gaps else 0
 
 
 if __name__ == "__main__":

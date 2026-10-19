@@ -9,6 +9,7 @@ from tw_stock_backtest.backtesting.costs import (
 from tw_stock_backtest.data.market_events import (
     CONFIRMED_HALTS,
     prepare_backtest_market,
+    unconfirmed_gaps,
 )
 from tw_stock_backtest.date_range import parse_date_range
 
@@ -179,5 +180,6 @@ def run_buy_and_hold(
         "corporate_action_events": corporate_action_events,
         "unbought": sorted(unbought),
         "unavailable_entire_period": sorted(waiting),
+        "unconfirmed_gaps": unconfirmed_gaps(market),
         "slippage_rate": slippage_rate,
     }

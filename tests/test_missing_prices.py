@@ -171,12 +171,74 @@ class TestBacktestWithMissingCloses(unittest.TestCase):
             if order["stock_id"] == "AAA" and order["date"] == days[50]:
                 self.assertEqual(order["reason"], "無成交價（原因未確認），當日不成交")
 
-    def test_missing_row_still_fails_with_a_specific_message(self):
+    def test_missing_row_is_unconfirmed_not_tradable_and_reported(self):
         records = {"AAA": series("AAA", 60), "BBB": series("BBB", 60)}
         del records["AAA"][50]
         days = trading_days(60)
-        with self.assertRaisesRegex(ValueError, f"AAA 缺少 {days[50]} 的行情列.*重新下載"):
+        result = self.backtest(records, days[40], days[-1], confirmed_halts={})
+        gap_day = next(p for p in result["equity_curve"] if p["date"] == days[50])
+        self.assertEqual(gap_day["stale_prices"], {"AAA": days[49]})
+        event = [e for e in result["market_events"] if e["stock_id"] == "AAA"]
+        self.assertEqual(
+            [(e["date"], e["market_status"]) for e in event], [(days[50], "MISSING_ROW")]
+        )
+        self.assertIn("不認定為停牌", event[0]["reason"])
+        self.assertEqual(
+            result["unconfirmed_gaps"],
+            [{"stock_id": "AAA", "first": days[50], "last": days[50], "days": 1}],
+        )
+
+    def test_missing_row_in_warmup_is_not_filled(self):
+        # 暖機期間的缺列不補，與研究排名讀到的序列相同。
+        records = {"AAA": series("AAA", 60), "BBB": series("BBB", 60)}
+        del records["AAA"][20]
+        days = trading_days(60)
+        result = self.backtest(records, days[40], days[-1], confirmed_halts={})
+        self.assertEqual(result["unconfirmed_gaps"], [])
+        self.assertEqual(result["market_events"], [])
+
+    def test_many_missing_rows_on_one_day_mean_the_data_is_not_updated(self):
+        records = {sid: series(sid, 60) for sid in ("AAA", "BBB", "CCC")}
+        days = trading_days(60)
+        for sid in ("AAA", "BBB"):
+            del records[sid][55:]
+        with self.assertRaisesRegex(
+            ValueError,
+            f"{days[55]} 有 2 檔（共 3 檔）缺少行情列.*未更新完整.*最後一個資料完整的行情日為 {days[54]}",
+        ):
             self.backtest(records, days[40], days[-1], confirmed_halts={})
+
+    def test_the_batch_threshold_is_more_than_ten_percent_and_at_least_two(self):
+        days = trading_days(60)
+        ids = [f"{1000 + i}" for i in range(25)]
+
+        def run(missing):
+            records = {sid: series(sid, 60) for sid in ids}
+            for sid in ids[:missing]:
+                del records[sid][58]
+            return self.backtest(records, days[50], days[-1], confirmed_halts={})
+
+        # 25 檔中 2 檔（8%）：個別缺列，照常完成。
+        self.assertEqual(len(run(2)["unconfirmed_gaps"]), 2)
+        # 3 檔（12%）：判定為未更新完整。
+        with self.assertRaisesRegex(ValueError, "未更新完整"):
+            run(3)
+
+    def test_a_stock_without_any_rows_was_never_downloaded(self):
+        records = {"AAA": series("AAA", 60), "BBB": []}
+        days = trading_days(60)
+        with self.assertRaisesRegex(ValueError, "BBB 在 .* 以前沒有任何行情列，可能尚未下載"):
+            self.backtest(records, days[40], days[-1], confirmed_halts={})
+
+    def test_a_missing_confirmed_halt_day_is_still_a_halt(self):
+        # 沒經過 load_records、清單中的停牌日沒有列：仍是已確認停牌，不是缺列。
+        records = {"AAA": series("AAA", 60), "BBB": series("BBB", 60)}
+        days = trading_days(60)
+        del records["AAA"][50]
+        halts = {("AAA", days[50]): {"reason": "測試", "source": "https://x", "sources": []}}
+        result = self.backtest(records, days[40], days[-1], confirmed_halts=halts)
+        self.assertEqual(result["unconfirmed_gaps"], [])
+        self.assertEqual([e["market_status"] for e in result["market_events"]], ["CONFIRMED_HALT"])
 
     def test_confirmed_halt_stays_in_the_window_like_research_ranking(self):
         # 回測與研究排名同一套規則：停牌列不刪除，窗口（5 筆）內有它時因子不計算。

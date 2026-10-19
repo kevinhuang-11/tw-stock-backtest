@@ -146,15 +146,29 @@
   </section>
   {% endif %}
 
+  {% if detail.get('unconfirmed_gaps') %}
+  <section class="card">
+    <div class="card-header"><div><h2>原因未確認的缺列</h2><p>其他股票當天有行情、這檔卻沒有列，而且查不到停止買賣公告。缺列期間視為不可交易、持股沿用最近收盤估值；不認定為停牌，這次結果不完整。</p></div></div>
+    <div class="table-wrap"><table class="table table-compact">
+      <thead><tr><th>股票</th><th>起</th><th>迄</th><th class="num">行情日數</th></tr></thead>
+      <tbody>{% for g in detail.unconfirmed_gaps %}<tr>
+        <td><a href="/stocks/{{ g.stock_id }}">{{ g.stock_id }}</a></td>
+        <td class="nowrap">{{ g.first }}</td><td class="nowrap">{{ g.last }}</td>
+        <td class="num">{{ g.days | int }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  {% endif %}
+
   {% if detail.get('market_events') %}
   <section class="card">
-    <div class="card-header"><div><h2>停牌與無成交價日</h2><p>這些日子該股不成交、不更新訊號，持股沿用最近一筆收盤估值。無成交價只表示來源當天沒有開高低收，不認定為停牌。</p></div></div>
+    <div class="card-header"><div><h2>停牌與無成交價日</h2><p>這些日子該股不成交、不更新訊號，持股沿用最近一筆收盤估值。無成交價與缺少行情列只表示來源當天沒有價格或沒有列，不認定為停牌。</p></div></div>
     <div class="table-wrap"><table class="table table-compact">
       <thead><tr><th>日期</th><th>股票</th><th>狀態</th><th>說明</th></tr></thead>
       <tbody>{% for e in detail.market_events %}<tr>
         <td class="nowrap">{{ e.date }}</td>
         <td><a href="/stocks/{{ e.stock_id }}">{{ e.stock_id }}</a></td>
-        <td>{{ ui.badge('無成交價', 'neutral') if e.market_status == 'NO_PRICE' else ui.badge('已確認停牌', 'warn') }}</td>
+        <td>{{ ui.badge('無成交價', 'neutral') if e.market_status == 'NO_PRICE' else ui.badge('缺少行情列', 'neutral') if e.market_status == 'MISSING_ROW' else ui.badge('已確認停牌', 'warn') }}</td>
         <td>{{ e.reason }}</td>
       </tr>{% endfor %}</tbody>
     </table></div>

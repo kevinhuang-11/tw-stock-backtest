@@ -76,6 +76,8 @@ def compare_strategies(
         "costs": settings["costs"],
         "input_sha256": hashlib.sha256(canonical(records).encode()).hexdigest(),
         "price_adjustment": prices.describe(),
+        # 原因未確認的缺列（docs/HALT-POLICY.md 3.6）；有的話結果不完整。
+        "unconfirmed_gaps": benchmark["unconfirmed_gaps"],
     }
     report.write_json("common.json", {"execution": common, "version": program_version()})
     rows, series, failures = [], [], []
@@ -402,7 +404,11 @@ def compare_periods(settings, strategies, periods, output_root):
                     Decimal(str(row["total_return"])) - Decimal(str(entry["benchmark_return"]))
                 ) * 100
                 rows.append(entry)
-            if data.get("failures") or any(r["unavailable_days"] for r in data["strategies"]):
+            if (
+                data.get("failures")
+                or data["common"].get("unconfirmed_gaps")
+                or any(r["unavailable_days"] for r in data["strategies"])
+            ):
                 item["status"] = "partial" if data["strategies"] else "failed"
         except Exception as error:
             # No arbitrary exception message or settings can leak into public outputs.
