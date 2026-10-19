@@ -1,6 +1,7 @@
 import argparse
 import sqlite3
 from collections import Counter
+from types import SimpleNamespace
 
 from tw_stock_backtest.analysis.adjustment import AdjustedHistory
 from tw_stock_backtest.analysis.factors import (
@@ -64,159 +65,215 @@ def format_percent(value):
     return f"{value:.2%}"
 
 
-def main():
-    args = parse_arguments()
+REASON_LABELS = {
+    "ranking_incomplete": "排名不完整",
+    "no_candidates": "沒有候選股",
+    "incomplete_forward_returns": "後續報酬資料不完整",
+}
+DETAIL_LABELS = {
+    "insufficient_future_dates": "未來行情日數不足",
+    "missing_entry_record": "缺少起算日行情",
+    "missing_exit_record": "缺少結束日行情",
+    "unavailable_entry_price": "起算日價格無效或不可交易",
+    "unavailable_exit_price": "結束日價格無效或不可交易",
+}
 
-    try:
-        start, end = parse_date_range(args.start, args.end)
-        settings = load_config(args.config)
 
-        for name, values in (
-            ("horizons", args.horizons),
-            ("top", args.top),
-        ):
-            if any(value <= 0 for value in values) or len(set(values)) != len(values):
-                raise ValueError(f"{name} 必須是正整數且不可重複")
+def _load(args):
+    """讀設定、排除股票、載入行情並建立暖機序列；失敗時丟出例外，由 main 處理。"""
+    start, end = parse_date_range(args.start, args.end)
+    settings = load_config(args.config)
 
-        stocks = settings["universe"]["stocks"]
-        db_path = settings["storage"]["database_path"]
+    for name, values in (
+        ("horizons", args.horizons),
+        ("top", args.top),
+    ):
+        if any(value <= 0 for value in values) or len(set(values)) != len(values):
+            raise ValueError(f"{name} 必須是正整數且不可重複")
 
-        # 開始日還沒上市或已終止上市的股票不納入股票池（docs/HALT-POLICY.md 3.9、3.10）。
-        excluded = listing_exclusions(stocks, db_path, start)
-        excluded_ids = {item["stock_id"] for item in excluded}
-        stocks = [stock_id for stock_id in stocks if stock_id not in excluded_ids]
-        if not stocks:
-            raise ValueError("股票池在開始日都還沒上市或已終止上市")
+    stocks = settings["universe"]["stocks"]
+    db_path = settings["storage"]["database_path"]
 
-        if max(args.top) > len(stocks):
-            raise ValueError("評估名次不可超過股票池檔數")
+    # 開始日還沒上市或已終止上市的股票不納入股票池（docs/HALT-POLICY.md 3.9、3.10）。
+    excluded = listing_exclusions(stocks, db_path, start)
+    excluded_ids = {item["stock_id"] for item in excluded}
+    stocks = [stock_id for stock_id in stocks if stock_id not in excluded_ids]
+    if not stocks:
+        raise ValueError("股票池在開始日都還沒上市或已終止上市")
 
-        # 僅讀到 end，不讀取保留期間的未來行情。
-        raw_records = {
-            stock_id: load_records(
-                stock_id,
-                "1900-01-01",
-                end.isoformat(),
-                db_path=db_path,
-            )
-            for stock_id in stocks
-        }
+    if max(args.top) > len(stocks):
+        raise ValueError("評估名次不可超過股票池檔數")
 
-        market, trading_dates = prepare_backtest_market(
-            raw_records,
-            start,
-            end,
-            confirmed_halts=CONFIRMED_HALTS,
+    # 僅讀到 end，不讀取保留期間的未來行情。
+    raw_records = {
+        stock_id: load_records(
+            stock_id,
+            "1900-01-01",
+            end.isoformat(),
+            db_path=db_path,
         )
+        for stock_id in stocks
+    }
 
-        # 保留停牌與無成交價的列，供後續評估判斷起訖日是否可交易。
-        records_by_stock = {stock_id: list(prices.values()) for stock_id, prices in market.items()}
+    market, trading_dates = prepare_backtest_market(
+        raw_records,
+        start,
+        end,
+        confirmed_halts=CONFIRMED_HALTS,
+    )
 
-        # 排名指標的暖機資料保留不可交易的列，與研究排名使用同一套規則。
-        # 訊號依價格模式逐日累積（每個訊號日只套用該日以前生效的公司行動）；
-        # 前瞻報酬計入期間內的公司行動（raw 模式只計價格報酬）。
-        prices = PriceSource(settings)
-        corporate_actions = prices.actions_by_stock(raw_records, end.isoformat())
-        histories = {
-            stock_id: AdjustedHistory(corporate_actions.get(stock_id, ())).extend(
-                record for record in records if record["date"] < start.isoformat()
-            )
-            for stock_id, records in records_by_stock.items()
-        }
+    # 保留停牌與無成交價的列，供後續評估判斷起訖日是否可交易。
+    records_by_stock = {stock_id: list(prices.values()) for stock_id, prices in market.items()}
 
-        rule_settings = {
-            key: settings["screening"][key]
-            for key in (
-                "short_window",
-                "long_window",
-                "volume_window",
-                "min_volume_ratio",
-                "momentum_window",
-            )
-        }
-        factor_settings = settings["factors"]
-        weights = {
-            "momentum": factor_settings["momentum_weight"],
-            "trend": factor_settings["trend_weight"],
-            "volatility": factor_settings["volatility_weight"],
-        }
+    # 排名指標的暖機資料保留不可交易的列，與研究排名使用同一套規則。
+    # 訊號依價格模式逐日累積（每個訊號日只套用該日以前生效的公司行動）；
+    # 前瞻報酬計入期間內的公司行動（raw 模式只計價格報酬）。
+    prices = PriceSource(settings)
+    corporate_actions = prices.actions_by_stock(raw_records, end.isoformat())
+    histories = {
+        stock_id: AdjustedHistory(corporate_actions.get(stock_id, ())).extend(
+            record for record in records if record["date"] < start.isoformat()
+        )
+        for stock_id, records in records_by_stock.items()
+    }
 
-        ranking_history = []
+    return SimpleNamespace(
+        start=start,
+        end=end,
+        settings=settings,
+        stocks=stocks,
+        excluded=excluded,
+        market=market,
+        trading_dates=trading_dates,
+        records_by_stock=records_by_stock,
+        prices=prices,
+        corporate_actions=corporate_actions,
+        histories=histories,
+    )
 
-        for signal_date in trading_dates:
-            evaluations = []
-            errors = {}
 
-            for stock_id in stocks:
-                record = market[stock_id][signal_date]
+def _rank_each_day(args, run):
+    """逐個訊號日只用當日以前的資料排名；任何一檔無法評估時，當天不產生候選。"""
+    settings, stocks, market, trading_dates, histories = (
+        run.settings,
+        run.stocks,
+        run.market,
+        run.trading_dates,
+        run.histories,
+    )
+    rule_settings = {
+        key: settings["screening"][key]
+        for key in (
+            "short_window",
+            "long_window",
+            "volume_window",
+            "min_volume_ratio",
+            "momentum_window",
+        )
+    }
+    factor_settings = settings["factors"]
+    weights = {
+        "momentum": factor_settings["momentum_weight"],
+        "trend": factor_settings["trend_weight"],
+        "volatility": factor_settings["volatility_weight"],
+    }
 
-                # 此時只加入訊號日當天及以前的資料。
-                histories[stock_id].append(record)
+    ranking_history = []
 
-                if not record["tradable"]:
-                    errors[stock_id] = not_tradable_reason(record)
-                    continue
+    for signal_date in trading_dates:
+        evaluations = []
+        errors = {}
 
-                try:
-                    if args.ranking == "rules":
-                        evaluation = evaluate_stock(
-                            histories[stock_id].rows,
-                            signal_date,
-                            **rule_settings,
-                        )
-                    else:
-                        evaluation = calculate_factor_row(
-                            histories[stock_id].rows,
-                            signal_date,
-                            factor_settings=factor_settings,
-                        )
+        for stock_id in stocks:
+            record = market[stock_id][signal_date]
 
-                    evaluations.append(evaluation)
+            # 此時只加入訊號日當天及以前的資料。
+            histories[stock_id].append(record)
 
-                except ValueError as error:
-                    errors[stock_id] = str(error)
+            if not record["tradable"]:
+                errors[stock_id] = not_tradable_reason(record)
+                continue
 
-            # 選股能力比較要求完整股票池排名。
-            # 與「停牌時其他股票仍可交易」的回測規則不同。
-            if errors:
-                candidates = []
-            elif args.ranking == "rules":
-                candidates = [row for row in evaluations if row["selected"]]
-                candidates.sort(
-                    key=lambda row: (
-                        -row["momentum"],
-                        row["stock_id"],
+            try:
+                if args.ranking == "rules":
+                    evaluation = evaluate_stock(
+                        histories[stock_id].rows,
+                        signal_date,
+                        **rule_settings,
                     )
-                )
-            else:
-                candidates = rank_factor_candidates(
-                    evaluations,
-                    weights=weights,
-                )
+                else:
+                    evaluation = calculate_factor_row(
+                        histories[stock_id].rows,
+                        signal_date,
+                        factor_settings=factor_settings,
+                    )
 
-            ranking_history.append(
-                {
-                    "date": signal_date,
-                    "candidates": candidates,
-                    "errors": errors,
-                }
+                evaluations.append(evaluation)
+
+            except ValueError as error:
+                errors[stock_id] = str(error)
+
+        # 選股能力比較要求完整股票池排名。
+        # 與「停牌時其他股票仍可交易」的回測規則不同。
+        if errors:
+            candidates = []
+        elif args.ranking == "rules":
+            candidates = [row for row in evaluations if row["selected"]]
+            candidates.sort(
+                key=lambda row: (
+                    -row["momentum"],
+                    row["stock_id"],
+                )
+            )
+        else:
+            candidates = rank_factor_candidates(
+                evaluations,
+                weights=weights,
             )
 
-        # 排名全部建立後，才使用後續價格進行事後評分。
-        report = evaluate_rankings(
-            ranking_history,
-            records_by_stock,
-            trading_dates,
-            horizons=tuple(args.horizons),
-            top_ns=tuple(args.top),
-            corporate_actions=corporate_actions,
-            delisted_valuation=settings["halts"]["delisted_valuation"],
+        ranking_history.append(
+            {
+                "date": signal_date,
+                "candidates": candidates,
+                "errors": errors,
+            }
         )
 
-    except (ValueError, sqlite3.Error, OSError) as error:
-        print(f"選股評估失敗：{error}")
-        return 1
+    return ranking_history
 
+
+def _evaluate(args, run, ranking_history):
+    """排名全部建立後，才使用後續價格進行事後評分。"""
+    settings, trading_dates, records_by_stock, corporate_actions = (
+        run.settings,
+        run.trading_dates,
+        run.records_by_stock,
+        run.corporate_actions,
+    )
+    report = evaluate_rankings(
+        ranking_history,
+        records_by_stock,
+        trading_dates,
+        horizons=tuple(args.horizons),
+        top_ns=tuple(args.top),
+        corporate_actions=corporate_actions,
+        delisted_valuation=settings["halts"]["delisted_valuation"],
+    )
+
+    return report
+
+
+def _print_header(args, run, ranking_history):
+    """評估方法、股票池、期間、價格口徑與原因未確認的缺列；回傳缺列清單。"""
+    start, end, stocks, excluded, market, trading_dates, prices = (
+        run.start,
+        run.end,
+        run.stocks,
+        run.excluded,
+        run.market,
+        run.trading_dates,
+        run.prices,
+    )
     print("選股能力評估：下一行情日開盤 → 第 N 個行情日收盤")
     print("進場日算第 1 日；未計費稅、滑價、股利與拆股")
     print("每日樣本可能重疊；平均報酬不是累積帳戶報酬")
@@ -240,64 +297,71 @@ def main():
             f" | {gap['days']} 個行情日（視為不可交易；結果不完整，退出碼 2）"
         )
 
-    reason_labels = {
-        "ranking_incomplete": "排名不完整",
-        "no_candidates": "沒有候選股",
-        "incomplete_forward_returns": "後續報酬資料不完整",
-    }
-    detail_labels = {
-        "insufficient_future_dates": "未來行情日數不足",
-        "missing_entry_record": "缺少起算日行情",
-        "missing_exit_record": "缺少結束日行情",
-        "unavailable_entry_price": "起算日價格無效或不可交易",
-        "unavailable_exit_price": "結束日價格無效或不可交易",
-    }
+    return gaps
 
+
+def _print_summary(summary, report):
+    """一組（觀察日數 × 前 N 名）的評估結果。"""
+    horizon = summary["horizon"]
+    top_n = summary["top_n"]
+
+    print(f"\n觀察 {horizon} 日／前 {top_n} 名")
+    print(f"有效訊號日：{summary['evaluated_days']}／{summary['signal_days']}")
+    print(f"候選股平均價格報酬：{format_percent(summary['average_selected_return'])}")
+    print(f"股票池平均價格報酬：{format_percent(summary['average_universe_return'])}")
+
+    excess = summary["average_excess_return"]
+    excess_text = "--" if excess is None else f"{excess * 100:+.2f} 個百分點"
+    print(f"平均報酬差：{excess_text}")
+    print(f"候選組合報酬為正的比例：{format_percent(summary['positive_return_ratio'])}")
+    print(f"候選組合勝過股票池的比例：{format_percent(summary['outperform_ratio'])}")
+
+    valid_rows = [
+        row
+        for row in report["details"]
+        if row["horizon"] == horizon and row["top_n"] == top_n and row["status"] == "ok"
+    ]
+    counts = Counter(row["selected_count"] for row in valid_rows)
+    counts_text = (
+        "、".join(f"{count} 檔：{days} 日" for count, days in sorted(counts.items())) or "無"
+    )
+    print(f"有效樣本實際候選數：{counts_text}")
+    if summary["stale_exits"]:
+        print(
+            f"出場日不可交易、以最近收盤估值：{summary['stale_exits']} 筆股票案例"
+            "（docs/HALT-POLICY.md 3.22）"
+        )
+
+    for reason, count in summary["unavailable_reasons"].items():
+        label = REASON_LABELS.get(reason, reason)
+        print(f"未評估－{label}：{count} 日")
+
+    # 此處計數單位是「股票 × 訊號日」，不是日數。
+    unavailable_counts = Counter(
+        reason
+        for row in report["details"]
+        if row["horizon"] == horizon and row["top_n"] == top_n
+        for reason in row["unavailable_stocks"].values()
+    )
+    for reason, count in sorted(unavailable_counts.items()):
+        label = DETAIL_LABELS.get(reason, reason)
+        print(f"  {label}：{count} 筆股票案例")
+
+
+def main():
+    args = parse_arguments()
+
+    try:
+        run = _load(args)
+        ranking_history = _rank_each_day(args, run)
+        report = _evaluate(args, run, ranking_history)
+    except (ValueError, sqlite3.Error, OSError) as error:
+        print(f"選股評估失敗：{error}")
+        return 1
+
+    gaps = _print_header(args, run, ranking_history)
     for summary in report["summaries"]:
-        horizon = summary["horizon"]
-        top_n = summary["top_n"]
-
-        print(f"\n觀察 {horizon} 日／前 {top_n} 名")
-        print(f"有效訊號日：{summary['evaluated_days']}／{summary['signal_days']}")
-        print(f"候選股平均價格報酬：{format_percent(summary['average_selected_return'])}")
-        print(f"股票池平均價格報酬：{format_percent(summary['average_universe_return'])}")
-
-        excess = summary["average_excess_return"]
-        excess_text = "--" if excess is None else f"{excess * 100:+.2f} 個百分點"
-        print(f"平均報酬差：{excess_text}")
-        print(f"候選組合報酬為正的比例：{format_percent(summary['positive_return_ratio'])}")
-        print(f"候選組合勝過股票池的比例：{format_percent(summary['outperform_ratio'])}")
-
-        valid_rows = [
-            row
-            for row in report["details"]
-            if row["horizon"] == horizon and row["top_n"] == top_n and row["status"] == "ok"
-        ]
-        counts = Counter(row["selected_count"] for row in valid_rows)
-        counts_text = (
-            "、".join(f"{count} 檔：{days} 日" for count, days in sorted(counts.items())) or "無"
-        )
-        print(f"有效樣本實際候選數：{counts_text}")
-        if summary["stale_exits"]:
-            print(
-                f"出場日不可交易、以最近收盤估值：{summary['stale_exits']} 筆股票案例"
-                "（docs/HALT-POLICY.md 3.22）"
-            )
-
-        for reason, count in summary["unavailable_reasons"].items():
-            label = reason_labels.get(reason, reason)
-            print(f"未評估－{label}：{count} 日")
-
-        # 此處計數單位是「股票 × 訊號日」，不是日數。
-        unavailable_counts = Counter(
-            reason
-            for row in report["details"]
-            if row["horizon"] == horizon and row["top_n"] == top_n
-            for reason in row["unavailable_stocks"].values()
-        )
-        for reason, count in sorted(unavailable_counts.items()):
-            label = detail_labels.get(reason, reason)
-            print(f"  {label}：{count} 筆股票案例")
+        _print_summary(summary, report)
 
     return 2 if gaps else 0
 
