@@ -112,6 +112,20 @@
   </section>
   {% endif %}
 
+  {% if detail.get('universe_exclusions') %}
+  <section class="card">
+    <div class="card-header"><div><h2>未納入股票池</h2><p>回測開始日還沒上市的股票不能在開始日持有，不納入股票池，也不在上市後中途加入。</p></div></div>
+    <div class="table-wrap"><table class="table table-compact">
+      <thead><tr><th>股票</th><th>上市日</th><th>說明</th></tr></thead>
+      <tbody>{% for e in detail.universe_exclusions %}<tr>
+        <td><a href="/stocks/{{ e.stock_id }}">{{ e.stock_id }}</a></td>
+        <td class="nowrap">{{ e.listed_date }}</td>
+        <td>{{ e.reason }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  {% endif %}
+
   {% if detail.get('market_events') %}
   <section class="card">
     <div class="card-header"><div><h2>停牌與無成交價日</h2><p>這些日子該股不成交、不更新訊號，持股沿用最近一筆收盤估值。無成交價只表示來源當天沒有開高低收，不認定為停牌。</p></div></div>

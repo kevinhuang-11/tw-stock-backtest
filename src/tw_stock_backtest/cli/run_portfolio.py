@@ -19,6 +19,7 @@ from tw_stock_backtest.config import (
     load_config,
 )
 from tw_stock_backtest.data.database import load_records
+from tw_stock_backtest.data.universe import listing_exclusions
 from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.prices import PriceSource, describe_prices
 from tw_stock_backtest.reporting import export_portfolio_report
@@ -153,6 +154,13 @@ def main():
         db_path = settings["storage"]["database_path"]
         cost_settings = CostSettings(**settings["costs"])
 
+        # 開始日還沒上市的股票不納入股票池（原因列在輸出與報表）。
+        listing_excluded = listing_exclusions(stocks, db_path, start)
+        excluded_ids = {item["stock_id"] for item in listing_excluded}
+        stocks = [stock_id for stock_id in stocks if stock_id not in excluded_ids]
+        if not stocks:
+            raise ValueError("股票池在回測開始日都還沒上市")
+
         # 載入開始日前的資料，供篩選指標暖機。
         # 資金與持股仍從回測開始日才開始模擬。
         records_by_stock = {
@@ -185,6 +193,7 @@ def main():
             corporate_actions=corporate_actions,
         )
         result["price_adjustment"] = prices.describe()
+        result["universe_exclusions"] = listing_excluded
         performance = summarize_performance(
             result["equity_curve"],
             result["initial_cash"],
@@ -217,6 +226,8 @@ def main():
     print("含設定費稅與固定比例滑價；未計股利、拆股與精確零股成交")
     print("期末持股按收盤價估值，不強制賣出")
     print(f"\n股票池：{', '.join(stocks)}")
+    for item in listing_excluded:
+        print(f"未納入股票池：{item['stock_id']}（{item['reason']}）")
     print(f"資料庫位置：{db_path}")
     print(f"指定期間：{start} ～ {end}")
     print(f"實際期間：{first_date} ～ {last_date}")

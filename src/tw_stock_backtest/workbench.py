@@ -105,6 +105,7 @@ def report_details(path):
             "strategy": result["strategy"]["performance"],
             "benchmark": result["benchmark"]["performance"],
             "market_events": strategy_result.get("market_events", []),
+            "universe_exclusions": strategy_result.get("universe_exclusions", []),
             # 舊報表沒有價格口徑的紀錄，視為原始價格。
             "price_mode": report_price_mode(strategy_result, configuration.get("settings")),
             "corporate_action_events": [
