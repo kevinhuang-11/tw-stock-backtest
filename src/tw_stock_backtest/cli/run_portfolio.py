@@ -165,7 +165,7 @@ def main():
             for stock_id in stocks
         }
 
-        # 訊號依價格模式計算；成交與估值仍用原始價格（公司行動的持股與現金調整尚未實作）。
+        # 訊號依價格模式計算；成交與估值用原始價格，持股與現金依公司行動調整（raw 模式不調整）。
         prices = PriceSource(settings)
         corporate_actions = prices.actions_by_stock(records_by_stock, end.isoformat())
         result = run_portfolio_backtest(
@@ -220,7 +220,12 @@ def main():
     print(f"指定期間：{start} ～ {end}")
     print(f"實際期間：{first_date} ～ {last_date}")
     print(f"回測行情日數：{len(result['equity_curve'])}")
-    print(describe_prices(result["price_adjustment"]) + "；成交與估值仍為原始價格")
+    print(describe_prices(result["price_adjustment"], backtest=True))
+    for event in result["corporate_action_events"]:
+        print(
+            f"公司行動 {event['applied_on']} | {event['stock_id']} | 持股 {event['shares_before']}"
+            f" → {event['shares_after']} | 入帳 {event['cash']} 元"
+        )
 
     if args.ranking == "rules":
         print("\n排名模式：規則篩選")

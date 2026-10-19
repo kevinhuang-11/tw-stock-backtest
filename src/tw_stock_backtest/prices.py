@@ -114,12 +114,22 @@ class PriceSource:
         }
 
 
-def describe_prices(summary):
-    """價格口徑的一行說明，給 CLI 輸出與報表使用。"""
+def describe_prices(summary, backtest=False):
+    """價格口徑的一行說明，給 CLI 輸出與報表使用；backtest 時另外說明持股與現金的處理。"""
     if summary.get("mode") != ADJUSTED:
-        return "價格：原始價格（未調整除權息、減資與變更面額）"
+        text = "價格：原始價格（未調整除權息、減資與變更面額）"
+        return text + "；回測不計股利與股數變動" if backtest else text
     text = f"價格：截至分析日的還原價（套用 {len(summary['actions'])} 筆公司行動）"
     gaps = summary.get("uncovered") or {}
     if gaps:
         text += f"；{len(gaps)} 檔有未下載公司行動資料的期間，這些期間無法調整"
+    if backtest:
+        text += BACKTEST_NOTE
     return text
+
+
+# 回測報表與 CLI 共用的註明。
+BACKTEST_NOTE = (
+    "。成交與估值使用原始價格；現金股利與減資退還股款於生效日入帳（簡化，實際發放日通常較晚），"
+    "未扣股利所得稅與二代健保補充保費；配股與減資換股不足一股依面額折發現金；現金增資不認購"
+)

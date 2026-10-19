@@ -133,3 +133,90 @@ class AdjustedBacktestTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EngineAccountingTests(unittest.TestCase):
+    """多股票引擎的公司行動帳：減資換股與除息入帳。"""
+
+    def setUp(self):
+        self.records = {"2330": rows("2330"), "2317": rows("2317")}
+        self.settings = {
+            "short_window": 2,
+            "long_window": 5,
+            "momentum_window": 3,
+            "volatility_window": 3,
+            "top_n": 2,
+            "momentum_weight": D("1"),
+            "trend_weight": D("1"),
+            "volatility_weight": D("1"),
+        }
+
+    def run_engine(self, actions):
+        return run_portfolio_backtest(
+            self.records,
+            DAYS[40],
+            DAYS[-1],
+            screening_settings=None,
+            ranking_method="factors",
+            factor_settings=self.settings,
+            initial_cash=D("1000000"),
+            quantity=1000,
+            max_positions=2,
+            cost_settings=COSTS,
+            corporate_actions=actions,
+        )
+
+    def equity(self, result, day):
+        return next(p for p in result["equity_curve"] if p["date"] == day)
+
+    def test_reduction_changes_shares_and_removes_the_false_jump(self):
+        raw = self.run_engine(None)
+        adjusted = self.run_engine({"2330": [reduction()], "2317": []})
+        before, on = DAYS[49], EVENT
+        self.assertEqual(self.equity(raw, before)["holdings"].get("2330"), 1000)
+        close = {r["date"]: r["close"] for r in self.records["2330"]}
+
+        def position_return(result):
+            # 2330 部位：恢復日的股數 × 收盤，加上當天入帳的公司行動現金，相對前一日。
+            received = sum(
+                e["cash"] for e in result["corporate_action_events"] if e["stock_id"] == "2330"
+            )
+            after = self.equity(result, on)["holdings"]["2330"] * close[on] + received
+            return after / (self.equity(result, before)["holdings"]["2330"] * close[before]) - 1
+
+        self.assertGreater(position_return(raw), D("0.7"))  # 股數沒換，帳面多出約八成
+        self.assertLess(abs(position_return(adjusted)), D("0.01"))
+        event = adjusted["corporate_action_events"][0]
+        self.assertEqual(
+            (event["stock_id"], event["shares_before"], event["shares_after"]), ("2330", 1000, 555)
+        )
+        self.assertEqual(event["fraction_cash"], 5)  # 0.556 股 × 面額 10 元
+        self.assertEqual(self.equity(adjusted, on)["holdings"]["2330"], 555)
+        self.assertEqual(raw["corporate_action_events"], [])
+
+    def test_dividend_is_credited_on_the_ex_date_to_holders_at_the_previous_close(self):
+        dividend = {
+            "stock_id": "2317",
+            "effective_date": DAYS[45],
+            "kind": "dividend",
+            "previous_close": D("10"),
+            "reference_price": D("9.5"),
+            "cash_dividend": D("0.5"),
+            "stock_dividend_per_1000": D(0),
+            "shares_per_1000": None,
+            "cash_return": D(0),
+            "needs_review": False,
+        }
+        result = self.run_engine({"2330": [], "2317": [dividend]})
+        held = self.equity(result, DAYS[44])["holdings"].get("2317", 0)
+        self.assertGreater(held, 0)
+        events = [e for e in result["corporate_action_events"] if e["stock_id"] == "2317"]
+        self.assertEqual(
+            [(e["applied_on"], e["cash_dividend"]) for e in events], [(DAYS[45], held // 2)]
+        )
+        # 入帳後現金增加：除息日的現金 = 前一日現金 + 股利 ± 當日開盤成交。
+        trades_on = sum(t["cash_change"] for t in result["trades"] if t["date"] == DAYS[45])
+        self.assertEqual(
+            self.equity(result, DAYS[45])["cash"],
+            self.equity(result, DAYS[44])["cash"] + held // 2 + trades_on,
+        )

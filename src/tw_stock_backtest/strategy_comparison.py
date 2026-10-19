@@ -47,7 +47,7 @@ def compare_strategies(
     )
     backtest = settings["backtest"]
     costs = CostSettings(**settings["costs"])
-    # 訊號依價格模式計算；成交與估值仍用原始價格（公司行動的持股與現金調整尚未實作）。
+    # 訊號依價格模式計算；成交與估值用原始價格，持股與現金依公司行動調整（raw 模式不調整）。
     prices = PriceSource(settings)
     corporate_actions = prices.actions_by_stock(records, end)
     benchmark = run_buy_and_hold(
