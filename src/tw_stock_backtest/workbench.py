@@ -17,7 +17,6 @@ from uuid import uuid4
 from flask import Flask, abort, redirect, render_template, request, send_file, url_for
 
 from tw_stock_backtest.backtesting.corporate_actions import dilution_total
-from tw_stock_backtest.cli.download_universe import save_progress
 from tw_stock_backtest.config import apply_overrides, load_config
 from tw_stock_backtest.data.universe import NetworkDisabled, ensure_network_allowed, offline_reason
 from tw_stock_backtest.notifications import preview_message
@@ -39,6 +38,7 @@ from tw_stock_backtest.research_digest import (
     score_text,
 )
 from tw_stock_backtest.security import child_environment, public_data, safe_text
+from tw_stock_backtest.serialization import save_progress
 from tw_stock_backtest.strategies import (
     StrategyLibrary,
     from_settings,

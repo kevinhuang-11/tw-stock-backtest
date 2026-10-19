@@ -3,9 +3,9 @@ import unittest
 from decimal import Decimal
 from unittest.mock import patch
 
-from tw_stock_backtest.cli.screen_factors import collect_factor_rows
+from tw_stock_backtest.factor_rows import collect_factor_rows
 
-MODULE = "tw_stock_backtest.cli.screen_factors"
+MODULE = "tw_stock_backtest.factor_rows"
 
 
 class TestCollectFactorRows(unittest.TestCase):

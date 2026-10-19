@@ -11,15 +11,14 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from tw_stock_backtest.analysis.factors import rank_factor_candidates
-from tw_stock_backtest.cli.fetch_stock import NoMarketData, fetch_month_with_retry
-from tw_stock_backtest.cli.screen_factors import collect_factor_rows
 from tw_stock_backtest.data.database import load_records, save_records
 from tw_stock_backtest.data.restrictions import annotate_rankings, load_restrictions
-from tw_stock_backtest.data.stock_data import normalize_row
+from tw_stock_backtest.data.stock_data import NoMarketData, fetch_month_with_retry, normalize_row
 from tw_stock_backtest.data.universe import ensure_network_allowed
 from tw_stock_backtest.date_range import filter_records, month_starts
+from tw_stock_backtest.factor_rows import collect_factor_rows
 from tw_stock_backtest.prices import PriceSource
-from tw_stock_backtest.reporting import _json_default
+from tw_stock_backtest.serialization import json_default
 
 
 def taipei_today():
@@ -95,14 +94,14 @@ def build_update_plans(stocks, settings, end, *, start=None, initial_days=90):
 
 def job_identity(job):
     return hashlib.sha256(
-        json.dumps(job, sort_keys=True, default=_json_default, ensure_ascii=False).encode()
+        json.dumps(job, sort_keys=True, default=json_default, ensure_ascii=False).encode()
     ).hexdigest()
 
 
 def load_research_progress(path, job):
     """研究進度與舊 download_universe 的進度格式分開，避免誤用。"""
     document = json.loads(Path(path).read_text(encoding="utf-8"))
-    expected = json.loads(json.dumps(job, default=_json_default))
+    expected = json.loads(json.dumps(job, default=json_default))
     if not isinstance(document, dict):
         raise ValueError("resume 格式無效")
     if (

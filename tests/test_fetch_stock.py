@@ -9,6 +9,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlparse
 
 from tw_stock_backtest.cli import fetch_stock
+from tw_stock_backtest.data import stock_data
 
 
 class TestFetchMonth(unittest.TestCase):
@@ -24,7 +25,7 @@ class TestFetchMonth(unittest.TestCase):
         return io.BytesIO(json.dumps(payload).encode("utf-8"))
 
     def fetch(self):
-        return fetch_stock.fetch_month(
+        return stock_data.fetch_month(
             "2330",
             "20260901",
             timeout_seconds=12,
@@ -32,7 +33,7 @@ class TestFetchMonth(unittest.TestCase):
 
     def test_success_and_request_parameters(self):
         with patch.object(
-            fetch_stock,
+            stock_data,
             "urlopen",
             return_value=self.make_response(self.payload),
         ) as mock_urlopen:
@@ -62,7 +63,7 @@ class TestFetchMonth(unittest.TestCase):
         )
 
         with patch.object(
-            fetch_stock,
+            stock_data,
             "urlopen",
             side_effect=error,
         ):
@@ -71,7 +72,7 @@ class TestFetchMonth(unittest.TestCase):
 
     def test_connection_error_is_propagated(self):
         with patch.object(
-            fetch_stock,
+            stock_data,
             "urlopen",
             side_effect=URLError("connection failed"),
         ):
@@ -80,7 +81,7 @@ class TestFetchMonth(unittest.TestCase):
 
     def test_timeout_is_propagated(self):
         with patch.object(
-            fetch_stock,
+            stock_data,
             "urlopen",
             side_effect=TimeoutError("request timed out"),
         ):
@@ -89,7 +90,7 @@ class TestFetchMonth(unittest.TestCase):
 
     def test_invalid_json_is_rejected(self):
         with patch.object(
-            fetch_stock,
+            stock_data,
             "urlopen",
             return_value=io.BytesIO(b"<html>error</html>"),
         ):
@@ -98,7 +99,7 @@ class TestFetchMonth(unittest.TestCase):
 
     def test_non_object_json_is_rejected(self):
         with patch.object(
-            fetch_stock,
+            stock_data,
             "urlopen",
             return_value=self.make_response([]),
         ):
@@ -114,7 +115,7 @@ class TestFetchMonth(unittest.TestCase):
         }
 
         with patch.object(
-            fetch_stock,
+            stock_data,
             "urlopen",
             return_value=self.make_response(payload),
         ):
@@ -143,7 +144,7 @@ class TestFetchMonth(unittest.TestCase):
         for payload in payloads:
             with self.subTest(payload=payload):
                 with patch.object(
-                    fetch_stock,
+                    stock_data,
                     "urlopen",
                     return_value=self.make_response(payload),
                 ):
@@ -216,7 +217,7 @@ class TestFetchCommandFailure(unittest.TestCase):
                 return_value=settings,
             ),
             patch.object(
-                fetch_stock,
+                stock_data,
                 "fetch_month",
                 side_effect=[
                     first_month,
@@ -228,7 +229,7 @@ class TestFetchCommandFailure(unittest.TestCase):
                 "save_records",
             ) as mock_save,
             patch.object(
-                fetch_stock.time,
+                stock_data.time,
                 "sleep",
             ) as mock_sleep,
             redirect_stdout(output),

@@ -450,8 +450,8 @@ class WatchResearchTests(unittest.TestCase):
         self.assertEqual(self.store.update_states("2330")["revenue"]["counts"], {"failed": 1})
 
     def test_price_update_passes_stock_metadata_to_existing_planner(self):
-        from tw_stock_backtest.cli.fetch_stock import NoMarketData
         from tw_stock_backtest.cli.update_watchlist import run
+        from tw_stock_backtest.data.stock_data import NoMarketData
 
         with patch(
             "tw_stock_backtest.research.fetch_month_with_retry",

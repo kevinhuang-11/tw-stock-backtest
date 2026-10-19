@@ -1,107 +1,17 @@
 import argparse
-import json
 import sqlite3
 import time
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
 
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config
 from tw_stock_backtest.data.database import save_records
-from tw_stock_backtest.data.stock_data import normalize_row
+from tw_stock_backtest.data.stock_data import fetch_month_with_retry, normalize_row
 from tw_stock_backtest.data.universe import ensure_network_allowed
 from tw_stock_backtest.date_range import (
     filter_records,
     month_starts,
     parse_date_range,
 )
-
-
-class NoMarketData(ValueError):
-    """來源明確表示無資料；仍相容既有 ValueError 處理。"""
-
-
-def fetch_month(stock_id, month, *, timeout_seconds):
-    """下載指定股票、指定月份的原始行情。"""
-    params = {
-        "stockNo": stock_id,
-        "date": month,
-        "response": "json",
-    }
-
-    query = urlencode(params)
-    url = f"https://www.twse.com.tw/exchangeReport/STOCK_DAY?{query}"
-
-    request = Request(
-        url,
-        headers={"User-Agent": "tw-stock-backtest/0.1"},
-    )
-
-    with urlopen(request, timeout=timeout_seconds) as response:
-        result = json.load(response)
-
-    if not isinstance(result, dict):
-        raise ValueError("行情回應格式錯誤，預期為 JSON 物件")
-
-    if result.get("stat") in ("查無資料", "很抱歉，沒有符合條件的資料!"):
-        raise NoMarketData("行情查詢未成功：來源明確回覆無資料")
-
-    if result.get("stat") != "OK":
-        raise ValueError(f"行情查詢未成功：{result.get('stat')}")
-
-    if not result.get("fields") or not result.get("data"):
-        raise ValueError("回應缺少欄位或行情資料")
-
-    return result
-
-
-def fetch_month_with_retry(
-    stock_id,
-    month,
-    *,
-    timeout_seconds,
-    max_attempts,
-    retry_wait_seconds,
-):
-    """遇到指定的暫時性錯誤時，有限次數重試。"""
-    for name, value in (
-        ("max_attempts", max_attempts),
-        ("retry_wait_seconds", retry_wait_seconds),
-    ):
-        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-            raise ValueError(f"{name} 必須是正整數")
-
-    for attempt in range(1, max_attempts + 1):
-        try:
-            return fetch_month(
-                stock_id,
-                month,
-                timeout_seconds=timeout_seconds,
-            )
-
-        except HTTPError as error:
-            # HTTPError 是 URLError 的子類別，必須先處理。
-            if error.code not in (502, 503, 504) or attempt == max_attempts:
-                raise
-
-            message = f"HTTP {error.code}"
-
-        except (URLError, TimeoutError, ConnectionError) as error:
-            if attempt == max_attempts:
-                raise
-
-            message = str(error)
-
-        wait_seconds = retry_wait_seconds * (2 ** (attempt - 1))
-
-        print(
-            f"查詢失敗：{message}。"
-            f"等待 {wait_seconds} 秒後進行第"
-            f" {attempt + 1}/{max_attempts} 次嘗試。",
-            flush=True,
-        )
-
-        time.sleep(wait_seconds)
 
 
 def parse_arguments():

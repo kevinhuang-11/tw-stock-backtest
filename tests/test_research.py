@@ -11,8 +11,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from tw_stock_backtest.cli import fetch_stock, run_research
+from tw_stock_backtest.cli import run_research
 from tw_stock_backtest.config import load_config
+from tw_stock_backtest.data import stock_data
 from tw_stock_backtest.data.database import load_records, save_records
 from tw_stock_backtest.reporting import ResearchReport
 from tw_stock_backtest.research import (
@@ -122,7 +123,7 @@ class TestIncremental(ResearchCase):
         with patch(
             "tw_stock_backtest.research.fetch_month_with_retry",
             side_effect=[
-                fetch_stock.NoMarketData(),
+                stock_data.NoMarketData(),
                 payload(),
             ],
         ):
@@ -152,9 +153,9 @@ class TestIncremental(ResearchCase):
 
     def test_source_no_data_uses_typed_compatible_error(self):
         response = io.BytesIO(json.dumps({"stat": "很抱歉，沒有符合條件的資料!"}).encode())
-        with patch.object(fetch_stock, "urlopen", return_value=response):
-            with self.assertRaises(fetch_stock.NoMarketData):
-                fetch_stock.fetch_month("AAA", "20260901", timeout_seconds=1)
+        with patch.object(stock_data, "urlopen", return_value=response):
+            with self.assertRaises(stock_data.NoMarketData):
+                stock_data.fetch_month("AAA", "20260901", timeout_seconds=1)
 
 
 class TestResearchRanking(ResearchCase):
@@ -235,9 +236,7 @@ class TestResearchReports(ResearchCase):
 
     def test_write_failure_does_not_publish_complete_directory(self):
         report = ResearchReport(self.root / "output")
-        with patch(
-            "tw_stock_backtest.cli.download_universe.os.replace", side_effect=OSError("disk full")
-        ):
+        with patch("tw_stock_backtest.serialization.os.replace", side_effect=OSError("disk full")):
             with self.assertRaises(OSError):
                 report.finish({"rankings": []})
         self.assertTrue(report.path.exists())

@@ -5,7 +5,6 @@ from datetime import date
 from pathlib import Path
 from uuid import uuid4
 
-from tw_stock_backtest.cli.download_universe import save_progress
 from tw_stock_backtest.cli.update_supplemental import update
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config
 from tw_stock_backtest.data.supplemental import (
@@ -17,6 +16,7 @@ from tw_stock_backtest.data.supplemental import (
 )
 from tw_stock_backtest.data.universe import NetworkDisabled
 from tw_stock_backtest.research import taipei_today, update_stocks
+from tw_stock_backtest.serialization import save_progress
 
 
 def run(

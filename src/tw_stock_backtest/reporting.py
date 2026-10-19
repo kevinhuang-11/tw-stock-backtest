@@ -1,22 +1,10 @@
 import csv
 import json
-from datetime import date, datetime, timezone
-from decimal import Decimal
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-
-def _json_default(value):
-    if isinstance(value, Decimal):
-        return str(value)
-
-    if isinstance(value, Path):
-        return str(value)
-
-    if isinstance(value, (date, datetime)):
-        return value.isoformat()
-
-    raise TypeError(f"不支援的 JSON 資料型別：{type(value).__name__}")
+from tw_stock_backtest.serialization import json_default, save_progress
 
 
 def export_portfolio_report(
@@ -87,7 +75,7 @@ def export_portfolio_report(
             document,
             ensure_ascii=False,
             indent=2,
-            default=_json_default,
+            default=json_default,
             allow_nan=False,
         )
         for filename, document in documents.items()
@@ -196,11 +184,10 @@ class ResearchReport:
         self.path.mkdir()
 
     def write_json(self, name, document):
-        from tw_stock_backtest.cli.download_universe import save_progress
 
         # 重用既有原子 JSON 寫入；先套用 Decimal/date/Path 序列化。
         safe = json.loads(
-            json.dumps(document, default=_json_default, ensure_ascii=False, allow_nan=False)
+            json.dumps(document, default=json_default, ensure_ascii=False, allow_nan=False)
         )
         save_progress(safe, self.path / name)
 

@@ -16,8 +16,8 @@ from test_ui_pages import PageCase, write
 from tw_stock_backtest.backtesting.benchmark import run_buy_and_hold
 from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.cli.run_portfolio import position_text
-from tw_stock_backtest.cli.screen_factors import collect_factor_rows
 from tw_stock_backtest.data.database import save_records
+from tw_stock_backtest.factor_rows import collect_factor_rows
 
 DAYS = trading_days(60)
 COSTS = CostSettings(
@@ -42,8 +42,8 @@ class ResearchReasonTests(unittest.TestCase):
     def reason(self, stock_id, as_of, halts=None, delistings=None):
         with (
             patch("tw_stock_backtest.data.database.CONFIRMED_HALTS", halts or {}),
-            patch("tw_stock_backtest.cli.screen_factors.CONFIRMED_HALTS", halts or {}),
-            patch("tw_stock_backtest.cli.screen_factors.CONFIRMED_DELISTINGS", delistings or {}),
+            patch("tw_stock_backtest.factor_rows.CONFIRMED_HALTS", halts or {}),
+            patch("tw_stock_backtest.factor_rows.CONFIRMED_DELISTINGS", delistings or {}),
         ):
             rows, errors = collect_factor_rows(
                 [{"stock_id": stock_id}], as_of, db_path=self.db, factor_settings={}
