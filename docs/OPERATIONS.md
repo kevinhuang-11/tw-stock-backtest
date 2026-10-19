@@ -184,16 +184,26 @@ rights = "decline"   # refuse（預設）或 decline
 
 回測使用訊號後的行情日成交，Decimal 處理金額、費稅及滑價。單檔回測不能證明多股票相對選股能力。`adjusted` 模式下回測計入股利與股數變動（見上方「公司行動」的表格）；仍是以日線開盤價成交的簡化模擬。
 
-停牌與缺價在回測中的處理：
+停牌、缺價與交易限制的完整規則（24 種情況）在 [HALT-POLICY.md](HALT-POLICY.md)，每個情況對應的測試在 `tests/test_halt_policy.py`。回測中最常遇到的幾種：
 
 | 情況 | 處理 |
 |---|---|
-| 已確認停牌（列在 [`confirmed_halts.json`](../src/tw_stock_backtest/data/confirmed_halts.json)） | 當日不成交、不更新該股訊號；持股沿用最近收盤估值並標示日期。來源在停止買賣期間不提供該股的列時，讀取行情會在這些行情日補上無價格的停牌列 |
-| 無成交價：來源有該日，但開高低收全空（例如只有零星零股成交） | 同上，但標示為「無成交價（原因未確認）」，不認定為停牌 |
-| 其他股票有行情、這檔卻整列不存在 | 整次回測失敗，訊息列出股票與最早缺的日期；可能是下載缺漏，請重新下載該月或將這檔移出股票池 |
-| 回測開始日之後才上市（依行情庫旁 `listed_stocks.json` 的上市日） | 不納入股票池，也不在上市後中途加入；`run_portfolio` 的輸出、`results.json` 的 `universe_exclusions`、策略比較的 `common.json` 與回測報表頁列出股票、上市日與原因。沒有名單（或是合成名單，沒有上市日）時不排除，缺列照上一列處理 |
+| 已確認停牌（列在 [`confirmed_halts.json`](../src/tw_stock_backtest/data/confirmed_halts.json) 的 `halts`） | 當日不成交、不更新該股訊號；持股沿用最近收盤估值並標示日期。來源在停止買賣期間不提供該股的列時，讀取行情會在這些行情日補上無價格的停牌列 |
+| 無成交價：來源有該日，但開高低收全空 | 同上，但標示為「無成交價（原因未確認）」，不認定為停牌 |
+| 其他股票有行情、這檔卻沒有列，也查不到公告 | 標為「缺少行情列（原因未確認）」，同樣不可交易、沿用最近收盤估值；結果的 `unconfirmed_gaps` 與報表列出，`run_portfolio`、`compare_strategies`、`evaluate_selection` 退出碼為 2。開始日以前（暖機）的缺列不補 |
+| 某個行情日缺列的股票超過股票池 10% 且至少 2 檔，或某檔結束日以前完全沒有列 | 整次失敗：行情可能未更新完整或尚未下載，請先更新，或把結束日提前 |
+| 回測開始日之後才上市（依 `listed_stocks.json` 的上市日），或開始日以前已終止上市 | 不納入股票池，也不在上市後中途加入；`universe_exclusions` 與報表頁列出日期與原因 |
+| 已終止上市（列在 `confirmed_halts.json` 的 `delistings`） | 終止上市日起不再交易；持股移到「無法變現」，不占名額、不能動用，估值依 `[halts] delisted_valuation`（`last_close` 或 `zero`） |
+| 停牌時已決定賣出 | 保留賣出意圖，恢復後第一個可交易的開盤賣出（成交紀錄的 `intent_date`） |
 
-停牌與無成交價日列在 `run_portfolio`／`run_backtest` 的輸出與工作台的回測報表中。
+`run_portfolio` 的輸出與回測報表頁列出停牌、無成交價與缺列日，以及期末持股（狀態、估值價與價格日期）、無法變現的部位和基準未買進的股票。
+
+處置股與全額交割（變更交易方法）只偵測並標示在成交、期末持股與研究排名旁，不模擬交易限制。資料用 `fetch_restrictions` 下載：每個日曆年一次處置公告查詢，加上本機每個行情日一次全額交割名單；先用 `--plan` 看請求數，超過 `--max-requests`（預設 100）時不連網、不寫入。報表會寫明已下載的範圍。
+
+```bash
+.venv/bin/python -m tw_stock_backtest.cli.fetch_restrictions --config config.toml \
+  --start 2026-08-01 --end 2026-10-14 --plan
+```
 
 全部上市股票的回測，把名單中的代號傳給 `--stocks`：
 
@@ -204,9 +214,9 @@ STOCKS=$(.venv/bin/python -c "import json; print(' '.join(s['stock_id'] for s in
   --start 2026-08-03 --end 2026-10-14 --strategy strategies/baseline.json
 ```
 
-開始日之後才上市的股票會自動排除；仍有整列缺漏的股票（重新下載後來源仍沒有資料、也查不到停止買賣公告）要自行移出股票池。持有全部股票的買進持有基準幾乎一定會遇到現金增資，`rights = "refuse"` 時會拒絕計算，需要改用 `decline`。
+開始日之後才上市的股票會自動排除；重新下載後仍有缺列、也查不到停止買賣公告的股票（例如 4155）不需要移出，會標為原因未確認的缺列，結果退出碼為 2。持有全部股票的買進持有基準幾乎一定會遇到現金增資，`rights = "refuse"` 時會拒絕計算，需要改用 `decline`。
 
-已確認停牌清單是 [`src/tw_stock_backtest/data/confirmed_halts.json`](../src/tw_stock_backtest/data/confirmed_halts.json)，每筆包含股票、含頭尾的日曆日區間、原因與至少一個 https 公開來源（證交所公告、減資資料或新聞稿）。新增時：
+已確認停牌清單是 [`src/tw_stock_backtest/data/confirmed_halts.json`](../src/tw_stock_backtest/data/confirmed_halts.json)（schema 2）。`halts` 每筆包含股票、含頭尾的日曆日區間、原因與至少一個 https 公開來源（證交所公告、減資資料或新聞稿），只收**全日**停止買賣，盤中暫停後同日恢復的不收。`delistings` 每筆包含公告日、終止上市日、類型（財務、股份轉換、合併、公開收購、轉上櫃、其他）、原因、對價（如有）與來源；停牌區間不可延伸到終止上市日以後。新增停牌時：
 
 1. 用 `inspect_db --gaps` 找出整列缺漏，先只針對該股與月份重新下載，排除下載缺漏。
 2. 到證交所或公開資訊觀測站查停止買賣的公告；查得到才加入，區間從停止買賣首日到恢復買賣前一天。
