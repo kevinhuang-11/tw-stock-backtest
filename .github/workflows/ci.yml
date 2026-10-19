@@ -25,6 +25,10 @@ jobs:
         run: ruff format --check
       - name: Lint
         run: ruff check --output-format=github
+      # 只檢查 pyproject.toml [tool.mypy] files 列出的核心模組；版本與 dev 依賴相同。
+      - run: python -m pip install mypy==2.3.1
+      - name: Type check
+        run: mypy
   test:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
