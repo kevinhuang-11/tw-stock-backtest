@@ -68,6 +68,10 @@ Windows：目前不支援在 Windows 上直接執行（工作台使用只有 Lin
 |---|---|
 | ![研究排名：候選股、總分與名次變化](docs/images/research-report.png) | ![回測報表：與買進持有並列的重點數字、資產與回撤](docs/images/backtest-report.png) |
 
+**原始價格與還原價**：6550 在 2026-09 減資（每千股換發約 520 股），原始價格把恢復買賣日畫成大漲 75%；個股頁切換成還原價後，減資前的價格依官方參考價回乘，K 線與均線、RSI、MACD 一起改用同一口徑，恢復買賣日實際是下跌約 9%。
+
+![同一檔股票在原始價格與還原價之下的個股圖：減資造成的假跳空在還原價中消失](docs/images/stock-adjusted.png)
+
 <details>
 <summary>手機寬度：建立研究</summary>
 
