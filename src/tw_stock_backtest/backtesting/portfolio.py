@@ -217,13 +217,19 @@ def run_portfolio_backtest(
     unrealizable = {}
     delisting_events = []
 
+    # 賣出意圖（docs/HALT-POLICY.md 3.15）：{股票: 最初決定賣出的訊號日}。賣出因不可交易
+    # 而沒成交時保留，之後每天都重新計畫賣出，不因指標暫時無法評估而凍結；重新評估後又
+    # 進入目標持股時取消。
+    sell_intents = {}
+
     for trading_date in trading_dates:
         received, applied = apply_due(schedule, trading_date, holdings)
         cash += received
         corporate_action_events.extend(applied)
-        delisting_events.extend(
-            retire_delisted(holdings, unrealizable, market, trading_date, delistings)
-        )
+        retired = retire_delisted(holdings, unrealizable, market, trading_date, delistings)
+        delisting_events.extend(retired)
+        for event in retired:
+            sell_intents.pop(event["stock_id"], None)
 
         # 開盤：執行上一行情日收盤後產生的計畫。
         if pending is not None:
@@ -305,6 +311,8 @@ def run_portfolio_backtest(
                                 "reason": reason,
                             }
                         )
+                        if action == "SELL" and not record["tradable"]:
+                            sell_intents.setdefault(stock_id, signal_date)
                         continue
 
                     cash += transaction["cash_change"]
@@ -328,6 +336,12 @@ def run_portfolio_backtest(
                             "quantity": shares,
                             **transaction,
                             "cash_after": cash,
+                            # 停牌後重試的賣出：記錄最初決定賣出的訊號日。
+                            **(
+                                {"intent_date": sell_intents.pop(stock_id)}
+                                if action == "SELL" and stock_id in sell_intents
+                                else {}
+                            ),
                         }
                     )
 
@@ -423,8 +437,10 @@ def run_portfolio_backtest(
             )
             strategy_diagnostics.append({"date": trading_date, **analysis})
 
-        # 停牌或無法更新訊號的既有持股暫時保留，仍占名額。
-        frozen = sorted(stock_id for stock_id in holdings if stock_id in errors)
+        # 停牌或無法更新訊號的既有持股暫時保留，仍占名額；已決定賣出的不凍結，繼續計畫賣出。
+        frozen = sorted(
+            stock_id for stock_id in holdings if stock_id in errors and stock_id not in sell_intents
+        )
 
         available_slots = max_positions - len(frozen)
 
@@ -433,6 +449,10 @@ def run_portfolio_backtest(
         ]
 
         target_ids = frozen + ranked_ids[:available_slots]
+
+        # 重新評估後又進入目標的持股，不再賣出。
+        for stock_id in [s for s in sell_intents if s in target_ids]:
+            del sell_intents[stock_id]
 
         pending = (
             trading_date,

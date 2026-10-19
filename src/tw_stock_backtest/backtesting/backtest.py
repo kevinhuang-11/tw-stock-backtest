@@ -26,7 +26,8 @@ def run_backtest(
     入帳股利與退還股款並調整股數（見 backtesting/corporate_actions.py）。
 
     停牌與無成交價日使用與多股票回測相同的檢查（prepare_market_records）：
-    當日不成交，持股沿用最近有效收盤估值，不補價格。
+    當日不成交，持股沿用最近有效收盤估值，不補價格。賣出訊號遇到不可交易日時保留，
+    在下一個可交易日開盤賣出；買進訊號遇到不可交易日則作廢（docs/HALT-POLICY.md 3.23）。
     """
     # 沒有提供設定時，維持原本的零成本模式。
     # 讓舊測試繼續驗證原本的交易邏輯。
@@ -81,6 +82,8 @@ def run_backtest(
 
     schedule = Schedule({stock_id: list(corporate_actions)}, "")
     corporate_action_events = []
+    # 因不可交易而沒賣成的賣出訊號日；之後第一個可交易日開盤賣出。
+    sell_intent = None
 
     for index, record in enumerate(records):
         held = {stock_id: shares} if shares else {}
@@ -100,6 +103,9 @@ def run_backtest(
             market_events.append(
                 {"stock_id": stock_id, "date": record["date"], **market_event(record, events)}
             )
+
+            if signal == "SELL" and shares > 0 and sell_intent is None:
+                sell_intent = records[index - 1]["date"]
 
             if (signal == "BUY" and shares == 0) or (signal == "SELL" and shares > 0):
                 skipped_orders.append(
@@ -128,7 +134,7 @@ def run_backtest(
                 executed_quantity = quantity
                 action = "BUY"
 
-        elif signal == "SELL" and shares > 0:
+        elif (signal == "SELL" or sell_intent is not None) and shares > 0:
             executed_quantity = shares
 
             transaction = calculate_transaction(
@@ -158,8 +164,16 @@ def run_backtest(
                     "tax": transaction["tax"],
                     "cash_change": transaction["cash_change"],
                     "cash_after": cash,
+                    # 不可交易日後重試的賣出：記錄最初的賣出訊號日。
+                    **(
+                        {"intent_date": sell_intent}
+                        if action == "SELL" and sell_intent is not None
+                        else {}
+                    ),
                 }
             )
+            if action == "SELL":
+                sell_intent = None
 
         # 不可交易日沿用最近有效收盤；尚未持股時不需要估值價格。
         equity = cash + (record["valuation_close"] * shares if shares else Decimal("0"))
