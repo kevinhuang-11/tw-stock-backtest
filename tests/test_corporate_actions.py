@@ -93,7 +93,10 @@ class DividendTests(unittest.TestCase):
         row, _, _ = ca.dividend_rows(payload, {"2330"})[0]
         action = ca.parse_dividend(row, list_url=LIST_URL)
         self.assertTrue(action["needs_review"])
-        self.assertIn("與官方 1800.00 不符", action["review_notes"][0])
+        self.assertIn(
+            "官方參考價 1800.00 與「前收 − 權值＋息值」1838.999965 不一致",
+            action["review_notes"][0],
+        )
 
 
 class ReductionTests(unittest.TestCase):
@@ -287,3 +290,134 @@ class StorageTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def dividend_payload(stock_id, day, prev, ref, spread, flag, detail_values):
+    """依 TWT49U 與 TWT49UDetail 的欄位格式組成一列；數值是 2026 年的官方公告。"""
+    list_fields = [
+        "資料日期",
+        "股票代號",
+        "股票名稱",
+        "除權息前收盤價",
+        "除權息參考價",
+        "權值+息值",
+        "權/息",
+        "漲停價格",
+        "跌停價格",
+        "開盤競價基準",
+        "減除股利參考價",
+        "詳細資料",
+    ]
+    row = [
+        day,
+        stock_id,
+        "樣本",
+        prev,
+        ref,
+        spread,
+        flag,
+        "0",
+        "0",
+        "0",
+        ref,
+        f"{stock_id},20260101",
+    ]
+    detail_fields = [
+        "股票代號",
+        "股票名稱",
+        "(每股配發現金股利)除息",
+        "(增資配股) 除權",
+        "A. 按普通股股東持股比例每千股無償配股",
+        "B. 員工紅利轉增資",
+        "C. (有償) 現金增資",
+        "每股認購金額",
+        "a. 公開承銷",
+        "b. 員工認購",
+        " c. 原股東認購",
+        "按股東持股比例每千股認購",
+    ]
+    detail = {"stat": "ok", "fields": detail_fields, "data": [[stock_id, "樣本", *detail_values]]}
+    return ca.records({"stat": "OK", "fields": list_fields, "data": [row]})[0], detail
+
+
+class ReferenceFormulaTests(unittest.TestCase):
+    def test_rights_ratio_uses_the_whole_cash_offering(self):
+        # 6225（2026-08-18）：原股東每千股可認購 868.7 股，但官方公式用整個現金增資的比例。
+        row, detail = dividend_payload(
+            "6225",
+            "115年08月18日",
+            "44.40",
+            "30.04",
+            "14.355834",
+            "權",
+            [
+                "0 元／股",
+                "",
+                "0 股",
+                "0 股",
+                "32,200,000 股",
+                "17.65 元／股",
+                "3,220,000 股",
+                "4,830,000 股",
+                "24,150,000 股",
+                "868.70503597 股",
+            ],
+        )
+        action = ca.parse_dividend(row, detail, list_url=LIST_URL)
+        self.assertFalse(
+            any("不符" in note for note in action["review_notes"]), action["review_notes"]
+        )
+        # 仍列為待確認：本專案不模擬認購，回測持有跨過生效日時拒絕計算。
+        self.assertTrue(action["needs_review"])
+        self.assertIn("回測持有跨過生效日時拒絕計算", action["review_notes"][0])
+
+    def test_stock_dividend_ratio_disclosed_in_whole_shares_is_tolerated(self):
+        # 1795（2026-08-31）：每千股配 13 股（只揭露到整股），現金 2.565316 元；
+        # 未捨入的官方參考價 = 193 − 5.010442 = 187.989558，反推 187.9908，差 0.0012 元。
+        row, detail = dividend_payload(
+            "1795",
+            "115年08月31日",
+            "193.00",
+            "187.98",
+            "5.010442",
+            "權息",
+            [
+                "2.565316 元／股",
+                "",
+                "13 股",
+                "0 股",
+                "0 股",
+                "0 元／股",
+                "0 股",
+                "0 股",
+                "0 股",
+                "0.00000000 股",
+            ],
+        )
+        action = ca.parse_dividend(row, detail, list_url=LIST_URL)
+        self.assertFalse(action["needs_review"], action["review_notes"])
+
+    def test_a_real_mismatch_is_still_flagged(self):
+        row, detail = dividend_payload(
+            "1795",
+            "115年08月31日",
+            "193.00",
+            "185.00",
+            "8.000000",
+            "權息",
+            [
+                "2.565316 元／股",
+                "",
+                "13 股",
+                "0 股",
+                "0 股",
+                "0 元／股",
+                "0 股",
+                "0 股",
+                "0 股",
+                "0.00000000 股",
+            ],
+        )
+        action = ca.parse_dividend(row, detail, list_url=LIST_URL)
+        self.assertTrue(action["needs_review"])
+        self.assertIn("與官方 185.00 不符", action["review_notes"][0])

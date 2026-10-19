@@ -209,19 +209,38 @@ def parse_dividend(row, detail=None, *, list_url):
         action["sources"].append(detail_url.replace("&response=json", ""))
         action["raw"]["detail"] = values
 
-    # 參考價 =（前收 − 現金股利 ＋ 認購價 × 每千股認購 ÷ 1000）÷（1 ＋ 配股率 ＋ 認購率）
+    # 參考價 =（前收 − 現金股利 ＋ 認購價 × 認購率）÷（1 ＋ 配股率 ＋ 認購率）。
+    # 官方公式的認購率是整個現金增資的比例（含公開承銷與員工認購），不只原股東的部分：
+    # 認購率 = 每千股認購 ÷ 1000 × 現金增資總股數 ÷ 原股東認購股數。
     stock_ratio = action["stock_dividend_per_1000"] / THOUSAND
     rights_ratio = action["rights_per_1000"] / THOUSAND
+    detail = action["raw"].get("detail") or {}
+    if rights_ratio:
+        offered = amount(detail.get(_key("C. (有償) 現金增資"), "0")) or ZERO
+        to_holders = amount(detail.get(_key(" c. 原股東認購"), "0")) or ZERO
+        if offered and to_holders:
+            rights_ratio = rights_ratio * offered / to_holders
     computed = (
         previous_close - action["cash_dividend"] + action["rights_price"] * rights_ratio
     ) / (1 + stock_ratio + rights_ratio)
-    if not _close_enough(computed, reference_price):
+    # 公布的參考價是未捨入值無條件捨去到小數第二位；「權值＋息值」等於前收減未捨入的參考價，
+    # 所以和未捨入值比對。配股率在詳細資料中只揭露到整股（例如每千股 13 股），反推會有
+    # 千分之幾元的差距，容許範圍仍是 0.01 元。
+    spread = amount(row.get(_key("權值+息值"), ""))
+    official = previous_close - spread if spread is not None else reference_price
+    if spread is not None and not _close_enough(official, reference_price):
+        _review(action, f"官方參考價 {reference_price} 與「前收 − 權值＋息值」{official} 不一致")
+    if not _close_enough(computed, official):
         _review(
             action,
             f"依公告數值反推參考價為 {computed.quantize(TOLERANCE, ROUND_DOWN)}，與官方 {reference_price} 不符",
         )
     if action["rights_per_1000"] > 0:
-        _review(action, "含現金增資認購權；本專案不認購，只調整價格序列")
+        _review(
+            action,
+            "含現金增資認購權：指標依官方參考價還原；本專案不模擬認購或轉讓認股權，"
+            "回測持有跨過生效日時拒絕計算",
+        )
     return action
 
 
