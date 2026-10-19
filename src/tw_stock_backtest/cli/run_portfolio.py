@@ -109,6 +109,20 @@ def parse_arguments():
     return parser.parse_args()
 
 
+def position_text(position):
+    """期末持股一行；不是正常狀態時附上狀態、估值價與日期（docs/HALT-POLICY.md 3.14）。"""
+    text = f"{position['stock_id']}：{position['shares']} 股"
+    if position["status"] != "NORMAL":
+        text += (
+            f"｜{position['status_label']}，以 {position['price_date']} 收盤 {position['price']}"
+            f" 估值，金額 {position['value']}"
+        )
+    notice = position["delisting_announced"]
+    if notice and position["status"] != "UNREALIZABLE":
+        text += f"｜已於 {notice['announced']} 公告 {notice['effective']} 終止上市"
+    return text
+
+
 def main():
     args = parse_arguments()
 
@@ -339,8 +353,8 @@ def main():
     )
 
     print("基準持股：")
-    for stock_id, shares in sorted(benchmark["holdings"].items()):
-        print(f"  {stock_id}：{shares} 股")
+    for position in benchmark["final_positions"]:
+        print(f"  {position_text(position)}")
 
     if benchmark["unbought"]:
         print("基準因單檔預算不足而未買進：" + ", ".join(benchmark["unbought"]))
@@ -350,11 +364,11 @@ def main():
         )
     print("\n期末持股：")
 
-    if not result["holdings"]:
+    if not result["final_positions"]:
         print("無")
     else:
-        for stock_id, quantity in sorted(result["holdings"].items()):
-            print(f"{stock_id}：{quantity} 股")
+        for position in result["final_positions"]:
+            print(position_text(position))
 
     print("\n成交紀錄：")
 

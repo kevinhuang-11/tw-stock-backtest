@@ -11,7 +11,8 @@ from tw_stock_backtest.config import (
     apply_overrides,
     load_config,
 )
-from tw_stock_backtest.data.database import load_records, next_record_date
+from tw_stock_backtest.data.database import load_records, market_has_rows
+from tw_stock_backtest.data.market_events import CONFIRMED_DELISTINGS, CONFIRMED_HALTS
 from tw_stock_backtest.data.universe import load_universe
 from tw_stock_backtest.prices import PriceSource, describe_prices
 
@@ -98,17 +99,32 @@ def collect_factor_rows(
             latest_date = records[-1]["date"]
 
             if latest_date != as_of:
-                # 分析日之後還有行情，代表那天本來就沒有交易（例如週末或休市），
-                # 不是資料沒更新；兩種情況要給不同的說明。
-                following = next_record_date(stock_id, as_of, db_path=db_path)
-
-                if following is not None:
+                # 只看分析日當天（docs/HALT-POLICY.md 3.7、3.12），不查之後的行情。
+                delisted = CONFIRMED_DELISTINGS.get(stock_id)
+                if delisted and delisted["effective"] <= as_of:
                     raise ValueError(
-                        f"{as_of} 沒有這檔股票的行情（可能是休市日或當日未交易）；"
-                        f"前一個行情日為 {latest_date}，下一個為 {following}"
+                        f"已於 {delisted['effective']} 終止上市（{delisted['reason']}）；"
+                        f"最後行情日期為 {latest_date}"
                     )
+                if market_has_rows(as_of, db_path=db_path):
+                    raise ValueError(
+                        f"{as_of} 其他股票有行情、這檔沒有列（原因未確認，不認定為停牌；"
+                        f"可能是行情未更新或下載缺漏）；最後行情日期為 {latest_date}"
+                    )
+                raise ValueError(
+                    f"行情庫在 {as_of} 沒有任何股票的行情（休市日，或行情尚未更新到這天）；"
+                    f"這檔最後行情日期為 {latest_date}"
+                )
 
-                raise ValueError(f"行情未更新至分析日期；最後行情日期為 {latest_date}")
+            last = records[-1]
+            # 與 prepare_market_records 相同：四個價格欄位都在、而且都是空的。
+            if all(
+                field in last and last[field] is None for field in ("open", "high", "low", "close")
+            ):
+                halt = CONFIRMED_HALTS.get((stock_id, as_of))
+                if halt:
+                    raise ValueError(f"分析日已確認停牌：{halt['reason']}")
+                raise ValueError("分析日無成交價（原因未確認，不認定為停牌）")
 
             row = calculate_factor_row(
                 records,

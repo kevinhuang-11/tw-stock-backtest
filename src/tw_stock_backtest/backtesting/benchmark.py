@@ -11,6 +11,7 @@ from tw_stock_backtest.backtesting.delisting import (
     retire_delisted,
     unrealizable_value,
 )
+from tw_stock_backtest.backtesting.positions import final_positions
 from tw_stock_backtest.data.market_events import (
     CONFIRMED_DELISTINGS,
     CONFIRMED_HALTS,
@@ -201,6 +202,14 @@ def run_buy_and_hold(
         "unavailable_entire_period": sorted(waiting),
         "unconfirmed_gaps": unconfirmed_gaps(market),
         "unrealizable": unrealizable,
+        "final_positions": final_positions(
+            holdings,
+            unrealizable,
+            market,
+            trading_dates[-1],
+            delistings,
+            delisted_valuation,
+        ),
         "delisting_events": delisting_events,
         "delisted_valuation": delisted_valuation,
         "slippage_rate": slippage_rate,

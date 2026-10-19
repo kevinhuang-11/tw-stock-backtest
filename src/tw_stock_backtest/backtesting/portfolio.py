@@ -19,6 +19,7 @@ from tw_stock_backtest.backtesting.delisting import (
     retire_delisted,
     unrealizable_value,
 )
+from tw_stock_backtest.backtesting.positions import final_positions
 from tw_stock_backtest.data.market_events import (
     CONFIRMED_DELISTINGS,
     CONFIRMED_HALTS,
@@ -497,6 +498,14 @@ def run_portfolio_backtest(
         # 原因未確認的缺列（MISSING_ROW）；有的話這次結果不完整（docs/HALT-POLICY.md 3.6）。
         "unconfirmed_gaps": unconfirmed_gaps(market),
         "unrealizable": unrealizable,
+        "final_positions": final_positions(
+            holdings,
+            unrealizable,
+            market,
+            trading_dates[-1],
+            delistings,
+            delisted_valuation,
+        ),
         "delisting_events": delisting_events,
         "delisted_valuation": delisted_valuation,
         "corporate_action_events": corporate_action_events,
