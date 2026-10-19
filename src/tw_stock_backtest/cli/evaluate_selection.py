@@ -105,7 +105,7 @@ def main():
 
         # 排名指標的暖機資料保留不可交易的列，與研究排名使用同一套規則。
         # 訊號依價格模式逐日累積（每個訊號日只套用該日以前生效的公司行動）；
-        # 前瞻報酬仍以原始價格計算（公司行動的報酬調整尚未實作）。
+        # 前瞻報酬計入期間內的公司行動（raw 模式只計價格報酬）。
         prices = PriceSource(settings)
         corporate_actions = prices.actions_by_stock(raw_records, end.isoformat())
         histories = {
@@ -200,6 +200,7 @@ def main():
             trading_dates,
             horizons=tuple(args.horizons),
             top_ns=tuple(args.top),
+            corporate_actions=corporate_actions,
         )
 
     except (ValueError, sqlite3.Error, OSError) as error:
@@ -215,7 +216,10 @@ def main():
     print(f"實際訊號期間：{trading_dates[0]} ～ {trading_dates[-1]}")
     print(f"行情資料截止：{end}")
     print(f"訊號日數：{len(ranking_history)}")
-    print(describe_prices(prices.describe()) + "；前瞻報酬仍為原始價格")
+    print(
+        describe_prices(prices.describe())
+        + ("；前瞻報酬計入股利與股數變動" if prices.mode == "adjusted" else "；前瞻報酬只計價格")
+    )
     print("評估名次使用 --top，不使用設定檔的 top_n")
 
     reason_labels = {

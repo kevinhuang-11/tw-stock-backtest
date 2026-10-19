@@ -109,3 +109,51 @@ class ScheduleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ForwardReturnTests(unittest.TestCase):
+    DAYS = ["2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06"]
+
+    def records(self, closes):
+        return [
+            {
+                "stock_id": "1234",
+                "date": day,
+                "open": D(c),
+                "high": D(c),
+                "low": D(c),
+                "close": D(c),
+            }
+            for day, c in zip(self.DAYS, closes, strict=True)
+        ]
+
+    def evaluate(self, closes, actions):
+        from tw_stock_backtest.analysis.forward_returns import evaluate_forward_return
+
+        return evaluate_forward_return(
+            self.records(closes), self.DAYS[0], self.DAYS, horizon=3, corporate_actions=actions
+        )
+
+    def test_dividend_inside_the_holding_period_is_counted(self):
+        # 進場 3/3 開盤 100，3/4 除息 2 元，出場 3/5 收盤 99：價格 −1%，含股利 +1%。
+        dividend = action("1234", self.DAYS[2], DIVIDEND, cash_dividend="2")
+        closes = ["100", "100", "98", "99", "99"]
+        self.assertEqual(self.evaluate(closes, [])["price_return"], D("-0.01"))
+        result = self.evaluate(closes, [dividend])
+        self.assertEqual(result["price_return"], D("0.01"))
+        self.assertEqual(
+            (result["return_basis"], result["corporate_actions"]), ("total", [self.DAYS[2]])
+        )
+
+    def test_action_on_the_entry_date_is_not_counted(self):
+        dividend = action("1234", self.DAYS[1], DIVIDEND, cash_dividend="2")
+        result = self.evaluate(["100", "100", "100", "100", "100"], [dividend])
+        self.assertEqual((result["price_return"], result["corporate_actions"]), (D("0"), []))
+
+    def test_reduction_uses_the_share_ratio_and_refund(self):
+        # 每千股換 750 股並退還 2.5 元：舊股 100 元 → 新股約 130 元。
+        reduction = action(
+            "1234", self.DAYS[2], CAPITAL_REDUCTION, shares_per_1000="750", cash_return="2.5"
+        )
+        result = self.evaluate(["100", "100", "130", "130", "130"], [reduction])
+        self.assertEqual(result["price_return"], (D("130") * D("0.75") + D("2.5")) / D("100") - 1)
