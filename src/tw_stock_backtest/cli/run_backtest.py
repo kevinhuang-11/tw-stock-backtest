@@ -1,6 +1,7 @@
 import argparse
 import sqlite3
 
+from tw_stock_backtest.analysis.adjustment import point_in_time
 from tw_stock_backtest.analysis.indicators import windowed_moving_average
 from tw_stock_backtest.analysis.strategies import moving_average_crossover
 from tw_stock_backtest.backtesting.backtest import run_backtest
@@ -11,6 +12,7 @@ from tw_stock_backtest.config import (
     load_config,
 )
 from tw_stock_backtest.data.database import load_records
+from tw_stock_backtest.prices import PriceSource, describe_prices
 
 
 def parse_arguments():
@@ -133,17 +135,20 @@ def main():
             print("資料庫中沒有符合條件的行情，請先下載資料。")
             return 0
 
-        closes = [record["close"] for record in records]
+        # 均線逐日以截至當日的序列計算（依價格模式；adjusted 只套用當日以前生效的公司行動），
+        # 窗口內有缺價的日子為空，不產生交叉訊號；與研究、回測同一套規則。
+        prices = PriceSource(settings)
+        actions = prices.actions_by_stock({stock_id: records}, records[-1]["date"]).get(
+            stock_id, []
+        )
 
-        # 窗口內有缺價的日子均線為空，不產生交叉訊號；與研究、回測同一套規則。
-        short_ma = windowed_moving_average(
-            closes,
-            short_window,
-        )
-        long_ma = windowed_moving_average(
-            closes,
-            long_window,
-        )
+        def average(window):
+            return lambda rows: windowed_moving_average(
+                [row["close"] for row in rows[-window:]], window
+            )[-1]
+
+        short_ma = point_in_time(records, actions, average(short_window))
+        long_ma = point_in_time(records, actions, average(long_window))
 
         signals = moving_average_crossover(
             short_ma,
@@ -156,6 +161,7 @@ def main():
             initial_cash=initial_cash,
             quantity=quantity,
             cost_settings=cost_settings,
+            corporate_actions=actions,
         )
 
     except (ValueError, sqlite3.Error, OSError) as error:
@@ -167,7 +173,8 @@ def main():
         "ROUND_HALF_UP": "四捨五入至整數元",
     }
 
-    print("回測：含設定費稅，未計滑價、股利與拆股")
+    print("回測：含設定費稅，未計滑價")
+    print(describe_prices(prices.describe(), backtest=True))
     print("成交價格仍以日線開盤價模擬，未精確模擬零股成交")
     print(f"股票代號：{stock_id}")
     print(f"資料庫位置：{db_path}")
@@ -201,6 +208,12 @@ def main():
     for order in result["skipped_orders"]:
         print(
             f"未成交：訊號日 {order['signal_date']} → {order['date']}，{order['action']}，{order['reason']}"
+        )
+
+    for event in result["corporate_action_events"]:
+        print(
+            f"公司行動 {event['applied_on']}：持股 {event['shares_before']} → {event['shares_after']}，"
+            f"入帳 {event['cash']} 元"
         )
 
     print("\n成交紀錄：")

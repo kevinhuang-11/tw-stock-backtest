@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
+from tw_stock_backtest.backtesting.corporate_actions import Schedule, apply_due
 from tw_stock_backtest.backtesting.costs import CostSettings, calculate_transaction
 from tw_stock_backtest.data.market_events import (
     CONFIRMED_HALTS,
@@ -17,8 +18,12 @@ def run_backtest(
     quantity,
     cost_settings=None,
     confirmed_halts=None,
+    corporate_actions=(),
 ):
     """前日訊號、次筆開盤成交；可傳入交易成本設定。
+
+    corporate_actions 是這檔的公司行動；與多股票引擎相同，生效日開盤前依前一日收盤的持股
+    入帳股利與退還股款並調整股數（見 backtesting/corporate_actions.py）。
 
     停牌與無成交價日使用與多股票回測相同的檢查（prepare_market_records）：
     當日不成交，持股沿用最近有效收盤估值，不補價格。
@@ -74,7 +79,16 @@ def run_backtest(
     skipped_orders = []
     market_events = []
 
+    schedule = Schedule({stock_id: list(corporate_actions)}, "")
+    corporate_action_events = []
+
     for index, record in enumerate(records):
+        held = {stock_id: shares} if shares else {}
+        received, applied = apply_due(schedule, record["date"], held)
+        shares = held.get(stock_id, 0)
+        cash += received
+        corporate_action_events.extend(applied)
+
         signal = signals[index - 1] if index > 0 else "NONE"
         open_price = record["open"]
 
@@ -176,4 +190,5 @@ def run_backtest(
         "equity_curve": equity_curve,
         "skipped_orders": skipped_orders,
         "market_events": market_events,
+        "corporate_action_events": corporate_action_events,
     }

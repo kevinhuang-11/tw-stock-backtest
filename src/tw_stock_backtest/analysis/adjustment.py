@@ -97,3 +97,17 @@ class AdjustedHistory:
         for record in records:
             self.append(record)
         return self
+
+
+def point_in_time(records, actions, compute):
+    """逐日以截至當日的還原序列計算 compute(rows)，回傳與 records 等長的結果。
+
+    給逐日輸出指標的工具使用（例如單檔均線交叉）：第 i 天的值只用到第 i 天以前生效的
+    公司行動，不會因為之後的事件改變。沒有公司行動時等於直接對原始序列逐日計算。
+    """
+    history = AdjustedHistory(actions)
+    values = []
+    for record in records:
+        history.append(record)
+        values.append(compute(history.rows))
+    return values

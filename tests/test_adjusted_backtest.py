@@ -1,19 +1,26 @@
 """回測訊號依截至訊號日的還原價計算；成交與估值仍是原始價格。資料全為合成。"""
 
+import contextlib
 import copy
+import io
 import json
+import sys
 import unittest
 from decimal import Decimal as D
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from test_adjusted_research import DAYS, EVENT, reduction, rows
 from test_end_to_end import TEST_CONFIG
 
+from tw_stock_backtest.analysis.adjustment import point_in_time
 from tw_stock_backtest.analysis.screening_history import build_screening_history
+from tw_stock_backtest.backtesting.backtest import run_backtest
 from tw_stock_backtest.backtesting.benchmark import run_buy_and_hold
 from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.backtesting.portfolio import run_portfolio_backtest
+from tw_stock_backtest.cli import analyze_stock
 from tw_stock_backtest.config import load_config
 from tw_stock_backtest.data import corporate_actions as ca
 from tw_stock_backtest.data.database import save_records
@@ -247,3 +254,75 @@ class BenchmarkAccountingTests(unittest.TestCase):
         event = adjusted["corporate_action_events"][0]
         self.assertEqual((event["stock_id"], event["applied_on"]), ("2330", EVENT))
         self.assertEqual(event["shares_after"], int(event["shares_before"] * D("0.555555556")))
+
+
+class SingleStockTests(unittest.TestCase):
+    def test_single_engine_exchanges_shares_on_the_reduction(self):
+        records = rows("2330")[45:55]
+        signals = ["BUY"] + ["NONE"] * (len(records) - 1)
+        result = run_backtest(records, signals, D("100000"), 1000, corporate_actions=[reduction()])
+        event = result["corporate_action_events"][0]
+        self.assertEqual(
+            (event["applied_on"], event["shares_before"], event["shares_after"]), (EVENT, 1000, 555)
+        )
+        curve = {p["date"]: p for p in result["equity_curve"]}
+        self.assertLess(abs(curve[EVENT]["equity"] / curve[DAYS[49]]["equity"] - 1), D("0.01"))
+        raw = run_backtest(records, signals, D("100000"), 1000)
+        raw_curve = {p["date"]: p for p in raw["equity_curve"]}
+        self.assertGreater(
+            raw_curve[EVENT]["equity"] / raw_curve[DAYS[49]]["equity"] - 1, D("0.05")
+        )
+
+    def test_point_in_time_values_before_the_event_match_raw(self):
+        records = rows("2330")
+
+        def last_close(rows_so_far):
+            return rows_so_far[0]["close"]  # 第一列在事件後會被還原
+
+        adjusted = point_in_time(records, [reduction()], last_close)
+        raw = point_in_time(records, [], last_close)
+        self.assertEqual(adjusted[:50], raw[:50])
+        self.assertNotEqual(adjusted[50], raw[50])
+
+    def test_analyze_stock_prints_point_in_time_averages(self):
+        with TemporaryDirectory() as folder:
+            config = Path(folder) / "config.toml"
+            config.write_text(TEST_CONFIG.replace("AAA", "2330"), encoding="utf-8")
+            db = load_config(config)["storage"]["database_path"]
+            save_records(rows("2330"), db_path=db)
+            ca.save_actions(
+                [reduction()], db, fetched_at="t", coverage=[("2330", "2026-01-01", "2026-12-31")]
+            )
+
+            def output(mode):
+                text = config.read_text(encoding="utf-8")
+                config.write_text(
+                    text.split("[corporate_actions]")[0]
+                    + f'[corporate_actions]\nmode = "{mode}"\n',
+                    encoding="utf-8",
+                )
+                buffer = io.StringIO()
+                argv = [
+                    "analyze_stock",
+                    "--config",
+                    str(config),
+                    "--stock",
+                    "2330",
+                    "--start",
+                    DAYS[0],
+                    "--end",
+                    DAYS[-1],
+                ]
+                with patch.object(sys, "argv", argv), contextlib.redirect_stdout(buffer):
+                    self.assertEqual(analyze_stock.main(), 0)
+                return {
+                    line.split()[0]: line.split()[1:]
+                    for line in buffer.getvalue().splitlines()
+                    if line[:4] == "2026"
+                }
+
+            raw, adjusted = output("raw"), output("adjusted")
+            for day in DAYS[:50]:
+                self.assertEqual(raw[day], adjusted[day], day)
+            self.assertEqual(raw[EVENT][0], adjusted[EVENT][0])  # 收盤欄是原始價格
+            self.assertNotEqual(raw[EVENT][2], adjusted[EVENT][2])  # 長均線已依還原價計算
