@@ -192,6 +192,7 @@ def main():
             sizing_mode=backtest_settings["sizing_mode"],
             slippage_rate=backtest_settings["slippage_rate"],
             corporate_actions=corporate_actions,
+            delisted_valuation=settings["halts"]["delisted_valuation"],
         )
         result["price_adjustment"] = prices.describe()
         result["universe_exclusions"] = listing_excluded
@@ -208,6 +209,7 @@ def main():
             cost_settings=cost_settings,
             slippage_rate=backtest_settings["slippage_rate"],
             corporate_actions=corporate_actions,
+            delisted_valuation=settings["halts"]["delisted_valuation"],
         )
 
         benchmark_performance = summarize_performance(
@@ -397,6 +399,18 @@ def main():
         )
         for gap in gaps:
             print(f"{gap['stock_id']} | {gap['first']} ～ {gap['last']} | {gap['days']} 個行情日")
+
+    for source, data in (("策略", result), ("基準", benchmark)):
+        for item in data["unrealizable"].values():
+            value = (
+                "以 0 估值（壓力測試）"
+                if data["delisted_valuation"] == "zero"
+                else f"以 {item['price_date']} 收盤 {item['last_close']} 估值"
+            )
+            print(
+                f"\n{source}無法變現：{item['stock_id']} {item['shares']} 股，"
+                f"{item['effective']} 終止上市（{item['kind_label']}：{item['reason']}），{value}"
+            )
 
     print(f"\n有個別股票未更新訊號的日期：{len(result['skipped_rebalances'])} 日")
 

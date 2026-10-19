@@ -14,7 +14,13 @@ from tw_stock_backtest.backtesting.costs import (
     calculate_buy_quantity,
     calculate_transaction,
 )
+from tw_stock_backtest.backtesting.delisting import (
+    check_valuation_mode,
+    retire_delisted,
+    unrealizable_value,
+)
 from tw_stock_backtest.data.market_events import (
+    CONFIRMED_DELISTINGS,
     CONFIRMED_HALTS,
     market_event,
     not_tradable_reason,
@@ -101,6 +107,8 @@ def run_portfolio_backtest(
     slippage_rate=Decimal("0"),
     strategy=None,
     corporate_actions=None,
+    delistings=None,
+    delisted_valuation="last_close",
 ):
 
     strategy_diagnostics = []
@@ -164,12 +172,15 @@ def run_portfolio_backtest(
         raise ValueError("top_n 必須是正整數")
 
     events = CONFIRMED_HALTS if confirmed_halts is None else confirmed_halts
+    delistings = CONFIRMED_DELISTINGS if delistings is None else delistings
+    check_valuation_mode(delisted_valuation)
 
     market, trading_dates = prepare_backtest_market(
         records_by_stock,
         start,
         end,
         confirmed_halts=events,
+        delistings=delistings,
     )
 
     # 暖機資料保留停牌與無成交價的列，與研究排名使用同一套規則：
@@ -202,10 +213,17 @@ def run_portfolio_backtest(
     schedule = Schedule(actions, "")
     corporate_action_events = []
 
+    # 終止上市的持股（docs/HALT-POLICY.md 3.16）：不再占名額，估值依 delisted_valuation。
+    unrealizable = {}
+    delisting_events = []
+
     for trading_date in trading_dates:
         received, applied = apply_due(schedule, trading_date, holdings)
         cash += received
         corporate_action_events.extend(applied)
+        delisting_events.extend(
+            retire_delisted(holdings, unrealizable, market, trading_date, delistings)
+        )
 
         # 開盤：執行上一行情日收盤後產生的計畫。
         if pending is not None:
@@ -219,6 +237,19 @@ def run_portfolio_backtest(
                     record = market[stock_id][trading_date]
                     reason = None
                     transaction = None
+
+                    if action == "SELL" and stock_id not in holdings:
+                        # 計畫賣出後、成交前終止上市：持股已轉為無法變現。
+                        skipped_orders.append(
+                            {
+                                "stock_id": stock_id,
+                                "signal_date": signal_date,
+                                "date": trading_date,
+                                "action": action,
+                                "reason": "已終止上市，持股已轉為無法變現",
+                            }
+                        )
+                        continue
 
                     shares = holdings[stock_id] if action == "SELL" else quantity
 
@@ -316,12 +347,14 @@ def run_portfolio_backtest(
             if not record["tradable"]:
                 stale_prices[stock_id] = record["valuation_price_date"]
 
+        frozen_value = unrealizable_value(unrealizable, delisted_valuation)
         equity_curve.append(
             {
                 "date": trading_date,
                 "cash": cash,
                 "market_value": market_value,
-                "equity": cash + market_value,
+                "unrealizable_value": frozen_value,
+                "equity": cash + market_value + frozen_value,
                 "holdings": holdings.copy(),
                 "stale_prices": stale_prices,
             }
@@ -335,6 +368,10 @@ def run_portfolio_backtest(
             record = prices[trading_date]
 
             histories[stock_id].append(record)
+
+            if record["market_status"] == "DELISTED":
+                # 已終止上市：不再評估，也不逐日記錄（終止上市本身另列在 delisting_events）。
+                continue
 
             if not record["tradable"]:
                 errors[stock_id] = f"{not_tradable_reason(record)}，僅暫停本股票訊號更新"
@@ -379,7 +416,11 @@ def run_portfolio_backtest(
             series = {stock_id: history.rows for stock_id, history in histories.items()}
             analysis = analyze_strategy(series, trading_date, strategy, indicator_records=series)
             candidates = analysis["candidates"]
-            errors.update(analysis["errors"])
+            errors.update(
+                (stock_id, message)
+                for stock_id, message in analysis["errors"].items()
+                if market[stock_id][trading_date]["market_status"] != "DELISTED"
+            )
             strategy_diagnostics.append({"date": trading_date, **analysis})
 
         # 停牌或無法更新訊號的既有持股暫時保留，仍占名額。
@@ -435,6 +476,9 @@ def run_portfolio_backtest(
         "market_events": market_events,
         # 原因未確認的缺列（MISSING_ROW）；有的話這次結果不完整（docs/HALT-POLICY.md 3.6）。
         "unconfirmed_gaps": unconfirmed_gaps(market),
+        "unrealizable": unrealizable,
+        "delisting_events": delisting_events,
+        "delisted_valuation": delisted_valuation,
         "corporate_action_events": corporate_action_events,
         "slippage_rate": slippage_rate,
     }

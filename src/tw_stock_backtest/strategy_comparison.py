@@ -64,6 +64,7 @@ def compare_strategies(
         cost_settings=costs,
         slippage_rate=backtest["slippage_rate"],
         corporate_actions=corporate_actions,
+        delisted_valuation=settings["halts"]["delisted_valuation"],
     )
     bench_performance = performance(benchmark)
     report = ResearchReport(output_root)
@@ -99,6 +100,7 @@ def compare_strategies(
                 sizing_mode=backtest["sizing_mode"],
                 slippage_rate=backtest["slippage_rate"],
                 corporate_actions=corporate_actions,
+                delisted_valuation=settings["halts"]["delisted_valuation"],
             )
             result["universe_exclusions"] = listing_excluded
             if [p["date"] for p in result["equity_curve"]] != [

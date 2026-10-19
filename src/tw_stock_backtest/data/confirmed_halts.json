@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
-  "description": "已人工核實、附公開來源的停止買賣或暫停交易事件。start 與 end 為含頭尾的日曆日區間，只有區間內實際出現的行情日會被當成停牌日。未列入的缺價或缺漏一律不認定為停牌。",
+  "schema_version": 2,
+  "description": "已人工核實、附公開來源的停止買賣或暫停交易事件（halts），以及終止上市（delistings）。halts 的 start 與 end 為含頭尾的日曆日區間，只有區間內實際出現的行情日會被當成停牌日。delistings 的 effective 是終止上市日（當天起不再交易），announced 是證交所公告日。未列入的缺價或缺漏一律不認定為停牌或終止上市。",
   "halts": [
     {
       "stock_id": "2317",
@@ -9,6 +9,15 @@
       "reason": "重大訊息待公布，暫停交易",
       "sources": [
         "https://investoredu.twse.com.tw/Mobile_Pages/..%2FFileSystem%2FFileUpload%2Fcb744523-2d37-495f-9738-345b882924e7.pdf"
+      ]
+    },
+    {
+      "stock_id": "3454",
+      "start": "2026-03-19",
+      "end": "2026-03-26",
+      "reason": "與台達電進行股份轉換，自 2026-03-19 停止買賣；2026-03-27 終止上市",
+      "sources": [
+        "https://www.twse.com.tw/staticFiles/news/news/tsecnews/8a8216d69c37647f019c89fca2900063.pdf"
       ]
     },
     {
@@ -40,6 +49,15 @@
       "sources": [
         "https://www.twse.com.tw/staticFiles/news/news/tsecnews/8a8216d69fc76da001a00f1e0ac8014b.pdf",
         "https://www.twse.com.tw/staticFiles/news/news/tsecnews/8a8216d6a023cc7101a03877622c004a.pdf"
+      ]
+    },
+    {
+      "stock_id": "2867",
+      "start": "2026-08-20",
+      "end": "2026-08-31",
+      "reason": "與玉山金控進行股份轉換，自 2026-08-20 停止買賣；2026-09-01 終止上市",
+      "sources": [
+        "https://www.twse.com.tw/staticFiles/news/news/tsecnews/8a8216d69f96ff79019fa7a7798c0064.pdf"
       ]
     },
     {
@@ -120,6 +138,61 @@
       "sources": [
         "https://www.twse.com.tw/zh/announcement/reduction/twtavu-detail.html?2323,20260930",
         "https://www.twse.com.tw/rwd/zh/reducation/TWTAVUDetail?STK_NO=2323&FILE_DATE=20260930&response=json"
+      ]
+    }
+  ],
+  "delistings": [
+    {
+      "stock_id": "6423",
+      "announced": "2026-01-16",
+      "effective": "2026-01-22",
+      "kind": "transfer_to_tpex",
+      "reason": "轉至櫃買中心上櫃（億而得-創），自 2026-01-22 終止上市",
+      "sources": [
+        "https://www.twse.com.tw/staticFiles/news/news/tsecnews/8a8216d69a3d6cf9019bc625f80f075e.pdf"
+      ]
+    },
+    {
+      "stock_id": "3454",
+      "announced": "2026-02-23",
+      "effective": "2026-03-27",
+      "kind": "share_swap",
+      "reason": "與台達電進行股份轉換，成為其百分之百持有的子公司",
+      "consideration": "依股份轉換契約（公告未載明對價）",
+      "sources": [
+        "https://www.twse.com.tw/staticFiles/news/news/tsecnews/8a8216d69c37647f019c89fca2900063.pdf"
+      ]
+    },
+    {
+      "stock_id": "6806",
+      "announced": "2026-05-13",
+      "effective": "2026-06-23",
+      "kind": "financial",
+      "reason": "財務報告淨值為負，列為變更交易方法並採分盤集合競價，自 2026-06-23 終止上市",
+      "sources": [
+        "https://www.twse.com.tw/staticFiles/news/news/tsecnews/8a8216d69dbea9fd019e212d55f901ef.pdf"
+      ]
+    },
+    {
+      "stock_id": "2867",
+      "announced": "2026-07-28",
+      "effective": "2026-09-01",
+      "kind": "share_swap",
+      "reason": "與玉山金控進行股份轉換，成為其百分之百持有的子公司",
+      "consideration": "依股份轉換契約（公告未載明對價）",
+      "sources": [
+        "https://www.twse.com.tw/staticFiles/news/news/tsecnews/8a8216d69f96ff79019fa7a7798c0064.pdf"
+      ]
+    },
+    {
+      "stock_id": "1589",
+      "announced": "2026-10-08",
+      "effective": "2026-11-18",
+      "kind": "financial",
+      "reason": "未依期限申報 114 年度財務報告，停止買賣屆滿 6 個月未補正",
+      "sources": [
+        "https://www.twse.com.tw/staticFiles/news/news/tsecnews/8a8216d6a0fa351b01a11ad20a4c00df.pdf",
+        "https://www.twse.com.tw/staticFiles/news/news/tsecnews/8a8216d6a0fa351b01a12f97b68f0114.pdf"
       ]
     }
   ]

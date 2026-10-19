@@ -85,7 +85,7 @@ class ConfirmedHaltFileTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "重疊"):
             self.load(entry(), entry(start="2026-03-04", end="2026-03-05"))
         with self.assertRaises(ValueError):
-            self.load(entry(), schema_version=2)
+            self.load(entry(), schema_version=3)
 
 
 # 合成行情：2026-03-02（一）～ 03-13（五）共 10 個行情日；1111 在 03-05～03-10 整列不存在。

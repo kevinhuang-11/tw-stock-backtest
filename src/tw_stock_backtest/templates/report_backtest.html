@@ -134,12 +134,12 @@
 
   {% if detail.get('universe_exclusions') %}
   <section class="card">
-    <div class="card-header"><div><h2>未納入股票池</h2><p>回測開始日還沒上市的股票不能在開始日持有，不納入股票池，也不在上市後中途加入。</p></div></div>
+    <div class="card-header"><div><h2>未納入股票池</h2><p>回測開始日還沒上市的股票不能在開始日持有，不納入股票池，也不在上市後中途加入；開始日以前已終止上市的股票也不納入。</p></div></div>
     <div class="table-wrap"><table class="table table-compact">
-      <thead><tr><th>股票</th><th>上市日</th><th>說明</th></tr></thead>
+      <thead><tr><th>股票</th><th>日期</th><th>說明</th></tr></thead>
       <tbody>{% for e in detail.universe_exclusions %}<tr>
         <td><a href="/stocks/{{ e.stock_id }}">{{ e.stock_id }}</a></td>
-        <td class="nowrap">{{ e.listed_date }}</td>
+        <td class="nowrap">{{ e.delisted_date or e.listed_date }}</td>
         <td>{{ e.reason }}</td>
       </tr>{% endfor %}</tbody>
     </table></div>

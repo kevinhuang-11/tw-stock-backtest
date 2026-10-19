@@ -7,13 +7,18 @@ from importlib import resources
 MAX_HALT_DAYS = 400
 
 
-def load_confirmed_halts(path=None):
-    """讀取已確認停牌清單，展開成 {(股票, 日期): {"reason", "source", "sources"}}。
+# 終止上市的類型（confirmed_halts.json 的 delistings[].kind）與報表上的說明。
+DELISTING_KINDS = {
+    "financial": "財務或營運因素",
+    "share_swap": "股份轉換",
+    "merger": "合併",
+    "tender_offer": "公開收購",
+    "transfer_to_tpex": "轉至櫃買中心上櫃（本專案沒有櫃買行情）",
+    "other": "其他",
+}
 
-    資料檔（預設為套件內的 confirmed_halts.json）每筆是一段含頭尾的日曆日區間，
-    必須附上至少一個 https 來源。區間內的週末或休市日也會展開，但只有實際出現的
-    行情日會被查到，不影響結果。格式不符時直接失敗，不略過任何一筆。
-    """
+
+def _read_document(path):
     if path is None:
         text = (
             resources.files(__package__)
@@ -24,8 +29,81 @@ def load_confirmed_halts(path=None):
         text = open(path, encoding="utf-8").read()
 
     document = json.loads(text)
-    if document.get("schema_version") != 1 or not isinstance(document.get("halts"), list):
+    # schema 1 只有 halts；schema 2 另有 delistings（終止上市）。
+    if document.get("schema_version") not in (1, 2) or not isinstance(document.get("halts"), list):
         raise ValueError("已確認停牌清單格式或 schema_version 無效")
+    return document
+
+
+def _check_sources(stock_id, sources, what):
+    if (
+        not isinstance(sources, list)
+        or not sources
+        or not all(isinstance(url, str) and url.startswith("https://") for url in sources)
+    ):
+        raise ValueError(f"{stock_id} 的{what}必須附上 https 來源")
+
+
+def load_delistings(path=None):
+    """讀取終止上市清單：{股票: {"stock_id", "announced", "effective", "kind", "reason",
+    "consideration", "sources"}}。
+
+    effective 是終止上市日（當天起不再交易），announced 是公告日，都必須附官方來源。
+    同一檔的停牌區間不可延伸到終止上市日以後。schema 1 的檔案沒有這個清單。
+    """
+    document = _read_document(path)
+    entries = document.get("delistings", [])
+    if document["schema_version"] == 1:
+        entries = []
+    if not isinstance(entries, list):
+        raise ValueError("終止上市清單格式無效")
+
+    result = {}
+    for entry in entries:
+        stock_id = entry.get("stock_id")
+        if not isinstance(stock_id, str) or not re.fullmatch(r"\d{4}", stock_id):
+            raise ValueError(f"終止上市的股票代號無效：{stock_id!r}")
+        if stock_id in result:
+            raise ValueError(f"{stock_id} 的終止上市重複")
+        if entry.get("kind") not in DELISTING_KINDS:
+            raise ValueError(f"{stock_id} 的終止上市類型無效：{entry.get('kind')!r}")
+        reason = entry.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError(f"{stock_id} 的終止上市原因不可為空")
+        _check_sources(stock_id, entry.get("sources"), "終止上市")
+        announced = date.fromisoformat(entry.get("announced", ""))
+        effective = date.fromisoformat(entry.get("effective", ""))
+        if announced > effective:
+            raise ValueError(f"{stock_id} 的終止上市公告日晚於終止上市日")
+        consideration = entry.get("consideration")
+        if consideration is not None and not isinstance(consideration, str):
+            raise ValueError(f"{stock_id} 的對價說明必須是文字")
+        result[stock_id] = {
+            "stock_id": stock_id,
+            "announced": announced.isoformat(),
+            "effective": effective.isoformat(),
+            "kind": entry["kind"],
+            "reason": reason,
+            "consideration": consideration,
+            "sources": list(entry["sources"]),
+        }
+
+    for halt in document["halts"]:
+        delisting = result.get(halt.get("stock_id"))
+        if delisting and str(halt.get("end", "")) >= delisting["effective"]:
+            raise ValueError(f"{halt['stock_id']} 的停牌區間延伸到終止上市日以後")
+
+    return result
+
+
+def load_confirmed_halts(path=None):
+    """讀取已確認停牌清單，展開成 {(股票, 日期): {"reason", "source", "sources"}}。
+
+    資料檔（預設為套件內的 confirmed_halts.json）每筆是一段含頭尾的日曆日區間，
+    必須附上至少一個 https 來源。區間內的週末或休市日也會展開，但只有實際出現的
+    行情日會被查到，不影響結果。格式不符時直接失敗，不略過任何一筆。
+    """
+    document = _read_document(path)
 
     halts = {}
     for entry in document["halts"]:
@@ -62,6 +140,8 @@ def load_confirmed_halts(path=None):
 
 # 未列入清單的缺價紀錄不認定為停牌，只標示為無成交價（原因未確認）。
 CONFIRMED_HALTS = load_confirmed_halts()
+# 已確認的終止上市；終止上市日以後沒有行情列是正常的，不當成缺列。
+CONFIRMED_DELISTINGS = load_delistings()
 
 
 PRICE_FIELDS = ("open", "high", "low", "close")
@@ -95,13 +175,17 @@ def market_event(record, confirmed_halts):
 def not_tradable_reason(record):
     if record["market_status"] == "CONFIRMED_HALT":
         return "已確認停牌"
+    if record["market_status"] == "DELISTED":
+        return "已終止上市"
     if record["market_status"] == "MISSING_ROW":
         return "缺少行情列（原因未確認）"
     return "無成交價（原因未確認）"
 
 
-def missing_row(stock_id, day):
-    """缺列在記憶體中的代表：沒有價格、量為 0，並標記 missing_row。不寫入行情庫。"""
+def missing_row(stock_id, day, *, delisted=False):
+    """缺列在記憶體中的代表：沒有價格、量為 0，並標記 missing_row（終止上市日以後標記
+    delisted）。不寫入行情庫。"""
+    marker = {"delisted": True} if delisted else {"missing_row": True}
     return {
         "stock_id": stock_id,
         "date": day,
@@ -112,7 +196,7 @@ def missing_row(stock_id, day):
         "volume": 0,
         "turnover": 0,
         "trade_count": 0,
-        "missing_row": True,
+        **marker,
     }
 
 
@@ -165,6 +249,7 @@ def prepare_market_records(
             field in record and record[field] is None for field in PRICE_FIELDS
         )
         missing = no_price and record.get("missing_row") is True
+        delisted = no_price and record.get("delisted") is True
 
         if is_halted:
             valid = all(
@@ -219,6 +304,8 @@ def prepare_market_records(
                 "market_status": (
                     "CONFIRMED_HALT"
                     if is_halted
+                    else "DELISTED"
+                    if delisted
                     else "MISSING_ROW"
                     if missing
                     else "NO_PRICE"
@@ -239,6 +326,7 @@ def prepare_backtest_market(
     end,
     *,
     confirmed_halts,
+    delistings=None,
 ):
     """整理各股票行情，保留暖機資料與共同回測日期。
 
@@ -248,9 +336,18 @@ def prepare_backtest_market(
 
     兩種情況仍整次失敗（3.7、3.8）：股票在 end 以前沒有任何列（尚未下載），以及某個
     行情日缺列的股票太多（行情未更新完整）。
+
+    delistings（預設為已確認的終止上市）中的股票，終止上市日起的行情日補上 DELISTED 列
+    （3.3），不算缺列；那天以後若還有行情列，代表清單或資料有誤，整次失敗。
     """
     if not records_by_stock:
         raise ValueError("股票池不可為空")
+    delistings = CONFIRMED_DELISTINGS if delistings is None else delistings
+    gone = {
+        stock_id: delistings[stock_id]["effective"]
+        for stock_id in records_by_stock
+        if stock_id in delistings
+    }
 
     trading_dates = set()
     never = []
@@ -260,7 +357,13 @@ def prepare_backtest_market(
             raise ValueError(f"{stock_id} 的行情混入其他股票")
 
         dates = [record["date"] for record in records if date.fromisoformat(record["date"]) <= end]
-        if not dates:
+        if stock_id in gone and any(day >= gone[stock_id] for day in dates):
+            late = next(day for day in dates if day >= gone[stock_id])
+            raise ValueError(
+                f"{stock_id} 已於 {gone[stock_id]} 終止上市，但 {late} 仍有行情列；"
+                "請檢查終止上市清單或行情資料"
+            )
+        if not dates and stock_id not in gone:
             never.append(stock_id)
         trading_dates.update(day for day in dates if start <= date.fromisoformat(day) <= end)
 
@@ -278,7 +381,11 @@ def prepare_backtest_market(
         for stock_id, records in records_by_stock.items()
     }
     missing = {
-        day: sorted(stock_id for stock_id, days in present.items() if day not in days)
+        day: sorted(
+            stock_id
+            for stock_id, days in present.items()
+            if day not in days and not (stock_id in gone and day >= gone[stock_id])
+        )
         for day in sorted(trading_dates)
     }
     threshold = MISSING_BATCH_RATIO * len(records_by_stock)
@@ -298,6 +405,12 @@ def prepare_backtest_market(
         filled += [
             missing_row(stock_id, day) for day, stocks in missing.items() if stock_id in stocks
         ]
+        if stock_id in gone:
+            filled += [
+                missing_row(stock_id, day, delisted=True)
+                for day in trading_dates
+                if day >= gone[stock_id]
+            ]
         filled.sort(key=lambda record: record["date"])
         prepared = prepare_market_records(
             filled,
