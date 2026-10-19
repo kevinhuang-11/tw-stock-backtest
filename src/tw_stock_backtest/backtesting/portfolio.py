@@ -1,6 +1,8 @@
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
+from typing import Any, cast
 
 from tw_stock_backtest.analysis.adjustment import AdjustedHistory
 from tw_stock_backtest.analysis.factors import (
@@ -30,14 +32,20 @@ from tw_stock_backtest.data.market_events import (
     unconfirmed_gaps,
 )
 from tw_stock_backtest.date_range import parse_date_range
+from tw_stock_backtest.typedefs import Action, Delistings, Halts, Market, Record, Row, Transaction
+
+# 排名的一列（rules 的篩選結果或 factors 的評分）。
+Ranking = dict[str, Any]
+# 開盤要執行的計畫：(訊號日, {"target", "sell", "buy", "keep"})。
+Pending = tuple[str, dict[str, list[str]]]
 
 
 def plan_rebalance(
-    holdings,
-    ranked_stock_ids,
+    holdings: Mapping[str, int],
+    ranked_stock_ids: Sequence[str],
     *,
-    max_positions,
-):
+    max_positions: int,
+) -> dict[str, list[str]]:
     """
     根據目前持股與候選排名，產生持股調整計畫。
 
@@ -98,10 +106,10 @@ class _Ranker:
 
     method: str
     top_n: int
-    rule_parameters: dict | None = None
-    factor_settings: dict | None = None
-    weights: dict | None = None
-    strategy: dict | None = None
+    rule_parameters: dict[str, Any] | None = None
+    factor_settings: dict[str, Any] | None = None
+    weights: dict[str, Decimal] | None = None
+    strategy: dict[str, Any] | None = None
 
 
 @dataclass
@@ -121,18 +129,23 @@ class _Account:
     """回測過程中會變動的帳戶狀態與紀錄。"""
 
     cash: Decimal
-    holdings: dict = field(default_factory=dict)
-    trades: list = field(default_factory=list)
-    skipped_orders: list = field(default_factory=list)
+    holdings: dict[str, int] = field(default_factory=dict)
+    trades: list[Row] = field(default_factory=list)
+    skipped_orders: list[Row] = field(default_factory=list)
     total_commission: Decimal = Decimal("0")
     total_tax: Decimal = Decimal("0")
     # 賣出意圖（docs/HALT-POLICY.md 3.15）：{股票: 最初決定賣出的訊號日}。賣出因不可交易
     # 而沒成交時保留，之後每天都重新計畫賣出，不因指標暫時無法評估而凍結；重新評估後又
     # 進入目標持股時取消。
-    sell_intents: dict = field(default_factory=dict)
+    sell_intents: dict[str, str] = field(default_factory=dict)
 
 
-def _strategy_settings(strategy, ranking_method, factor_settings, screening_settings):
+def _strategy_settings(
+    strategy: dict[str, Any] | None,
+    ranking_method: str,
+    factor_settings: dict[str, Any] | None,
+    screening_settings: dict[str, Any] | None,
+) -> tuple[dict[str, Any] | None, str, dict[str, Any] | None, dict[str, Any] | None]:
     """有策略時，排名模式與參數都改用策略的設定。"""
     if strategy is None:
         return None, ranking_method, factor_settings, screening_settings
@@ -149,7 +162,14 @@ def _strategy_settings(strategy, ranking_method, factor_settings, screening_sett
     return strategy, strategy["ranking_mode"], factor_settings, screening_settings
 
 
-def _validate_inputs(initial_cash, quantity, cost_settings, slippage_rate, max_positions, sizing):
+def _validate_inputs(
+    initial_cash: object,
+    quantity: object,
+    cost_settings: object,
+    slippage_rate: Decimal,
+    max_positions: int,
+    sizing: str,
+) -> None:
     if not isinstance(initial_cash, Decimal) or not initial_cash.is_finite() or initial_cash <= 0:
         raise ValueError("初始資金必須是正值且有限的 Decimal")
 
@@ -166,14 +186,20 @@ def _validate_inputs(initial_cash, quantity, cost_settings, slippage_rate, max_p
         raise ValueError("股數配置模式必須是 fixed_quantity 或 fixed_budget")
 
 
-def _ranker(ranking_method, screening_settings, factor_settings, strategy):
+def _ranker(
+    ranking_method: str,
+    screening_settings: dict[str, Any] | None,
+    factor_settings: dict[str, Any] | None,
+    strategy: dict[str, Any] | None,
+) -> _Ranker:
     if ranking_method == "rules":
-        active_settings = screening_settings
+        # 型別上可能是 None：rules 卻沒有篩選設定時會丟出 TypeError（既有行為，見 REVIEW）。
+        active_settings = cast(dict[str, Any], screening_settings)
         ranker = _Ranker(
             method="rules",
             top_n=0,
             rule_parameters={
-                key: screening_settings[key]
+                key: active_settings[key]
                 for key in (
                     "short_window",
                     "long_window",
@@ -205,7 +231,9 @@ def _ranker(ranking_method, screening_settings, factor_settings, strategy):
     return ranker
 
 
-def _warm_histories(market, actions, start):
+def _warm_histories(
+    market: Market, actions: Mapping[str, Sequence[Action]], start: date
+) -> dict[str, AdjustedHistory]:
     """暖機資料保留停牌與無成交價的列，與研究排名使用同一套規則：
     窗口內有缺價就不計算，不刪列湊窗口。
 
@@ -223,7 +251,9 @@ def _warm_histories(market, actions, start):
     }
 
 
-def _skip(account, stock_id, signal_date, trading_date, action, reason):
+def _skip(
+    account: _Account, stock_id: str, signal_date: str, trading_date: str, action: str, reason: str
+) -> None:
     account.skipped_orders.append(
         {
             "stock_id": stock_id,
@@ -235,7 +265,15 @@ def _skip(account, stock_id, signal_date, trading_date, action, reason):
     )
 
 
-def _execute_order(account, rules, action, stock_id, record, signal_date, trading_date):
+def _execute_order(
+    account: _Account,
+    rules: _OrderRules,
+    action: str,
+    stock_id: str,
+    record: Record,
+    signal_date: str,
+    trading_date: str,
+) -> None:
     """開盤成交一筆；不能成交時記在 skipped_orders 並說明原因。"""
     if action == "SELL" and stock_id not in account.holdings:
         # 計畫賣出後、成交前終止上市：持股已轉為無法變現。
@@ -290,6 +328,8 @@ def _execute_order(account, rules, action, stock_id, record, signal_date, tradin
             account.sell_intents.setdefault(stock_id, signal_date)
         return
 
+    # 走到這裡時 reason 為 None，成交金額一定已經算好。
+    transaction = cast(Transaction, transaction)
     account.cash += transaction["cash_change"]
 
     if action == "SELL":
@@ -321,7 +361,9 @@ def _execute_order(account, rules, action, stock_id, record, signal_date, tradin
     )
 
 
-def _execute_plan(account, rules, pending, market, trading_date):
+def _execute_plan(
+    account: _Account, rules: _OrderRules, pending: Pending, market: Market, trading_date: str
+) -> None:
     """開盤：執行上一行情日收盤後產生的計畫，先賣後買。"""
     signal_date, plan = pending
     for action, stock_ids in (("SELL", plan["sell"]), ("BUY", plan["buy"])):
@@ -337,7 +379,13 @@ def _execute_plan(account, rules, pending, market, trading_date):
             )
 
 
-def _close_valuation(account, market, trading_date, unrealizable, delisted_valuation):
+def _close_valuation(
+    account: _Account,
+    market: Market,
+    trading_date: str,
+    unrealizable: dict[str, Row],
+    delisted_valuation: str,
+) -> Row:
     """收盤：持有中的停牌或無成交價股票使用最近有效收盤價估值，並標示價格日期。"""
     market_value = Decimal("0")
     stale_prices = {}
@@ -366,7 +414,13 @@ def _close_valuation(account, market, trading_date, unrealizable, delisted_valua
     }
 
 
-def _evaluate_day(ranker, market, histories, trading_date, events):
+def _evaluate_day(
+    ranker: _Ranker,
+    market: Market,
+    histories: dict[str, AdjustedHistory],
+    trading_date: str,
+    events: Halts,
+) -> tuple[list[Ranking], dict[str, str], list[Row], Row | None]:
     """逐檔計算訊號並排名，回傳 (候選, 無法更新的原因, 當天的不可交易事件, 策略診斷)。
 
     一檔停牌，不阻止其他股票更新訊號。
@@ -400,7 +454,7 @@ def _evaluate_day(ranker, market, histories, trading_date, events):
                 evaluation = evaluate_stock(
                     histories[stock_id].rows,
                     trading_date,
-                    **ranker.rule_parameters,
+                    **cast(dict[str, Any], ranker.rule_parameters),
                 )
             else:
                 evaluation = calculate_factor_row(
@@ -437,7 +491,14 @@ def _evaluate_day(ranker, market, histories, trading_date, events):
     return candidates, errors, day_events, diagnostics
 
 
-def _plan_next(account, candidates, errors, *, top_n, max_positions):
+def _plan_next(
+    account: _Account,
+    candidates: Sequence[Ranking],
+    errors: Mapping[str, str],
+    *,
+    top_n: int,
+    max_positions: int,
+) -> dict[str, list[str]]:
     """收盤後決定下一個開盤的計畫。
 
     停牌或無法更新訊號的既有持股暫時保留，仍占名額；已決定賣出的不凍結，繼續計畫賣出。
@@ -461,25 +522,25 @@ def _plan_next(account, candidates, errors, *, top_n, max_positions):
 
 
 def run_portfolio_backtest(
-    records_by_stock,
-    start_text,
-    end_text,
+    records_by_stock: Mapping[str, Sequence[Record]],
+    start_text: str,
+    end_text: str,
     *,
-    screening_settings,
-    initial_cash,
-    quantity,
-    max_positions,
-    cost_settings,
-    ranking_method="rules",
-    factor_settings=None,
-    confirmed_halts=None,
-    sizing_mode="fixed_quantity",
-    slippage_rate=Decimal("0"),
-    strategy=None,
-    corporate_actions=None,
-    delistings=None,
-    delisted_valuation="last_close",
-):
+    screening_settings: dict[str, Any] | None,
+    initial_cash: Decimal,
+    quantity: int,
+    max_positions: int,
+    cost_settings: CostSettings,
+    ranking_method: str = "rules",
+    factor_settings: dict[str, Any] | None = None,
+    confirmed_halts: Halts | None = None,
+    sizing_mode: str = "fixed_quantity",
+    slippage_rate: Decimal = Decimal("0"),
+    strategy: dict[str, Any] | None = None,
+    corporate_actions: Mapping[str, Sequence[Action]] | None = None,
+    delistings: Delistings | None = None,
+    delisted_valuation: str = "last_close",
+) -> dict[str, Any]:
     """多股票回測：每天收盤後排名，下一個行情日開盤依計畫調整持股。
 
     流程分成：設定與驗證、整理行情與暖機序列，以及每個行情日的四步——
@@ -532,8 +593,8 @@ def run_portfolio_backtest(
     corporate_action_events = []
 
     # 終止上市的持股（docs/HALT-POLICY.md 3.16）：不再占名額，估值依 delisted_valuation。
-    unrealizable = {}
-    delisting_events = []
+    unrealizable: dict[str, Row] = {}
+    delisting_events: list[Row] = []
 
     for trading_date in trading_dates:
         received, applied = apply_due(schedule, trading_date, account.holdings)

@@ -6,6 +6,8 @@
 
 from decimal import Decimal
 
+from tw_stock_backtest.typedefs import Delistings, Market, Row
+
 STATUS_LABELS = {
     "NORMAL": "正常",
     "CONFIRMED_HALT": "停牌中",
@@ -15,7 +17,14 @@ STATUS_LABELS = {
 }
 
 
-def final_positions(holdings, unrealizable, market, day, delistings, delisted_valuation):
+def final_positions(
+    holdings: dict[str, int],
+    unrealizable: dict[str, Row],
+    market: Market,
+    day: str,
+    delistings: Delistings,
+    delisted_valuation: str,
+) -> list[Row]:
     """回傳期末持股明細，依股票代號排序；金額與估值價保持 Decimal。"""
     result = []
     for stock_id, shares in sorted(holdings.items()):

@@ -16,7 +16,9 @@
 - 換股率無法確定（已列入人工確認）時拒絕計算，不自行推定。
 """
 
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from decimal import ROUND_DOWN, Decimal
+from typing import Any
 
 from tw_stock_backtest.analysis.adjustment import (
     ex_dividend_reference,
@@ -24,37 +26,42 @@ from tw_stock_backtest.analysis.adjustment import (
     refuses_rights,
 )
 from tw_stock_backtest.data.corporate_actions import CAPITAL_REDUCTION, DIVIDEND, PAR_CHANGE
+from tw_stock_backtest.typedefs import Action, Row
 
 PAR_VALUE = Decimal("10")
 THOUSAND = Decimal("1000")
 ZERO = Decimal("0")
 
 
-def _yuan(value):
+def _yuan(value: Decimal) -> Decimal:
     """元以下捨去。"""
     return value.to_integral_value(rounding=ROUND_DOWN)
 
 
-def share_ratio(action):
+def share_ratio(action: Action) -> Decimal:
     """每 1 股舊股在生效日後變成幾股（可能是小數）。"""
+    ratio: Decimal
     if action["kind"] == DIVIDEND:
-        return 1 + action["stock_dividend_per_1000"] / THOUSAND
+        ratio = 1 + action["stock_dividend_per_1000"] / THOUSAND
+        return ratio
     if action["kind"] in (CAPITAL_REDUCTION, PAR_CHANGE):
         if not action["shares_per_1000"]:
             raise ValueError(
                 f"{action['stock_id']} {action['effective_date']} 的換股率無法確定（待人工確認），"
                 "無法計算持股變化"
             )
-        return action["shares_per_1000"] / THOUSAND
+        ratio = action["shares_per_1000"] / THOUSAND
+        return ratio
     raise ValueError(f"未知的公司行動類型：{action['kind']}")
 
 
-def cash_per_share(action):
+def cash_per_share(action: Action) -> Decimal:
     """每 1 股舊股收到的現金（股利加上減資退還股款）。"""
-    return action["cash_dividend"] + action["cash_return"]
+    cash: Decimal = action["cash_dividend"] + action["cash_return"]
+    return cash
 
 
-def entitlement(shares, action):
+def entitlement(shares: int, action: Action) -> Row:
     """持有 shares 股（整數）時，這筆公司行動帶來的變化。"""
     if isinstance(shares, bool) or not isinstance(shares, int) or shares < 0:
         raise ValueError("持股必須是非負整數")
@@ -84,7 +91,7 @@ def entitlement(shares, action):
     }
 
 
-def declined_rights(shares, action):
+def declined_rights(shares: int, action: Action) -> dict[str, Any]:
     """放棄認購的明細：可認購股數、認購價與稀釋損失（元以下捨去；已反映在市價，不另外扣除）。
 
     稀釋損失 = 持股 ×（1 ＋ 配股率）×（減除股利參考價 − 官方參考價），也就是除權後部位
@@ -104,7 +111,7 @@ def declined_rights(shares, action):
     }
 
 
-def declined_text(event):
+def declined_text(event: Mapping[str, Any]) -> str:
     """CLI 輸出用：放棄認購的說明；不是放棄認購的事件回傳空字串。"""
     if event.get("rights") != "decline":
         return ""
@@ -115,7 +122,7 @@ def declined_text(event):
     )
 
 
-def dilution_total(events):
+def dilution_total(events: Iterable[Mapping[str, Any]]) -> Decimal:
     """放棄認購的稀釋損失合計。"""
     return sum(
         (Decimal(str(e["dilution_loss"])) for e in events if e.get("rights") == "decline"), ZERO
@@ -125,7 +132,7 @@ def dilution_total(events):
 class RightsOfferingHeld(ValueError):
     """持有跨過含現金增資的生效日；這段報酬不計算。"""
 
-    def __init__(self, action):
+    def __init__(self, action: Action) -> None:
         super().__init__(
             f"持有 {action['stock_id']} 跨過 {action['effective_date']} 的現金增資除權"
             f"（原股東每千股可認購 {action['rights_per_1000'].normalize():f} 股、"
@@ -139,7 +146,7 @@ class RightsOfferingHeld(ValueError):
 class Schedule:
     """依生效日排序的公司行動；due() 依序取出尚未套用、生效日不晚於指定日期的事件。"""
 
-    def __init__(self, actions_by_stock, start):
+    def __init__(self, actions_by_stock: Mapping[str, Sequence[Action]] | None, start: str) -> None:
         self._events = sorted(
             (a["effective_date"], a["stock_id"], a["kind"], a)
             for actions in (actions_by_stock or {}).values()
@@ -148,13 +155,13 @@ class Schedule:
         )
         self._next = 0
 
-    def due(self, day):
+    def due(self, day: str) -> Iterator[Action]:
         while self._next < len(self._events) and self._events[self._next][0] <= day:
             yield self._events[self._next][3]
             self._next += 1
 
 
-def apply_due(schedule, day, holdings):
+def apply_due(schedule: Schedule, day: str, holdings: dict[str, int]) -> tuple[Decimal, list[Row]]:
     """在 day 開盤前套用到期的公司行動；更新 holdings，回傳 (入帳現金, 事件明細)。"""
     cash, details = ZERO, []
     for action in schedule.due(day):

@@ -17,9 +17,17 @@
 缺價（None）維持 None，不會被補值；原始資料不會被修改，回傳的是新的列。
 """
 
+from collections.abc import Callable, Iterable, Sequence
 from decimal import ROUND_HALF_UP, Decimal
+from typing import TypeVar
 
 from tw_stock_backtest.data.corporate_actions import CAPITAL_REDUCTION, DIVIDEND, PAR_CHANGE
+from tw_stock_backtest.typedefs import Action, Record
+
+T = TypeVar("T")
+
+# 生效日、價格因子、股數比。
+Event = tuple[str, Decimal, Decimal]
 
 PRICE_FIELDS = ("open", "high", "low", "close")
 THOUSAND = Decimal("1000")
@@ -31,27 +39,28 @@ DECLINE = "decline"
 RIGHTS_MODES = (REFUSE, DECLINE)
 
 
-def is_rights_offering(action):
+def is_rights_offering(action: Action) -> bool:
     """含現金增資認購權的除權（原股東每千股可認購股數大於 0）。"""
     return bool(action.get("rights_per_1000")) and action["rights_per_1000"] > 0
 
 
-def refuses_rights(action):
+def refuses_rights(action: Action) -> bool:
     """含現金增資、且處理方式是 refuse（沒有標示時的預設）。"""
     return is_rights_offering(action) and action.get("rights", REFUSE) == REFUSE
 
 
-def ex_dividend_reference(action):
+def ex_dividend_reference(action: Action) -> Decimal:
     """減除股利參考價（未捨入）：只扣現金股利、只計無償配股，不含現金增資。
 
     （前收 − 現金股利）÷（1 ＋ 每千股無償配股 ÷ 1000），與證交所除權息表的同名欄位同一個公式。
     """
-    return (action["previous_close"] - action["cash_dividend"]) / (
+    reference: Decimal = (action["previous_close"] - action["cash_dividend"]) / (
         ONE + action["stock_dividend_per_1000"] / THOUSAND
     )
+    return reference
 
 
-def breaks(actions):
+def breaks(actions: Iterable[Action]) -> list[str]:
     """處理方式為 refuse 的現金增資生效日，由舊到新。
 
     官方參考價假設依整個現金增資的比例認購，不符合任何實際持有人（不認購的人價格照市價、
@@ -61,12 +70,12 @@ def breaks(actions):
     return sorted({a["effective_date"] for a in actions if refuses_rights(a)})
 
 
-def events(actions):
+def events(actions: Iterable[Action]) -> list[Event]:
     """公司行動轉成 [(生效日, 價格因子, 股數比)]，依生效日排序；同一天的多筆合併相乘。
 
     refuse 的現金增資不在這裡（見 breaks）；decline 的價格因子用減除股利參考價。
     """
-    merged = {}
+    merged: dict[str, tuple[Decimal, Decimal]] = {}
     for action in actions:
         if refuses_rights(action):
             continue
@@ -91,7 +100,7 @@ def events(actions):
     return sorted((day, price, shares) for day, (price, shares) in merged.items())
 
 
-def _scaled(record, price, shares):
+def _scaled(record: Record, price: Decimal, shares: Decimal) -> Record:
     row = dict(record)
     for field in PRICE_FIELDS:
         if field in row and row[field] is not None:
@@ -101,7 +110,9 @@ def _scaled(record, price, shares):
     return row
 
 
-def adjust(records, actions, as_of=None):
+def adjust(
+    records: Sequence[Record], actions: Sequence[Action], as_of: str | None = None
+) -> list[Record]:
     """回傳截至 as_of 的還原序列（只含 as_of 以前的列）；as_of 省略時取最後一列的日期。"""
     rows = [r for r in records if as_of is None or r["date"] <= as_of]
     if not rows or not actions:
@@ -131,14 +142,14 @@ class AdjustedHistory:
     任何時點的內容都等於 adjust(到該日為止的原始列, actions, 該日)，但每個事件只重算一次。
     """
 
-    def __init__(self, actions=()):
+    def __init__(self, actions: Sequence[Action] = ()) -> None:
         self._events = events(actions) if actions else []
         self._breaks = breaks(actions) if actions else []
         self._next = 0
         self._next_break = 0
-        self.rows = []
+        self.rows: list[Record] = []
 
-    def advance(self, as_of):
+    def advance(self, as_of: str) -> None:
         while self._next < len(self._events) and self._events[self._next][0] <= as_of:
             day, price, shares = self._events[self._next]
             self.rows = [_scaled(r, price, shares) if r["date"] < day else r for r in self.rows]
@@ -148,19 +159,21 @@ class AdjustedHistory:
             self.rows = [r for r in self.rows if r["date"] >= day]
             self._next_break += 1
 
-    def append(self, record):
+    def append(self, record: Record) -> None:
         if self.rows and record["date"] <= self.rows[-1]["date"]:
             raise ValueError("還原序列必須依日期遞增加入")
         self.advance(record["date"])
         self.rows.append(dict(record))
 
-    def extend(self, records):
+    def extend(self, records: Iterable[Record]) -> "AdjustedHistory":
         for record in records:
             self.append(record)
         return self
 
 
-def point_in_time(records, actions, compute):
+def point_in_time(
+    records: Iterable[Record], actions: Sequence[Action], compute: Callable[[list[Record]], T]
+) -> list[T]:
     """逐日以截至當日的還原序列計算 compute(rows)，回傳與 records 等長的結果。
 
     給逐日輸出指標的工具使用（例如單檔均線交叉）：第 i 天的值只用到第 i 天以前生效的

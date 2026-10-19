@@ -1,5 +1,7 @@
+from collections.abc import Sequence
 from datetime import date
 from decimal import Decimal
+from typing import Any, cast
 
 from tw_stock_backtest.backtesting.corporate_actions import Schedule, apply_due
 from tw_stock_backtest.backtesting.costs import CostSettings, calculate_transaction
@@ -9,17 +11,18 @@ from tw_stock_backtest.data.market_events import (
     not_tradable_reason,
     prepare_market_records,
 )
+from tw_stock_backtest.typedefs import Action, Halts, Record, Row
 
 
 def run_backtest(
-    records,
-    signals,
-    initial_cash,
-    quantity,
-    cost_settings=None,
-    confirmed_halts=None,
-    corporate_actions=(),
-):
+    records: Sequence[Record],
+    signals: Sequence[str],
+    initial_cash: Decimal,
+    quantity: int,
+    cost_settings: CostSettings | None = None,
+    confirmed_halts: Halts | None = None,
+    corporate_actions: Sequence[Action] = (),
+) -> dict[str, Any]:
     """前日訊號、次筆開盤成交；可傳入交易成本設定。
 
     corporate_actions 是這檔的公司行動；與多股票引擎相同，生效日開盤前依前一日收盤的持股
@@ -48,7 +51,8 @@ def run_backtest(
         raise ValueError("買入股數必須是正整數")
 
     previous_date = None
-    stock_id = records[0]["stock_id"] if records else None
+    # 沒有行情時為 None（迴圈不會執行）；cast 只告訴型別檢查器，不影響執行。
+    stock_id = cast(str, records[0]["stock_id"] if records else None)
 
     for record, signal in zip(records, signals, strict=True):
         current_date = date.fromisoformat(record["date"])
@@ -73,15 +77,15 @@ def run_backtest(
 
     cash = initial_cash
     shares = 0
-    trades = []
-    equity_curve = []
+    trades: list[Row] = []
+    equity_curve: list[Row] = []
     total_commission = Decimal("0")
     total_tax = Decimal("0")
-    skipped_orders = []
-    market_events = []
+    skipped_orders: list[Row] = []
+    market_events: list[Row] = []
 
     schedule = Schedule({stock_id: list(corporate_actions)}, "")
-    corporate_action_events = []
+    corporate_action_events: list[Row] = []
     # 因不可交易而沒賣成的賣出訊號日；之後第一個可交易日開盤賣出。
     sell_intent = None
 

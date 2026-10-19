@@ -1,8 +1,13 @@
 import json
 import re
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, timedelta
 from decimal import Decimal
 from importlib import resources
+from pathlib import Path
+from typing import Any
+
+from tw_stock_backtest.typedefs import Delistings, Halts, Market, Record, Row
 
 MAX_HALT_DAYS = 400
 
@@ -18,7 +23,7 @@ DELISTING_KINDS = {
 }
 
 
-def _read_document(path):
+def _read_document(path: str | Path | None) -> dict[str, Any]:
     if path is None:
         text = (
             resources.files(__package__)
@@ -28,14 +33,14 @@ def _read_document(path):
     else:
         text = open(path, encoding="utf-8").read()
 
-    document = json.loads(text)
+    document: dict[str, Any] = json.loads(text)
     # schema 1 只有 halts；schema 2 另有 delistings（終止上市）。
     if document.get("schema_version") not in (1, 2) or not isinstance(document.get("halts"), list):
         raise ValueError("已確認停牌清單格式或 schema_version 無效")
     return document
 
 
-def _check_sources(stock_id, sources, what):
+def _check_sources(stock_id: str, sources: object, what: str) -> None:
     if (
         not isinstance(sources, list)
         or not sources
@@ -44,7 +49,7 @@ def _check_sources(stock_id, sources, what):
         raise ValueError(f"{stock_id} 的{what}必須附上 https 來源")
 
 
-def load_delistings(path=None):
+def load_delistings(path: str | Path | None = None) -> Delistings:
     """讀取終止上市清單：{股票: {"stock_id", "announced", "effective", "kind", "reason",
     "consideration", "sources"}}。
 
@@ -96,7 +101,7 @@ def load_delistings(path=None):
     return result
 
 
-def load_confirmed_halts(path=None):
+def load_confirmed_halts(path: str | Path | None = None) -> Halts:
     """讀取已確認停牌清單，展開成 {(股票, 日期): {"reason", "source", "sources"}}。
 
     資料檔（預設為套件內的 confirmed_halts.json）每筆是一段含頭尾的日曆日區間，
@@ -160,7 +165,7 @@ MISSING_BATCH_RATIO = Decimal("0.1")
 MISSING_BATCH_MINIMUM = 2
 
 
-def market_event(record, confirmed_halts):
+def market_event(record: Record, confirmed_halts: Halts) -> dict[str, Any]:
     """不可交易日的說明：已確認停牌附上來源；無成交價與缺列說明原因未確認。"""
     if record["market_status"] == "CONFIRMED_HALT":
         return {
@@ -172,7 +177,7 @@ def market_event(record, confirmed_halts):
     return {**NO_PRICE_EVENT, "market_status": "NO_PRICE"}
 
 
-def not_tradable_reason(record):
+def not_tradable_reason(record: Record) -> str:
     if record["market_status"] == "CONFIRMED_HALT":
         return "已確認停牌"
     if record["market_status"] == "DELISTED":
@@ -182,7 +187,7 @@ def not_tradable_reason(record):
     return "無成交價（原因未確認）"
 
 
-def missing_row(stock_id, day, *, delisted=False):
+def missing_row(stock_id: str, day: str, *, delisted: bool = False) -> Record:
     """缺列在記憶體中的代表：沒有價格、量為 0，並標記 missing_row（終止上市日以後標記
     delisted）。不寫入行情庫。"""
     marker = {"delisted": True} if delisted else {"missing_row": True}
@@ -201,11 +206,11 @@ def missing_row(stock_id, day, *, delisted=False):
 
 
 def prepare_market_records(
-    records,
+    records: Iterable[Record],
     *,
-    confirmed_halts,
-    allow_unpriced_halt=False,
-):
+    confirmed_halts: Halts,
+    allow_unpriced_halt: bool = False,
+) -> list[Record]:
     """保留原始價格，增加交易狀態與估值價格。
 
     不可交易日有兩種：列在 confirmed_halts 的停牌，以及來源有該日但開高低收全為空的
@@ -321,13 +326,13 @@ def prepare_market_records(
 
 
 def prepare_backtest_market(
-    records_by_stock,
-    start,
-    end,
+    records_by_stock: Mapping[str, Sequence[Record]],
+    start: date,
+    end: date,
     *,
-    confirmed_halts,
-    delistings=None,
-):
+    confirmed_halts: Halts,
+    delistings: Delistings | None = None,
+) -> tuple[Market, list[str]]:
     """整理各股票行情，保留暖機資料與共同回測日期。
 
     行情日是期間內任何一檔有列的日期。期間內某檔缺列、又不在停牌清單時，補上一列
@@ -349,8 +354,8 @@ def prepare_backtest_market(
         if stock_id in delistings
     }
 
-    trading_dates = set()
-    never = []
+    trading_dates: set[str] = set()
+    never: list[str] = []
 
     for stock_id, records in records_by_stock.items():
         if any(record["stock_id"] != stock_id for record in records):
@@ -422,7 +427,7 @@ def prepare_backtest_market(
     return market, sorted(trading_dates)
 
 
-def unconfirmed_gaps(market):
+def unconfirmed_gaps(market: Market) -> list[Row]:
     """回測期間內的 MISSING_ROW，依股票整理成 [{stock_id, first, last, days}]。"""
     result = []
     for stock_id, prices in sorted(market.items()):
@@ -442,7 +447,14 @@ UNTRADABLE_LABELS = {
 }
 
 
-def untradable_ranges(stock_id, records, market_days, *, confirmed_halts, delistings):
+def untradable_ranges(
+    stock_id: str,
+    records: Iterable[Record],
+    market_days: Sequence[str],
+    *,
+    confirmed_halts: Halts,
+    delistings: Delistings,
+) -> list[Row]:
     """個股頁用（docs/HALT-POLICY.md G11）：market_days 中這檔不可交易的日子，連續同狀態合併成區段。
 
     records 是這檔截至分析日的行情（含 load_records 補的停牌列），market_days 是同期間
@@ -452,7 +464,7 @@ def untradable_ranges(stock_id, records, market_days, *, confirmed_halts, delist
     by_date = {record["date"]: record for record in records}
     position = {day: index for index, day in enumerate(market_days)}
     gone = (delistings.get(stock_id) or {}).get("effective")
-    ranges = []
+    ranges: list[Row] = []
     for day in market_days:
         record = by_date.get(day)
         if gone and day >= gone:

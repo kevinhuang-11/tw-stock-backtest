@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 
+from tw_stock_backtest.typedefs import Transaction
+
 
 @dataclass(frozen=True)
 class CostSettings:
@@ -14,7 +16,7 @@ class CostSettings:
     commission_rounding: str = ROUND_DOWN
     tax_rounding: str = ROUND_DOWN
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         rates = (
             ("手續費率", self.commission_rate),
             ("手續費折扣倍率", self.commission_discount),
@@ -47,7 +49,9 @@ class CostSettings:
                 raise ValueError("目前只支援無條件捨去或四捨五入")
 
 
-def calculate_transaction(price, quantity, side, settings):
+def calculate_transaction(
+    price: Decimal, quantity: int, side: str, settings: CostSettings
+) -> Transaction:
     """計算一筆成交的股款、手續費、交易稅與現金變動。"""
     if not isinstance(price, Decimal) or not price.is_finite() or price <= 0:
         raise ValueError("成交價格必須是大於 0 的有限 Decimal")
@@ -89,7 +93,7 @@ def calculate_transaction(price, quantity, side, settings):
     }
 
 
-def calculate_buy_quantity(price, budget, settings):
+def calculate_buy_quantity(price: Decimal, budget: Decimal, settings: CostSettings) -> int:
     """找出預算內可買的最大整數股數，預算包含手續費。"""
     if not isinstance(price, Decimal) or not price.is_finite() or price <= 0:
         raise ValueError("價格必須是大於零的有限 Decimal")
@@ -125,7 +129,7 @@ def calculate_buy_quantity(price, budget, settings):
     return low
 
 
-def apply_slippage(price, action, slippage_rate=Decimal("0")):
+def apply_slippage(price: Decimal, action: str, slippage_rate: Decimal = Decimal("0")) -> Decimal:
     """
     依固定比例模擬不利滑價。
 

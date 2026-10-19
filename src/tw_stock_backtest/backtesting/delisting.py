@@ -10,16 +10,23 @@
 from decimal import Decimal
 
 from tw_stock_backtest.data.market_events import DELISTING_KINDS
+from tw_stock_backtest.typedefs import Delistings, Market, Row
 
 VALUATION_MODES = ("last_close", "zero")
 
 
-def check_valuation_mode(mode):
+def check_valuation_mode(mode: str) -> None:
     if mode not in VALUATION_MODES:
         raise ValueError("delisted_valuation 必須是 last_close 或 zero")
 
 
-def retire_delisted(holdings, unrealizable, market, day, delistings):
+def retire_delisted(
+    holdings: dict[str, int],
+    unrealizable: dict[str, Row],
+    market: Market,
+    day: str,
+    delistings: Delistings,
+) -> list[Row]:
     """把 day 已終止上市的持股移到 unrealizable，回傳這天移出的明細。"""
     events = []
     for stock_id in sorted(holdings):
@@ -46,7 +53,7 @@ def retire_delisted(holdings, unrealizable, market, day, delistings):
     return events
 
 
-def unrealizable_value(unrealizable, mode):
+def unrealizable_value(unrealizable: dict[str, Row], mode: str) -> Decimal:
     """無法變現部位的估值；zero 模式為 0。最後收盤不存在時也是 0（從未有成交價）。"""
     if mode == "zero":
         return Decimal("0")

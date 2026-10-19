@@ -18,6 +18,8 @@ dev = [
     "playwright>=1.49,<2",
     # 鎖定確切版本：不同版本的 ruff format 結果可能不同，本機與 CI 必須一致。
     "ruff==0.17.0",
+    # 型別檢查；同樣鎖定版本，新版可能多出新的檢查。
+    "mypy==2.3.1",
 ]
 
 [tool.setuptools.packages.find]
@@ -50,3 +52,47 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["tw_stock_backtest"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+# 只檢查已加上型別提示的核心模組（CI 也只跑這份清單）；新增模組時加進 files 與下方的 module。
+files = [
+    "src/tw_stock_backtest/backtesting",
+    "src/tw_stock_backtest/analysis/indicators.py",
+    "src/tw_stock_backtest/analysis/adjustment.py",
+    "src/tw_stock_backtest/data/market_events.py",
+    "src/tw_stock_backtest/data/corporate_actions.py",
+]
+# 其他模組暫時放寬：仍會被分析以推斷型別，但不回報它們的錯誤。
+follow_imports = "silent"
+warn_unused_configs = true
+# 還沒加型別提示的模組：從已完成的模組呼叫它們時不回報 no-untyped-call。
+untyped_calls_exclude = [
+    "tw_stock_backtest.analysis.factors",
+    "tw_stock_backtest.analysis.screening",
+    "tw_stock_backtest.data.database",
+    "tw_stock_backtest.date_range",
+    "tw_stock_backtest.strategies",
+]
+
+[[tool.mypy.overrides]]
+# 已完成的核心模組：較嚴格的檢查（相當於 --strict 的各項，逐項列出以便日後調整）。
+module = [
+    "tw_stock_backtest.backtesting.*",
+    "tw_stock_backtest.analysis.indicators",
+    "tw_stock_backtest.analysis.adjustment",
+    "tw_stock_backtest.data.market_events",
+    "tw_stock_backtest.data.corporate_actions",
+]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+disallow_any_generics = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_return_any = true
+warn_unused_ignores = true
+strict_equality = true
+extra_checks = true

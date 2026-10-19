@@ -1,4 +1,6 @@
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
+from typing import Any
 
 from tw_stock_backtest.backtesting.corporate_actions import Schedule, apply_due
 from tw_stock_backtest.backtesting.costs import (
@@ -19,9 +21,10 @@ from tw_stock_backtest.data.market_events import (
     unconfirmed_gaps,
 )
 from tw_stock_backtest.date_range import parse_date_range
+from tw_stock_backtest.typedefs import Action, Delistings, Halts, Record, Row
 
 
-def affordable_quantity(price, budget, cost_settings):
+def affordable_quantity(price: Decimal, budget: Decimal, cost_settings: CostSettings) -> int:
     """使用二分搜尋，找出包含手續費後能負擔的最大整數股數。"""
     low = 0
     high = int(budget // price)
@@ -47,18 +50,18 @@ def affordable_quantity(price, budget, cost_settings):
 
 
 def run_buy_and_hold(
-    records_by_stock,
-    start_text,
-    end_text,
+    records_by_stock: Mapping[str, Sequence[Record]],
+    start_text: str,
+    end_text: str,
     *,
-    initial_cash,
-    cost_settings,
-    confirmed_halts=None,
-    slippage_rate=Decimal("0"),
-    corporate_actions=None,
-    delistings=None,
-    delisted_valuation="last_close",
-):
+    initial_cash: Decimal,
+    cost_settings: CostSettings,
+    confirmed_halts: Halts | None = None,
+    slippage_rate: Decimal = Decimal("0"),
+    corporate_actions: Mapping[str, Sequence[Action]] | None = None,
+    delistings: Delistings | None = None,
+    delisted_valuation: str = "last_close",
+) -> dict[str, Any]:
     """各檔平均分配預算，在第一個可交易日開盤買進並持有到期末。
 
     corporate_actions（{股票: 公司行動}）與多股票引擎使用相同的公司行動帳：
@@ -90,18 +93,18 @@ def run_buy_and_hold(
     budget = (initial_cash * 100 // len(market)) / Decimal("100")
 
     cash = initial_cash
-    holdings = {}
-    trades = []
-    equity_curve = []
+    holdings: dict[str, int] = {}
+    trades: list[Row] = []
+    equity_curve: list[Row] = []
     total_commission = Decimal("0")
     waiting = set(market)
-    unbought = []
+    unbought: list[str] = []
 
     schedule = Schedule(corporate_actions, "")
-    corporate_action_events = []
+    corporate_action_events: list[Row] = []
     # 終止上市的持股與策略相同的規則（docs/HALT-POLICY.md 3.16）。
-    unrealizable = {}
-    delisting_events = []
+    unrealizable: dict[str, Row] = {}
+    delisting_events: list[Row] = []
 
     for trading_date in trading_dates:
         received, applied = apply_due(schedule, trading_date, holdings)

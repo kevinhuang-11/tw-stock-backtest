@@ -1,12 +1,21 @@
+from collections.abc import Callable, Sequence
 from decimal import Decimal
+from typing import Any, TypeVar, cast
+
+from tw_stock_backtest.typedefs import Record
+
+T = TypeVar("T")
+
+# 可能缺價的價格序列：缺價為 None；非 Decimal 的值在檢查時視為無效。
+Prices = Sequence[Decimal | None]
 
 
-def is_valid_price(value):
+def is_valid_price(value: object) -> bool:
     """價格是否為有限且大於 0 的 Decimal；None（缺價）與其他型別都不是。"""
     return isinstance(value, Decimal) and value.is_finite() and value > 0
 
 
-def restart_index(prices):
+def restart_index(prices: Prices) -> int:
     """最後一筆無效價格的下一個位置；全部有效時為 0。
 
     遞迴指標（EMA、RSI、MACD）的每個值都由前一個值推算，缺價那天之後的值無法定義。
@@ -19,9 +28,10 @@ def restart_index(prices):
     return 0
 
 
-def valid_segments(prices):
+def valid_segments(prices: Prices) -> list[tuple[int, int]]:
     """把序列切成連續有效價格的區段，回傳 [(起點, 終點)]，終點不含。"""
-    segments, start = [], None
+    segments: list[tuple[int, int]] = []
+    start: int | None = None
     for index, price in enumerate(prices):
         if is_valid_price(price):
             if start is None:
@@ -34,15 +44,20 @@ def valid_segments(prices):
     return segments
 
 
-def segmented(calculate, prices, empty=None):
+def segmented(
+    calculate: Callable[[Sequence[Decimal]], Sequence[T]],
+    prices: Prices,
+    empty: T | None = None,
+) -> list[T | None]:
     """在每個有效區段內各自計算遞迴指標；缺價位置與暖機不足處為 empty。"""
-    result = [empty] * len(prices)
+    result: list[T | None] = [empty] * len(prices)
     for start, end in valid_segments(prices):
-        result[start:end] = calculate(prices[start:end])
+        # 區段內都是有效價格（valid_segments 已檢查）。
+        result[start:end] = calculate(cast(Sequence[Decimal], prices[start:end]))
     return result
 
 
-def simple_moving_average(prices, period):
+def simple_moving_average(prices: Sequence[Decimal], period: int) -> list[Decimal | None]:
     """計算 SMA；輸出與輸入等長，資料不足的位置填 None。"""
     if isinstance(period, bool) or not isinstance(period, int):
         raise ValueError("均線期間必須是正整數")
@@ -50,7 +65,7 @@ def simple_moving_average(prices, period):
     if period <= 0:
         raise ValueError("均線期間必須大於 0")
 
-    averages = []
+    averages: list[Decimal | None] = []
     window_sum = Decimal("0")
 
     for index, price in enumerate(prices):
@@ -75,7 +90,9 @@ def simple_moving_average(prices, period):
     return averages
 
 
-def window_gap_reason(dates, values, label="收盤價"):
+def window_gap_reason(
+    dates: Sequence[str], values: Sequence[object], label: str = "收盤價"
+) -> str | None:
     """計算窗口（由舊到新）內有缺價時回傳說明，沒有時回傳 None。
 
     沒有交易日曆，也不能看分析日之後的行情，所以恢復時間以「再幾個行情日」表示：
@@ -92,42 +109,42 @@ def window_gap_reason(dates, values, label="收盤價"):
     )
 
 
-def windowed_moving_average(prices, period):
+def windowed_moving_average(prices: Prices, period: int) -> list[Decimal | None]:
     """逐日 SMA；窗口內有任何缺價或無效價格時該日為 None，缺價離開窗口後恢復。
 
     不補值、不刪列湊窗口。研究、回測、個股圖與單檔 CLI 共用這個規則。
     """
     _period(period)
-    result = []
+    result: list[Decimal | None] = []
     for index in range(len(prices)):
         window = prices[max(0, index - period + 1) : index + 1]
         if len(window) < period or not all(is_valid_price(price) for price in window):
             result.append(None)
         else:
-            result.append(simple_moving_average(window, period)[-1])
+            result.append(simple_moving_average(cast(Sequence[Decimal], window), period)[-1])
     return result
 
 
-def _period(period):
+def _period(period: object) -> None:
     if isinstance(period, bool) or not isinstance(period, int) or period <= 0:
         raise ValueError("期間必須為正整數")
 
 
-def _finite(values, positive=False):
+def _finite(values: Sequence[object], positive: bool = False) -> None:
     if any(
         not isinstance(v, Decimal) or not v.is_finite() or (positive and v <= 0) for v in values
     ):
         raise ValueError("輸入必須為有限 Decimal；價格須正值，不可缺值")
 
 
-def exponential_moving_average(values, period):
+def exponential_moving_average(values: Sequence[Decimal], period: int) -> list[Decimal | None]:
     """EMA: first period values' SMA seed; alpha=2/(period+1). Earlier entries None.
 
     Accept signed finite Decimal series (also used for MACD signal), no gap removal.
     """
     _period(period)
     _finite(values)
-    result = [None] * len(values)
+    result: list[Decimal | None] = [None] * len(values)
     if len(values) < period:
         return result
     current = sum(values[:period], Decimal(0)) / period
@@ -139,7 +156,7 @@ def exponential_moving_average(values, period):
     return result
 
 
-def relative_strength_index(prices, period=14):
+def relative_strength_index(prices: Sequence[Decimal], period: int = 14) -> list[Decimal | None]:
     """Wilder RSI: N changes seed average gains/losses; then (old*(N-1)+new)/N.
 
     First output at N+1 prices; flat=50, gains-only=100, losses-only=0.
@@ -147,7 +164,7 @@ def relative_strength_index(prices, period=14):
     """
     _period(period)
     _finite(prices, positive=True)
-    result = [None] * len(prices)
+    result: list[Decimal | None] = [None] * len(prices)
     if len(prices) <= period:
         return result
     changes = [b - a for a, b in zip(prices, prices[1:], strict=False)]
@@ -156,7 +173,7 @@ def relative_strength_index(prices, period=14):
     gain = sum(gains[:period], Decimal(0)) / period
     loss = sum(losses[:period], Decimal(0)) / period
 
-    def value():
+    def value() -> Decimal:
         return (
             Decimal(50)
             if gain == loss == 0
@@ -173,7 +190,9 @@ def relative_strength_index(prices, period=14):
     return result
 
 
-def moving_average_convergence_divergence(prices, fast=12, slow=26, signal=9):
+def moving_average_convergence_divergence(
+    prices: Sequence[Decimal], fast: int = 12, slow: int = 26, signal: int = 9
+) -> list[dict[str, Decimal | None]]:
     """SMA-seeded EMA(fast)-EMA(slow); signal seeds first M available MACD values.
 
     MACD available after slow prices; signal/histogram after slow+signal-1.
@@ -185,9 +204,12 @@ def moving_average_convergence_divergence(prices, fast=12, slow=26, signal=9):
         raise ValueError("MACD fast 必須小於 slow")
     _finite(prices, positive=True)
     a, b = exponential_moving_average(prices, fast), exponential_moving_average(prices, slow)
-    values = [a[i] - b[i] for i in range(slow - 1, len(prices))]
+    # slow - 1 以後兩條 EMA 都已有值（fast < slow）。
+    values = [cast(Decimal, a[i]) - cast(Decimal, b[i]) for i in range(slow - 1, len(prices))]
     signals = exponential_moving_average(values, signal)
-    result = [{"macd": None, "signal": None, "histogram": None} for _ in prices]
+    result: list[dict[str, Decimal | None]] = [
+        {"macd": None, "signal": None, "histogram": None} for _ in prices
+    ]
     for offset, value in enumerate(values):
         line = signals[offset]
         result[slow - 1 + offset] = {
@@ -198,7 +220,7 @@ def moving_average_convergence_divergence(prices, fast=12, slow=26, signal=9):
     return result
 
 
-def previous_high_breakout(records, period):
+def previous_high_breakout(records: Sequence[Record], period: int) -> dict[str, Any]:
     """Today's close > maximum high of preceding N rows; exclude today's high.
 
     Needs N+1 rows, no filling or removing missing rows. Only used window validated.
