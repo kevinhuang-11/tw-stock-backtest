@@ -703,6 +703,15 @@ legend .badge { margin-left: var(--s-1); vertical-align: 2px; }
 .search-row { display: flex; gap: var(--s-2); }
 .search-row input { flex: 1; min-height: 44px; font-size: var(--text-md); }
 .search-row button { min-height: 44px; }
+.search-row select { min-height: 44px; max-width: 14em; }
+.search-summary { margin: 0; font-size: var(--text-sm); color: var(--c-text-2); }
+.chip-list { display: flex; flex-wrap: wrap; gap: var(--s-2); margin: 0; padding: 0; list-style: none; }
+@media (max-width: 640px) {
+  /* 手機：輸入框獨佔一行，產業選單與按鈕在下一行 */
+  .search-row { flex-wrap: wrap; }
+  .search-row input { flex-basis: 100%; }
+  .search-row select { flex: 1; max-width: none; }
+}
 .stock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s-3); }
 .stock-card { display: grid; gap: 2px; padding: var(--s-4); }
 .stock-code { font-size: var(--text-lg); font-weight: 700; font-variant-numeric: tabular-nums; }

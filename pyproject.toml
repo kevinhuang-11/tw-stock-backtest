@@ -63,6 +63,7 @@ files = [
     "src/tw_stock_backtest/analysis/adjustment.py",
     "src/tw_stock_backtest/data/market_events.py",
     "src/tw_stock_backtest/data/corporate_actions.py",
+    "src/tw_stock_backtest/stock_search.py",
 ]
 # 其他模組暫時放寬：仍會被分析以推斷型別，但不回報它們的錯誤。
 follow_imports = "silent"
@@ -84,6 +85,7 @@ module = [
     "tw_stock_backtest.analysis.adjustment",
     "tw_stock_backtest.data.market_events",
     "tw_stock_backtest.data.corporate_actions",
+    "tw_stock_backtest.stock_search",
 ]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true

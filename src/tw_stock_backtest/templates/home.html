@@ -92,6 +92,7 @@
       </li>
       {% endfor %}
     </ul>
+    {% if jobs | length > 6 %}<div class="card-footer">共 {{ jobs | length }} 筆工作，這裡只列出最近 6 筆；已完成工作的結果都在<a href="/reports">全部報表</a>。</div>{% endif %}
     {% else %}
       {{ ui.empty('還沒有工作', '建立研究或回測後，進度會顯示在這裡。', '建立研究', '/new/research', 'clock') }}
     {% endif %}

@@ -28,6 +28,13 @@ from tw_stock_backtest.data_status import market_dates
 from tw_stock_backtest.prices import PriceSource
 from tw_stock_backtest.research_digest import differences, load_bundle
 from tw_stock_backtest.security import public_data
+from tw_stock_backtest.stock_search import (
+    MATCH_LABELS,
+    MAX_QUERY,
+    industries,
+    search,
+    summary_text,
+)
 from tw_stock_backtest.strategies import analyze_strategy, from_settings, snapshot
 from tw_stock_backtest.web_forms import FormErrors, job_form
 
@@ -127,12 +134,13 @@ def identities(wb):
     dbpath = Path(wb.settings["storage"]["database_path"])
     if dbpath.is_file():
         with closing(sqlite3.connect(dbpath.resolve().as_uri() + "?mode=ro", uri=True)) as db:
-            for (sid,) in db.execute("SELECT DISTINCT stock_id FROM stock_prices LIMIT 3000"):
+            # 不設筆數上限：名單與行情庫有多少檔就列多少檔，搜尋時再依規則篩選。
+            for (sid,) in db.execute("SELECT DISTINCT stock_id FROM stock_prices"):
                 if re.fullmatch(r"[0-9]{4}", sid):
                     result[sid] = {"stock_id": sid}
     path = dbpath.parent / "listed_stocks.json"
     if path.is_file() and not path.is_symlink():
-        for item in load_universe(path)["stocks"][:3000]:
+        for item in load_universe(path)["stocks"]:
             result[item["stock_id"]] = {k: item.get(k) for k in ("stock_id", "name", "industry")}
     return result
 
@@ -249,6 +257,10 @@ def stock_history(bundles, sid):
         previous = (bundle, value)
     return list(reversed(result))
 
+
+# 搜尋結果的顯示上限：個股搜尋頁一次列 30 檔，選擇器的下拉清單列 8 檔。
+SEARCH_PAGE_LIMIT = 30
+PICKER_LIMIT = 8
 
 KIND_LABELS = {"dividend": "除權息", "capital_reduction": "減資", "par_change": "變更面額"}
 PRICE_BASIS = {
@@ -479,22 +491,43 @@ def register_stock_routes(app, wb, token):
         except (OSError, sqlite3.Error):
             return {"error": "自選清單無法讀取"}, 503
 
+    def search_args():
+        query = request.args.get("q", "").strip()
+        industry = request.args.get("industry", "").strip()
+        if len(query) > MAX_QUERY or len(industry) > MAX_QUERY:
+            abort(400)
+        return query, industry
+
     @app.get("/stocks")
     def stock_search():
-        query = request.args.get("q", "").strip()
-        if len(query) > 40:
-            abort(400)
+        # 與股票選擇器（/api/stock-search）同一個 search()，排序與上限規則相同。
+        query, industry = search_args()
         try:
-            items = [
-                r
-                for sid, r in sorted(identities(wb).items())
-                if query in sid or query in (r.get("name") or "")
-            ][:30]
-            if re.fullmatch(r"[0-9]{4}", query) and not any(r["stock_id"] == query for r in items):
-                items.insert(0, {"stock_id": query})
+            stocks = list(identities(wb).values())
+            result = search(stocks, query, industry=industry, limit=SEARCH_PAGE_LIMIT)
+            watched = [r["stock_id"] for r in notes.items()] if not result["active"] else []
         except (OSError, ValueError, sqlite3.Error):
             return "本機名單或行情無法讀取；未下載資料", 503
-        return render_template("stock_search.html", items=items, query=query)
+        names = {s["stock_id"]: s for s in stocks}
+        return render_template(
+            "stock_search.html",
+            result=result,
+            summary=summary_text(result),
+            query=query,
+            industry=industry,
+            industries=industries(stocks),
+            watched=[names.get(sid, {"stock_id": sid}) for sid in watched],
+            match_labels=MATCH_LABELS,
+        )
+
+    @app.get("/api/stock-search")
+    def stock_search_api():
+        query, industry = search_args()
+        try:
+            result = search(identities(wb).values(), query, industry=industry, limit=PICKER_LIMIT)
+        except (OSError, ValueError, sqlite3.Error):
+            return {"error": "股票名單無法讀取"}, 503
+        return {**result, "summary": summary_text(result)}
 
     @app.get("/stocks/<sid>")
     def stock_page(sid):
@@ -526,6 +559,7 @@ def register_stock_routes(app, wb, token):
                 filter_rows,
                 observations,
                 previous_snapshots,
+                snapshot_count,
             )
 
             entries = notes.items()
@@ -558,6 +592,7 @@ def register_stock_routes(app, wb, token):
                 csrf=token,
                 strategies=wb.library.list(),
                 snapshots=previous_snapshots(wb.state / "watchlist-reports")[:10],
+                snapshot_total=snapshot_count(wb.state / "watchlist-reports"),
             )
         except (OSError, ValueError, sqlite3.Error):
             return "自選清單無法讀取", 503

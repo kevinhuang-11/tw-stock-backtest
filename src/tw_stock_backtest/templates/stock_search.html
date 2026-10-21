@@ -13,13 +13,28 @@
     <div class="search-row">
       <label class="visually-hidden" for="stock-q">股票代號或名稱</label>
       <input id="stock-q" type="search" name="q" maxlength="40" value="{{ query }}" placeholder="輸入代號或名稱，例如 2330 或 台積電" autofocus>
+      <label class="visually-hidden" for="stock-industry">產業</label>
+      <select id="stock-industry" name="industry" class="search-industry">
+        <option value="">全部產業</option>
+        {% for item in industries %}<option value="{{ item.name }}"{% if item.name == industry %} selected{% endif %}>{{ item.name }}（{{ item.count }}）</option>{% endfor %}
+      </select>
       <button class="btn-primary">{{ ui.icon('search') }}搜尋</button>
     </div>
-    <span class="hint">最多顯示 30 筆；輸入完整的四位數代號，即使名單中沒有也能開啟該股頁面。</span>
+    <span class="hint">排序：代號完全符合 → 代號開頭符合 → 名稱開頭符合 → 名稱包含。只輸入文字時最多顯示 {{ result.limit or 30 }} 筆；選了產業時列出該產業所有符合的股票。輸入完整的四位數代號，即使名單中沒有也能開啟該股頁面。</span>
   </form>
-  {% if items %}
+
+  {% if result.active %}
+  <p class="search-summary" role="status">{{ summary }}{% if industry %}（產業：{{ industry }}）{% endif %}</p>
+  {% if result.stocks or result.unlisted_code %}
   <div class="stock-grid">
-    {% for item in items %}
+    {% if result.unlisted_code %}
+    <a class="card card-link stock-card" href="/stocks/{{ result.unlisted_code }}">
+      <span class="stock-code">{{ result.unlisted_code }}</span>
+      <span class="stock-name">名單中沒有這個代號</span>
+      <span class="item-meta">仍可開啟個股頁，只讀本機已有的資料</span>
+    </a>
+    {% endif %}
+    {% for item in result.stocks %}
     <a class="card card-link stock-card" href="/stocks/{{ item.stock_id }}">
       <span class="stock-code">{{ item.stock_id }}</span>
       <span class="stock-name">{{ item.get('name') or '名稱未提供' }}</span>
@@ -28,7 +43,27 @@
     {% endfor %}
   </div>
   {% else %}
-  <div class="card">{{ ui.empty('沒有符合的本機名單', '換個關鍵字，或輸入完整的四位數代號。不會自動下載。', icon_name='search') }}</div>
+  <div class="card">{{ ui.empty('沒有符合的本機名單', '換個關鍵字、改選其他產業，或輸入完整的四位數代號。不會自動下載。', icon_name='search') }}</div>
+  {% endif %}
+
+  {% else %}
+  {% if watched %}
+  <section class="card">
+    <div class="card-header"><div><h2>自選股</h2></div></div>
+    <div class="card-body"><ul class="chip-list">{% for item in watched %}<li><a class="chip" href="/stocks/{{ item.stock_id }}">{{ item.stock_id }}{% if item.get('name') %} {{ item.name }}{% endif %}</a></li>{% endfor %}</ul></div>
+  </section>
+  {% endif %}
+  <section class="card" data-recent-list hidden>
+    <div class="card-header"><div><h2>最近查看</h2><p>記錄在這個瀏覽器，不會送到其他地方。</p></div></div>
+    <div class="card-body"><ul class="chip-list"></ul></div>
+  </section>
+  <section class="card">
+    <div class="card-header"><div><h2>怎麼找股票</h2></div></div>
+    <div class="card-body stack-sm">
+      <p>輸入代號（例如 2330，或只輸入開頭 23 列出 23xx）或名稱（例如「台積電」，或名稱中的一段「積電」）。也可以依產業瀏覽：</p>
+      <ul class="chip-list">{% for item in industries %}<li><a class="chip" href="/stocks?industry={{ item.name | urlencode }}">{{ item.name }} <span class="chip-count">{{ item.count }}</span></a></li>{% endfor %}</ul>
+    </div>
+  </section>
   {% endif %}
 </div>
 {% endblock %}

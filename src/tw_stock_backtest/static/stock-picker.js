@@ -5,9 +5,9 @@
 (() => {
 const SEPARATORS = /[\s,，、;；]+/;
 const CODE = /^\d{4}$/;
-const MAX_SUGGESTIONS = 8;
+const SEARCH_DELAY = 120;           // 毫秒；連續輸入時只送最後一次搜尋
 let serial = 0;
-let stockList;      // 共用的名單請求，整頁只取一次
+let stockList;      // 共用的名單請求（代號、名稱、產業），整頁只取一次
 let watchlistList;
 
 const make = (tag, className, text) => {
@@ -18,8 +18,13 @@ const make = (tag, className, text) => {
 };
 
 const loadStocks = () => stockList ??= fetch('/api/stock-options')
-  .then(response => { if (!response.ok) throw new Error(); return response.json(); })
-  .then(data => data.stocks);
+  .then(response => { if (!response.ok) throw new Error(); return response.json(); });
+
+// 搜尋與排序在伺服器（stock_search.py），與個股搜尋頁是同一個函式，兩邊結果一定相同。
+const searchStocks = (query, industry) => fetch('/api/stock-search?' + new URLSearchParams({q: query, industry}))
+  .then(response => { if (!response.ok) throw new Error(); return response.json(); });
+
+const recent = () => (window.WorkbenchApp && window.WorkbenchApp.recentStocks ? window.WorkbenchApp.recentStocks.read() : []);
 
 const loadWatchlist = () => watchlistList ??= fetch('/api/watchlist-options')
   .then(response => { if (!response.ok) throw new Error(); return response.json(); })
@@ -32,8 +37,13 @@ function mount(field) {
   const max = Number(field.dataset.max) || 10;
   const known = new Map();              // 代號 → {stock_id, name, industry}
   const chosen = field.value.trim().split(SEPARATORS).filter(Boolean);
-  let options = [];                     // 目前顯示的建議
+  let options = [];                     // 目前顯示、可以選的建議（不含分組標題與說明）
   let active = -1;                      // 鍵盤目前指到的建議
+  let watched = [];                     // 自選股代號；沒有輸入時列出
+  let searchSerial = 0;                 // 只採用最後一次送出的搜尋結果
+  let searchTimer;
+  let pending = null;                   // 尚未完成的搜尋；Enter 與上下鍵會等它完成
+  let settle = null;                    // 讓被新搜尋取代的舊 pending 也會結束
 
   // ----- 結構 -----
   const root = make('div', 'stock-picker');
@@ -69,8 +79,13 @@ function mount(field) {
   addWatchlist.type = 'button';
   const clearAll = make('button', 'sp-action', '清除全部');
   clearAll.type = 'button';
+  // 依產業瀏覽：選了產業時列出該產業所有股票，也可以再輸入文字縮小範圍。
+  const industry = make('select', 'sp-industry');
+  industry.id = id + '-industry';
+  industry.setAttribute('aria-label', '依產業篩選');
+  industry.append(new Option('全部產業', ''));
   // 快捷操作放在輸入區上方，展開的建議清單才不會蓋住它們。
-  actions.append(addWatchlist, clearAll, count);
+  actions.append(industry, addWatchlist, clearAll, count);
   head.append(actions);
 
   const message = make('p', 'sp-message');
@@ -171,37 +186,81 @@ function mount(field) {
     if (index < 0) input.removeAttribute('aria-activedescendant');
   };
 
+  // 把一組項目畫進清單：groups 是 [{title, stocks}]，note 是清單底部的說明（不可選）。
+  const render = (groups, note, emptyText) => {
+    options = [];
+    const nodes = [];
+    for (const group of groups) {
+      if (!group.stocks.length) continue;
+      if (group.title) {
+        const title = make('li', 'sp-group', group.title);
+        title.setAttribute('role', 'presentation');
+        nodes.push(title);
+      }
+      for (const stock of group.stocks) {
+        const index = options.length;
+        options.push(stock);
+        const item = make('li', 'sp-option');
+        item.id = id + '-option-' + index;
+        item.setAttribute('role', 'option');
+        item.append(make('span', 'sp-option-code', stock.stock_id), make('span', 'sp-option-name', stock.name || '名稱未提供'));
+        if (chosen.includes(stock.stock_id)) item.append(make('span', 'sp-option-chosen', '已選'));
+        else if (stock.industry) item.append(make('span', 'sp-option-industry', stock.industry));
+        // mousedown 時就加入，避免輸入框先失去焦點而關閉清單。
+        item.addEventListener('mousedown', event => { event.preventDefault(); choose(index); });
+        nodes.push(item);
+      }
+    }
+    if (!options.length && emptyText) nodes.push(make('li', 'sp-empty', emptyText));
+    if (note) {
+      const footer = make('li', 'sp-note', note);
+      footer.setAttribute('role', 'presentation');
+      nodes.push(footer);
+    }
+    list.replaceChildren(...nodes);
+    list.hidden = !nodes.length;
+    input.setAttribute('aria-expanded', list.hidden ? 'false' : 'true');
+  };
+
+  const describeStock = code => known.get(code) || {stock_id: code};
+
+  // 沒有輸入、也沒有選產業：列出自選股與最近查看，都沒有時顯示使用說明。
+  const showStart = () => {
+    const recentCodes = recent().map(item => item.stock_id).filter(code => !watched.includes(code));
+    const groups = [
+      {title: '自選股', stocks: watched.map(describeStock)},
+      {title: '最近查看', stocks: recentCodes.map(code => ({...recent().find(item => item.stock_id === code), ...known.get(code)}))},
+    ];
+    const empty = !groups.some(group => group.stocks.length);
+    render(groups, null, empty ? '輸入代號（例如 2330，或開頭 23）或名稱（例如 台積電、積電）；也可以從上方的產業選單瀏覽' : null);
+    highlight(-1);
+  };
+
   const refresh = () => {
     const query = input.value.trim();
+    clearTimeout(searchTimer);
+    if (settle) { settle(); settle = null; }
     if (document.activeElement !== input || SEPARATORS.test(query)) { close(); return; }
-    const matches = [];
-    for (const stock of known.values()) {
-      if (chosen.includes(stock.stock_id)) continue;
-      // 代號從開頭比對的排在前面，其次才是名稱或代號中間符合的。
-      const rank = !query ? 1 : stock.stock_id.startsWith(query) ? 0
-        : (stock.name || '').includes(query) || stock.stock_id.includes(query) ? 1 : -1;
-      if (rank >= 0) matches.push([rank, stock]);
-    }
-    matches.sort((a, b) => a[0] - b[0] || a[1].stock_id.localeCompare(b[1].stock_id));
-    options = matches.slice(0, MAX_SUGGESTIONS).map(pair => pair[1]);
-
-    list.replaceChildren(...options.map((stock, index) => {
-      const item = make('li', 'sp-option');
-      item.id = id + '-option-' + index;
-      item.setAttribute('role', 'option');
-      item.append(make('span', 'sp-option-code', stock.stock_id), make('span', 'sp-option-name', stock.name || '名稱未提供'));
-      if (stock.industry) item.append(make('span', 'sp-option-industry', stock.industry));
-      // mousedown 時就加入，避免輸入框先失去焦點而關閉清單。
-      item.addEventListener('mousedown', event => { event.preventDefault(); choose(index); });
-      return item;
-    }));
-    if (!options.length && query) {
-      const empty = make('li', 'sp-empty', CODE.test(query) ? '名單中沒有 ' + query + '；按 Enter 仍可加入' : '找不到符合的股票');
-      list.append(empty);
-    }
-    list.hidden = !list.children.length;
-    input.setAttribute('aria-expanded', list.hidden ? 'false' : 'true');
-    highlight(options.length && query ? 0 : -1);
+    if (!query && !industry.value) { searchSerial++; pending = null; showStart(); return; }
+    const ticket = ++searchSerial;
+    // 舊的建議立刻清掉，避免在新結果回來前選到舊清單的項目。
+    render([], null, '搜尋中…');
+    highlight(-1);
+    pending = new Promise(resolve => {
+      settle = resolve;
+      searchTimer = setTimeout(() => {
+        searchStocks(query, industry.value).then(result => {
+          if (ticket !== searchSerial || document.activeElement !== input) return;
+          for (const stock of result.stocks) if (!known.has(stock.stock_id)) known.set(stock.stock_id, stock);
+          const unlisted = result.unlisted_code ? '名單中沒有 ' + result.unlisted_code + '；按 Enter 仍可加入' : '找不到符合的股票';
+          render([{title: null, stocks: result.stocks}], result.total ? result.summary : null, unlisted);
+          highlight(options.length && query ? 0 : -1);
+        }).catch(() => {
+          if (ticket !== searchSerial) return;
+          render([], null, '搜尋失敗；仍可直接輸入或貼上代號');
+        }).finally(() => { if (ticket === searchSerial) { pending = null; settle = null; } resolve(); });
+      }, SEARCH_DELAY);
+    });
   };
 
   const choose = index => {
@@ -225,6 +284,7 @@ function mount(field) {
     if (event.target === control || event.target === tags) { event.preventDefault(); input.focus(); }
   });
   input.addEventListener('focus', refresh);
+  industry.addEventListener('change', () => { input.focus(); refresh(); });
   input.addEventListener('input', () => { say(''); refresh(); });
   input.addEventListener('blur', close);
 
@@ -238,6 +298,14 @@ function mount(field) {
 
   input.addEventListener('keydown', event => {
     if (event.isComposing) return;      // 注音／拼音選字中，不攔截按鍵
+    if (pending && (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter')) {
+      // 搜尋還沒回來：等結果出來再處理這個按鍵。
+      if (event.key === 'Enter' && !input.value.trim()) return;
+      event.preventDefault();
+      const key = event.key;
+      pending.then(() => input.dispatchEvent(new KeyboardEvent('keydown', {key, bubbles: true})));
+      return;
+    }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       if (list.hidden) { refresh(); return; }
       if (!options.length) return;
@@ -288,11 +356,14 @@ function mount(field) {
   // ----- 啟動 -----
   for (const code of chosen) known.set(code, {stock_id: code});
   sync();
-  loadStocks().then(stocks => {
-    for (const stock of stocks) known.set(stock.stock_id, stock);
+  loadStocks().then(data => {
+    for (const stock of data.stocks) known.set(stock.stock_id, stock);
+    for (const item of data.industries || []) industry.append(new Option(item.name + '（' + item.count + '）', item.name));
     sync();                             // 補上已選股票的名稱
     refresh();
   }).catch(() => say('名稱清單載入失敗；仍可輸入或貼上代號', true));
+  // 自選股只用於沒有輸入時的建議；載入失敗時就只列最近查看。
+  loadWatchlist().then(codes => { watched = codes; refresh(); }).catch(() => {});
 }
 
 window.StockPicker = {mount};

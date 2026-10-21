@@ -249,6 +249,15 @@ STOCKS=$(.venv/bin/python -c "import json; print(' '.join(s['stock_id'] for s in
 
 範例（2026-10-13 取得的資料）：2330／2317／2454 各有 2025-09～2026-09 共 13 個月的營收，可以顯示最近 12 個月；更早的月份不足，所以不推算完整一年的年增率。法人資料各有 2026-09-03～10-06 共 22 日，但行情只到 9/29，20 日窗口只對得上 17 筆，三檔都會顯示為資料不足。你實際取得的範圍取決於來源當時提供的內容，可能與此不同。
 
+## 搜尋股票
+
+個股頁的搜尋與表單中的股票選擇器用同一套規則（`stock_search.py`），結果與排序相同：
+
+- 排序：代號完全符合 → 代號開頭符合（輸入 23 列出 23xx）→ 名稱開頭符合 → 名稱包含（輸入「積電」找到台積電）；同一級內依代號排序。代號中間的片段（例如 330 對 2330）不算符合。全形數字與英文大小寫都視為相同。
+- 只輸入文字時，個股頁最多列 30 筆、選擇器最多列 8 筆，超過時說明「共 N 筆符合，目前顯示前 M 筆」。選了產業時列出該產業所有符合的股票，不截斷；產業可以和文字一起使用。
+- 沒有輸入時不預先列出股票，改列自選股與最近查看過的股票（記錄在瀏覽器的 localStorage，不送到伺服器；私密瀏覽時沒有紀錄），兩者都沒有時顯示使用說明。個股頁另列所有產業的連結，沒有 JavaScript 時也能依產業瀏覽。
+- 輸入完整的四位數代號，即使名單中沒有，仍可開啟個股頁或加入選擇器。
+
 ## 自選與摘要
 
 - 自選總覽各欄保留自己的資料期間。條件、原報表名次及資料完整性分開；數字排序缺值始終在後。
@@ -275,7 +284,7 @@ STOCKS=$(.venv/bin/python -c "import json; print(' '.join(s['stock_id'] for s in
 
 ## CI 與研究工作流程
 
-- `.github/workflows/ci.yml`：push／pull request／手動觸發；Python 3.12、安裝套件後從乾淨目錄執行離線完整測試、Matplotlib Agg。
+- `.github/workflows/ci.yml`：push／pull request／手動觸發；Python 3.12。lint job 執行 `ruff format --check`、`ruff check` 與 `mypy`（版本與 dev 依賴相同）；test job 安裝套件後從乾淨目錄執行離線完整測試、Matplotlib Agg。
 - `.github/workflows/research.yml`：只能在 Actions 頁面手動觸發（workflow_dispatch），可指定 `as_of`、`stocks`、`allow_partial`；沒有排程，也不需要任何 secret 或 repository variable。股票池最多 10 檔、請求間隔至少 3 秒，否則在發出請求前就停止。
 - cache 只保存 `data/research-cache.db`，每 run／attempt 有新 key，restore prefix 取先前版本；cache 可失效，空 cache 只有限初始化 90 日。
 - artifacts 保存明列研究摘要／排名／診斷，保留 14 天；不包括 SQLite、私人工作台筆記或郵件。資料與產物不 commit 回儲存庫。
@@ -304,6 +313,12 @@ STOCKS=$(.venv/bin/python -c "import json; print(' '.join(s['stock_id'] for s in
 .venv/bin/ruff check --fix     # lint；CI 執行 ruff check
 ```
 
+型別檢查使用 mypy，設定在 `pyproject.toml` 的 `[tool.mypy]`：只檢查已加上型別提示的核心模組（`files` 清單），並對它們啟用嚴格選項；其他模組暫時放寬。mypy 版本鎖定在 dev 依賴，CI 使用同一版本，只裝 mypy 就能執行。
+
+```bash
+.venv/bin/mypy
+```
+
 全專案的一次性排版記錄在 `.git-blame-ignore-revs`。GitHub 的 blame 會自動略過；本機執行 `git config blame.ignoreRevsFile .git-blame-ignore-revs` 後，`git blame` 也會略過。
 
-自動化測試涵蓋到 HTTP 層（以 Flask 測試用戶端請求頁面）。瀏覽器端的互動由 `tools/check_stock_picker.py`（Playwright）檢查，需安裝開發依賴後手動執行，不在 CI 中。
+自動化測試涵蓋到 HTTP 層（以 Flask 測試用戶端請求頁面）。瀏覽器端的互動由 `tools/check_stock_picker.py`（Playwright）檢查：股票選擇器的鍵盤操作、貼上、上限與手機觸控，以及股票搜尋的排序、筆數提示、產業篩選、最近查看與沒有 JavaScript 時的退路。需安裝開發依賴後手動執行，不在 CI 中。
