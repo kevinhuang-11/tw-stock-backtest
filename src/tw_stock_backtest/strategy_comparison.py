@@ -12,6 +12,11 @@ from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.backtesting.metrics import summarize_exposure, summarize_performance
 from tw_stock_backtest.backtesting.portfolio import run_portfolio_backtest
 from tw_stock_backtest.data.database import load_records
+from tw_stock_backtest.data.restrictions import (
+    annotate_backtest,
+    coverage_summary,
+    load_restrictions,
+)
 from tw_stock_backtest.data.universe import listing_exclusions
 from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.plotting import prepare_series
@@ -64,7 +69,11 @@ def compare_strategies(
         cost_settings=costs,
         slippage_rate=backtest["slippage_rate"],
         corporate_actions=corporate_actions,
+        delisted_valuation=settings["halts"]["delisted_valuation"],
     )
+    # 處置與全額交割只標示，不改變數字（docs/HALT-POLICY.md 3.17）。
+    restrictions = load_restrictions(settings["storage"]["database_path"])
+    annotate_backtest(benchmark, restrictions)
     bench_performance = performance(benchmark)
     report = ResearchReport(output_root)
     common = {
@@ -76,6 +85,8 @@ def compare_strategies(
         "costs": settings["costs"],
         "input_sha256": hashlib.sha256(canonical(records).encode()).hexdigest(),
         "price_adjustment": prices.describe(),
+        # 原因未確認的缺列（docs/HALT-POLICY.md 3.6）；有的話結果不完整。
+        "unconfirmed_gaps": benchmark["unconfirmed_gaps"],
     }
     report.write_json("common.json", {"execution": common, "version": program_version()})
     rows, series, failures = [], [], []
@@ -97,8 +108,11 @@ def compare_strategies(
                 sizing_mode=backtest["sizing_mode"],
                 slippage_rate=backtest["slippage_rate"],
                 corporate_actions=corporate_actions,
+                delisted_valuation=settings["halts"]["delisted_valuation"],
             )
             result["universe_exclusions"] = listing_excluded
+            annotate_backtest(result, restrictions)
+            result["restriction_coverage"] = coverage_summary(settings["storage"]["database_path"])
             if [p["date"] for p in result["equity_curve"]] != [
                 p["date"] for p in benchmark["equity_curve"]
             ]:
@@ -402,7 +416,11 @@ def compare_periods(settings, strategies, periods, output_root):
                     Decimal(str(row["total_return"])) - Decimal(str(entry["benchmark_return"]))
                 ) * 100
                 rows.append(entry)
-            if data.get("failures") or any(r["unavailable_days"] for r in data["strategies"]):
+            if (
+                data.get("failures")
+                or data["common"].get("unconfirmed_gaps")
+                or any(r["unavailable_days"] for r in data["strategies"])
+            ):
                 item["status"] = "partial" if data["strategies"] else "failed"
         except Exception as error:
             # No arbitrary exception message or settings can leak into public outputs.

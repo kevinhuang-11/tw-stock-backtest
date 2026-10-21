@@ -17,7 +17,6 @@ from uuid import uuid4
 from flask import Flask, abort, redirect, render_template, request, send_file, url_for
 
 from tw_stock_backtest.backtesting.corporate_actions import dilution_total
-from tw_stock_backtest.cli.download_universe import save_progress
 from tw_stock_backtest.config import apply_overrides, load_config
 from tw_stock_backtest.data.universe import NetworkDisabled, ensure_network_allowed, offline_reason
 from tw_stock_backtest.notifications import preview_message
@@ -39,6 +38,7 @@ from tw_stock_backtest.research_digest import (
     score_text,
 )
 from tw_stock_backtest.security import child_environment, public_data, safe_text
+from tw_stock_backtest.serialization import save_progress
 from tw_stock_backtest.strategies import (
     StrategyLibrary,
     from_settings,
@@ -125,6 +125,31 @@ def report_details(path):
             "benchmark": result["benchmark"]["performance"],
             "market_events": strategy_result.get("market_events", []),
             "universe_exclusions": strategy_result.get("universe_exclusions", []),
+            "unconfirmed_gaps": strategy_result.get("unconfirmed_gaps", []),
+            # 期末持股、無法變現與基準未買進（docs/HALT-POLICY.md 3.13、3.14、3.16）。
+            "final_positions": strategy_result.get("final_positions", []),
+            "benchmark_positions": [
+                p
+                for p in (result["benchmark"].get("result") or {}).get("final_positions", [])
+                if p.get("status") != "NORMAL"
+            ],
+            "benchmark_unbought": (result["benchmark"].get("result") or {}).get("unbought", []),
+            "benchmark_unavailable": (result["benchmark"].get("result") or {}).get(
+                "unavailable_entire_period", []
+            ),
+            "delisted_valuation": strategy_result.get("delisted_valuation", "last_close"),
+            # 處置與全額交割已下載的範圍；舊報表沒有這個欄位（None）。
+            "restriction_coverage": strategy_result.get("restriction_coverage"),
+            # 成交旁的處置／全額交割標示：trades.csv 不含這一欄，從 results.json 對回。
+            "trade_restrictions": {
+                trade_key(source, trade): trade["restrictions"]
+                for source, data in (
+                    ("strategy", strategy_result),
+                    ("benchmark", result["benchmark"].get("result") or {}),
+                )
+                for trade in data.get("trades", [])
+                if trade.get("restrictions")
+            },
             # 舊報表沒有價格口徑的紀錄，視為原始價格；沒有現金增資處理方式時視為 refuse。
             "price_mode": report_price_mode(strategy_result, configuration.get("settings")),
             "rights_mode": report_price_basis(strategy_result, configuration.get("settings"))[1],
@@ -138,6 +163,11 @@ def report_details(path):
             "configuration": configuration,
         }
     return {"kind": "unknown", "status": "incomplete"}
+
+
+def trade_key(source, trade):
+    """成交的識別字串：來源、股票、成交日與買賣方向。"""
+    return "|".join((source, trade["stock_id"], trade["date"], trade["action"]))
 
 
 def compare_rankings(left, right):
@@ -917,6 +947,9 @@ def create_app(workbench, dev=False):
                         except InvalidOperation:
                             pass
                 trades = [row for row in trades if row.get("source") in ("strategy", "benchmark")]
+                labels = entry["details"].get("trade_restrictions") or {}
+                for row in trades:
+                    row["restrictions"] = labels.get(trade_key(row["source"], row), [])
             return render_template(
                 "report_backtest.html",
                 detail=entry["details"],

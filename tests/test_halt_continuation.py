@@ -110,9 +110,12 @@ class TestHaltContinuation(unittest.TestCase):
             [
                 ("AAA", "BUY", "2026-01-02"),
                 ("BBB", "BUY", "2026-01-03"),
-                ("AAA", "SELL", "2026-01-05"),
+                # 1/2 決定賣出、1/3 停牌賣不掉：保留賣出意圖，恢復交易的第一個開盤（1/4）就賣
+                # （docs/HALT-POLICY.md 3.15），不等恢復後重新評估。
+                ("AAA", "SELL", "2026-01-04"),
             ],
         )
+        self.assertEqual(result["trades"][-1]["intent_date"], "2026-01-02")
 
         # 停牌日 AAA 賣不掉，但 BBB 仍能買進。
         self.assertEqual(

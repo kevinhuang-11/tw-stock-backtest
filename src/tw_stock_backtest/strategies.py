@@ -20,9 +20,8 @@ from tw_stock_backtest.analysis.indicators import (
     window_gap_reason,
 )
 from tw_stock_backtest.analysis.screening import evaluate_stock
-from tw_stock_backtest.cli.download_universe import save_progress
 from tw_stock_backtest.config import apply_overrides
-from tw_stock_backtest.reporting import _json_default
+from tw_stock_backtest.serialization import json_default, save_progress
 
 CONDITIONS = {
     "rsi": {"period", "minimum", "maximum"},
@@ -54,7 +53,7 @@ RULE_FIELDS = {
 def canonical(value):
     return json.dumps(
         value,
-        default=_json_default,
+        default=json_default,
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),

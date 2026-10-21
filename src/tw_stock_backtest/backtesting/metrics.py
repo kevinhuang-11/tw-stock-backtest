@@ -1,8 +1,11 @@
 from datetime import date
 from decimal import Decimal
+from typing import Any, cast
+
+from tw_stock_backtest.typedefs import Row
 
 
-def summarize_performance(equity_curve, initial_cash):
+def summarize_performance(equity_curve: list[Row], initial_cash: Decimal) -> dict[str, Any]:
     """根據每日收盤資產，計算基本績效統計。"""
     if not isinstance(initial_cash, Decimal) or not initial_cash.is_finite() or initial_cash <= 0:
         raise ValueError("初始資金必須是正值且有限的 Decimal")
@@ -77,7 +80,7 @@ def summarize_performance(equity_curve, initial_cash):
     }
 
 
-def summarize_exposure(equity_curve):
+def summarize_exposure(equity_curve: list[Row]) -> dict[str, Decimal]:
     """計算每日收盤持股市值占比，包含空手日。"""
     if not equity_curve:
         raise ValueError("資產曲線不可為空")
@@ -95,6 +98,8 @@ def summarize_exposure(equity_curve):
             if not isinstance(value, Decimal) or not value.is_finite() or value < 0:
                 raise ValueError(f"{name}必須是非負的有限 Decimal")
 
+        # 上面的迴圈已確認兩者都是 Decimal；cast 只告訴型別檢查器，不影響執行。
+        equity, market_value = cast(Decimal, equity), cast(Decimal, market_value)
         if market_value > equity:
             raise ValueError("持股市值不可超過總資產")
 

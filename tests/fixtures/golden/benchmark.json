@@ -1,0 +1,1134 @@
+{
+ "cash": "11846.75",
+ "corporate_action_events": [
+  {
+   "applied_on": "2026-05-11",
+   "cash": "8622",
+   "cash_dividend": "8622",
+   "cash_return": "0",
+   "date": "2026-05-11",
+   "fraction_cash": "0",
+   "kind": "dividend",
+   "needs_review": false,
+   "shares_after": 4311,
+   "shares_before": 4311,
+   "stock_id": "AAA"
+  },
+  {
+   "applied_on": "2026-05-21",
+   "cash": "3036",
+   "cash_dividend": "0",
+   "cash_return": "3034",
+   "date": "2026-05-21",
+   "fraction_cash": "2",
+   "kind": "capital_reduction",
+   "needs_review": false,
+   "shares_after": 2427,
+   "shares_before": 3034,
+   "stock_id": "CCC"
+  },
+  {
+   "applied_on": "2026-05-27",
+   "cash": "0",
+   "cash_dividend": "0",
+   "cash_return": "0",
+   "date": "2026-05-27",
+   "dilution_loss": "14000",
+   "ex_dividend_reference": "80",
+   "fraction_cash": "0",
+   "kind": "dividend",
+   "needs_review": false,
+   "reference_price": "75",
+   "rights": "decline",
+   "rights_price": "40",
+   "rights_shares": "280",
+   "shares_after": 2800,
+   "shares_before": 2800,
+   "stock_id": "DDD"
+  }
+ ],
+ "delisted_valuation": "last_close",
+ "delisting_events": [
+  {
+   "announced": "2026-05-25",
+   "consideration": null,
+   "date": "2026-06-08",
+   "effective": "2026-06-08",
+   "kind": "financial",
+   "kind_label": "財務或營運因素",
+   "last_close": "91.55",
+   "price_date": "2026-06-05",
+   "reason": "合成終止上市",
+   "shares": 2463,
+   "sources": [
+    "https://x"
+   ],
+   "stock_id": "EEE"
+  }
+ ],
+ "equity_curve": [
+  {
+   "cash": "188.75",
+   "date": "2026-03-30",
+   "equity": "997533.00",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "997344.25",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-03-31",
+   "equity": "1003290.70",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "1003101.95",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-01",
+   "equity": "996336.65",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "996147.90",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-02",
+   "equity": "984767.10",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "984578.35",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-03",
+   "equity": "990524.80",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "990336.05",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-06",
+   "equity": "998709.25",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "998520.50",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-07",
+   "equity": "990322.95",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "990134.20",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-08",
+   "equity": "998507.40",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "998318.65",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-09",
+   "equity": "1004265.10",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "1004076.35",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-10",
+   "equity": "992695.55",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "992506.80",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-13",
+   "equity": "985741.50",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "985552.75",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-14",
+   "equity": "991499.20",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "991310.45",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-15",
+   "equity": "987783.65",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "987594.90",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-16",
+   "equity": "1006435.85",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "1006247.10",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-17",
+   "equity": "956365.55",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "956176.80",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-20",
+   "equity": "975017.75",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "974829.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-21",
+   "equity": "993669.95",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "993481.20",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-22",
+   "equity": "989954.40",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "989765.65",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-23",
+   "equity": "995712.10",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "995523.35",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-24",
+   "equity": "988758.05",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "988569.30",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-27",
+   "equity": "977188.50",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "976999.75",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-28",
+   "equity": "982946.20",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "982757.45",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-29",
+   "equity": "991130.65",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "990941.90",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-04-30",
+   "equity": "982744.35",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "982555.60",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-05-01",
+   "equity": "990928.80",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "990740.05",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-05-04",
+   "equity": "993480.70",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "993291.95",
+   "stale_prices": {
+    "BBB": "2026-05-01"
+   },
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-05-05",
+   "equity": "978705.35",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "978516.60",
+   "stale_prices": {
+    "BBB": "2026-05-01"
+   },
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-05-06",
+   "equity": "983684.00",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "983495.25",
+   "stale_prices": {
+    "BBB": "2026-05-01"
+   },
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-05-07",
+   "equity": "986235.90",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "986047.15",
+   "stale_prices": {
+    "BBB": "2026-05-01"
+   },
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "188.75",
+   "date": "2026-05-08",
+   "equity": "980205.05",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "980016.30",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "8810.75",
+   "date": "2026-05-11",
+   "equity": "1007479.25",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "998668.50",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "8810.75",
+   "date": "2026-05-12",
+   "equity": "957408.95",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "948598.20",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "8810.75",
+   "date": "2026-05-13",
+   "equity": "972268.65",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "963457.90",
+   "stale_prices": {
+    "CCC": "2026-05-12"
+   },
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "8810.75",
+   "date": "2026-05-14",
+   "equity": "994713.35",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "985902.60",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "8810.75",
+   "date": "2026-05-15",
+   "equity": "990997.80",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "982187.05",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "8810.75",
+   "date": "2026-05-18",
+   "equity": "992275.50",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "983464.75",
+   "stale_prices": {
+    "DDD": "2026-05-15"
+   },
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "8810.75",
+   "date": "2026-05-19",
+   "equity": "989801.45",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "980990.70",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "8810.75",
+   "date": "2026-05-20",
+   "equity": "978231.90",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 3034,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "969421.15",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-05-21",
+   "equity": "949239.85",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "937393.10",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-05-22",
+   "equity": "956665.55",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "944818.80",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-05-25",
+   "equity": "947520.50",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "935673.75",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-05-26",
+   "equity": "954946.20",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "943099.45",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-05-27",
+   "equity": "962524.90",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "950678.15",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-05-28",
+   "equity": "950196.60",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "938349.85",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-05-29",
+   "equity": "942483.80",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "930637.05",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-06-01",
+   "equity": "950062.50",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "938215.75",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-06-02",
+   "equity": "945588.20",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "933741.45",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-06-03",
+   "equity": "963481.65",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "951634.90",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-06-04",
+   "equity": "915232.35",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "903385.60",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-06-05",
+   "equity": "933125.80",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800,
+    "EEE": 2463
+   },
+   "market_value": "921279.05",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-06-08",
+   "equity": "946216.40",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800
+   },
+   "market_value": "708882.00",
+   "stale_prices": {},
+   "unrealizable_value": "225487.65"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-06-09",
+   "equity": "947407.00",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800
+   },
+   "market_value": "710072.60",
+   "stale_prices": {},
+   "unrealizable_value": "225487.65"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-06-10",
+   "equity": "950182.85",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800
+   },
+   "market_value": "712848.45",
+   "stale_prices": {},
+   "unrealizable_value": "225487.65"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-06-11",
+   "equity": "948134.95",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800
+   },
+   "market_value": "710800.55",
+   "stale_prices": {},
+   "unrealizable_value": "225487.65"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-06-12",
+   "equity": "931003.80",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800
+   },
+   "market_value": "693669.40",
+   "stale_prices": {},
+   "unrealizable_value": "225487.65"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-06-15",
+   "equity": "933779.65",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800
+   },
+   "market_value": "696445.25",
+   "stale_prices": {},
+   "unrealizable_value": "225487.65"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-06-16",
+   "equity": "946870.25",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800
+   },
+   "market_value": "709535.85",
+   "stale_prices": {},
+   "unrealizable_value": "225487.65"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-06-17",
+   "equity": "932922.35",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800
+   },
+   "market_value": "695587.95",
+   "stale_prices": {},
+   "unrealizable_value": "225487.65"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-06-18",
+   "equity": "946012.95",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800
+   },
+   "market_value": "708678.55",
+   "stale_prices": {},
+   "unrealizable_value": "225487.65"
+  },
+  {
+   "cash": "11846.75",
+   "date": "2026-06-19",
+   "equity": "948788.80",
+   "holdings": {
+    "AAA": 4311,
+    "BBB": 3562,
+    "CCC": 2427,
+    "DDD": 2800
+   },
+   "market_value": "711454.40",
+   "stale_prices": {},
+   "unrealizable_value": "225487.65"
+  }
+ ],
+ "final_equity": "948788.80",
+ "final_positions": [
+  {
+   "delisting_announced": null,
+   "price": "36.20",
+   "price_date": "2026-06-19",
+   "shares": 4311,
+   "status": "NORMAL",
+   "status_label": "正常",
+   "stock_id": "AAA",
+   "value": "156058.20"
+  },
+  {
+   "delisting_announced": null,
+   "price": "49.60",
+   "price_date": "2026-06-19",
+   "shares": 3562,
+   "status": "NORMAL",
+   "status_label": "正常",
+   "stock_id": "BBB",
+   "value": "176675.20"
+  },
+  {
+   "delisting_announced": null,
+   "price": "63.00",
+   "price_date": "2026-06-19",
+   "shares": 2427,
+   "status": "NORMAL",
+   "status_label": "正常",
+   "stock_id": "CCC",
+   "value": "152901.00"
+  },
+  {
+   "delisting_announced": null,
+   "price": "80.65",
+   "price_date": "2026-06-19",
+   "shares": 2800,
+   "status": "NORMAL",
+   "status_label": "正常",
+   "stock_id": "DDD",
+   "value": "225820.00"
+  },
+  {
+   "delisting_announced": {
+    "announced": "2026-05-25",
+    "effective": "2026-06-08"
+   },
+   "price": "91.55",
+   "price_date": "2026-06-05",
+   "shares": 2463,
+   "status": "UNREALIZABLE",
+   "status_label": "無法變現（已終止上市）",
+   "stock_id": "EEE",
+   "value": "225487.65"
+  }
+ ],
+ "holdings": {
+  "AAA": 4311,
+  "BBB": 3562,
+  "CCC": 2427,
+  "DDD": 2800
+ },
+ "initial_cash": "1000000",
+ "slippage_rate": "0",
+ "total_commission": "850",
+ "total_return": "-0.0512112",
+ "total_tax": "0",
+ "trades": [
+  {
+   "action": "BUY",
+   "amount": "199814.85",
+   "cash_after": "800015.15",
+   "cash_change": "-199984.85",
+   "commission": "170",
+   "date": "2026-03-30",
+   "price": "46.35",
+   "quantity": 4311,
+   "raw_price": "46.35",
+   "stock_id": "AAA",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "199828.20",
+   "cash_after": "600016.95",
+   "cash_change": "-199998.20",
+   "commission": "170",
+   "date": "2026-03-30",
+   "price": "56.10",
+   "quantity": 3562,
+   "raw_price": "56.10",
+   "stock_id": "BBB",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "199788.90",
+   "cash_after": "400058.05",
+   "cash_change": "-199958.90",
+   "commission": "170",
+   "date": "2026-03-30",
+   "price": "65.85",
+   "quantity": 3034,
+   "raw_price": "65.85",
+   "stock_id": "CCC",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "199780.00",
+   "cash_after": "200108.05",
+   "cash_change": "-199950.00",
+   "commission": "170",
+   "date": "2026-03-30",
+   "price": "71.35",
+   "quantity": 2800,
+   "raw_price": "71.35",
+   "stock_id": "DDD",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "199749.30",
+   "cash_after": "188.75",
+   "cash_change": "-199919.30",
+   "commission": "170",
+   "date": "2026-03-30",
+   "price": "81.10",
+   "quantity": 2463,
+   "raw_price": "81.10",
+   "stock_id": "EEE",
+   "tax": "0"
+  }
+ ],
+ "unavailable_entire_period": [],
+ "unbought": [],
+ "unconfirmed_gaps": [
+  {
+   "days": 1,
+   "first": "2026-05-18",
+   "last": "2026-05-18",
+   "stock_id": "DDD"
+  }
+ ],
+ "unrealizable": {
+  "EEE": {
+   "announced": "2026-05-25",
+   "consideration": null,
+   "effective": "2026-06-08",
+   "kind": "financial",
+   "kind_label": "財務或營運因素",
+   "last_close": "91.55",
+   "price_date": "2026-06-05",
+   "reason": "合成終止上市",
+   "shares": 2463,
+   "sources": [
+    "https://x"
+   ],
+   "stock_id": "EEE"
+  }
+ }
+}

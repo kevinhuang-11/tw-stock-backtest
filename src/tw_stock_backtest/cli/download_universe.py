@@ -1,12 +1,10 @@
 import argparse
 import json
-import os
 import subprocess
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from tempfile import NamedTemporaryFile
 
 from tw_stock_backtest.cli.update_universe import DEFAULT_UNIVERSE_PATH
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config
@@ -17,6 +15,7 @@ from tw_stock_backtest.data.universe import (
     load_universe,
 )
 from tw_stock_backtest.date_range import parse_date_range
+from tw_stock_backtest.serialization import save_progress
 
 DEFAULT_LOG_DIR = DEFAULT_CONFIG_PATH.parent / "data" / "download_logs"
 
@@ -120,39 +119,6 @@ def download_batch(
             time.sleep(interval_seconds)
 
     return results
-
-
-def save_progress(report, path):
-    """完整寫入暫存檔後，才替換既有進度檔。"""
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    temporary_path = None
-
-    try:
-        with NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-            delete=False,
-        ) as file:
-            temporary_path = Path(file.name)
-
-            json.dump(
-                report,
-                file,
-                ensure_ascii=False,
-                indent=2,
-            )
-            file.write("\n")
-
-        os.replace(temporary_path, path)
-
-    finally:
-        if temporary_path is not None:
-            temporary_path.unlink(missing_ok=True)
 
 
 def load_progress(path, expected_job):

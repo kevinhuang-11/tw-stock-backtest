@@ -104,11 +104,16 @@ class TestBuyAndHold(unittest.TestCase):
         self.assertEqual(result["unbought"], ["AAA", "BBB"])
         self.assertEqual(result["final_equity"], Decimal("20"))
 
-    def test_missing_date_is_rejected(self):
+    def test_missing_date_is_unconfirmed_and_valued_at_the_last_close(self):
+        # 只有一檔缺列：不讓整次失敗，視為不可交易並沿用最近收盤（docs/HALT-POLICY.md 3.6）。
         self.records["BBB"].pop()
-
-        with self.assertRaises(ValueError):
-            self.run_benchmark()
+        result = self.run_benchmark()
+        self.assertEqual(
+            result["unconfirmed_gaps"],
+            [{"stock_id": "BBB", "first": "2026-01-06", "last": "2026-01-06", "days": 1}],
+        )
+        last = result["equity_curve"][-1]
+        self.assertEqual(last["stale_prices"], {"BBB": "2026-01-05"})
 
 
 class TestBenchmarkSlippage(unittest.TestCase):

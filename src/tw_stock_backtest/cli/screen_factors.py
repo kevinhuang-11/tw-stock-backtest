@@ -3,7 +3,6 @@ import sqlite3
 from datetime import date
 
 from tw_stock_backtest.analysis.factors import (
-    calculate_factor_row,
     rank_factor_candidates,
 )
 from tw_stock_backtest.config import (
@@ -11,8 +10,8 @@ from tw_stock_backtest.config import (
     apply_overrides,
     load_config,
 )
-from tw_stock_backtest.data.database import load_records, next_record_date
 from tw_stock_backtest.data.universe import load_universe
+from tw_stock_backtest.factor_rows import collect_factor_rows
 from tw_stock_backtest.prices import PriceSource, describe_prices
 
 
@@ -62,72 +61,6 @@ def parse_arguments():
     )
 
     return parser.parse_args()
-
-
-def collect_factor_rows(
-    stocks,
-    as_of,
-    *,
-    db_path,
-    factor_settings,
-    prices=None,
-):
-    """逐檔計算因子，收集成功結果與無法評估的原因。
-
-    prices：PriceSource；提供時依它的模式讀取（adjusted 為截至分析日的還原價），
-    省略時讀原始價格。
-    """
-    factor_rows = []
-    errors = []
-
-    for stock in stocks:
-        stock_id = stock["stock_id"]
-
-        # 資料庫故障應讓整個命令失敗，
-        # 不把系統故障當成個別股票資料不足。
-        records = (
-            prices.load(stock_id, "1900-01-01", as_of)
-            if prices is not None
-            else load_records(stock_id, "1900-01-01", as_of, db_path=db_path)
-        )
-
-        try:
-            if not records:
-                raise ValueError("沒有指定日期以前的行情")
-
-            latest_date = records[-1]["date"]
-
-            if latest_date != as_of:
-                # 分析日之後還有行情，代表那天本來就沒有交易（例如週末或休市），
-                # 不是資料沒更新；兩種情況要給不同的說明。
-                following = next_record_date(stock_id, as_of, db_path=db_path)
-
-                if following is not None:
-                    raise ValueError(
-                        f"{as_of} 沒有這檔股票的行情（可能是休市日或當日未交易）；"
-                        f"前一個行情日為 {latest_date}，下一個為 {following}"
-                    )
-
-                raise ValueError(f"行情未更新至分析日期；最後行情日期為 {latest_date}")
-
-            row = calculate_factor_row(
-                records,
-                as_of,
-                factor_settings=factor_settings,
-            )
-            factor_rows.append(row)
-
-        except ValueError as error:
-            note = prices.restart_note(stock_id, as_of) if prices is not None else ""
-            errors.append(
-                {
-                    "stock_id": stock_id,
-                    "name": stock.get("name", ""),
-                    "reason": str(error) + note,
-                }
-            )
-
-    return factor_rows, errors
 
 
 def main():

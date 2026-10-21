@@ -98,18 +98,44 @@ class TestForwardReturn(unittest.TestCase):
         )
         self.assertIsNone(result["price_return"])
 
-    def test_halted_exit_does_not_use_stale_price(self):
-        self.records[-1]["close"] = None
-        self.records[-1]["tradable"] = False
-        self.records[-1]["valuation_close"] = Decimal("110")
+    def test_halted_exit_uses_the_last_close_and_says_so(self):
+        # docs/HALT-POLICY.md 3.22：和回測的持股估值一致，不讓停牌的樣本消失。
+        self.records[-1].update(
+            close=None,
+            tradable=False,
+            valuation_close=Decimal("110"),
+            valuation_price_date="2024-01-08",
+            market_status="CONFIRMED_HALT",
+        )
 
         result = self.evaluate()
 
-        self.assertEqual(
-            result["reason"],
-            "unavailable_exit_price",
-        )
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["price_return"], Decimal("0.1"))
+        self.assertTrue(result["stale_exit"])
+        self.assertEqual(result["exit_price_date"], "2024-01-08")
+        self.assertEqual(result["exit_status"], "CONFIRMED_HALT")
+
+    def test_halted_exit_without_any_earlier_close_is_unavailable(self):
+        self.records[-1].update(close=None, tradable=False, valuation_close=None)
+        result = self.evaluate()
+        self.assertEqual(result["reason"], "unavailable_exit_price")
         self.assertIsNone(result["price_return"])
+
+    def test_delisted_exit_follows_the_valuation_setting(self):
+        self.records[-1].update(
+            close=None,
+            tradable=False,
+            valuation_close=Decimal("110"),
+            valuation_price_date="2024-01-08",
+            market_status="DELISTED",
+        )
+        frozen = self.evaluate()
+        self.assertEqual(frozen["price_return"], Decimal("0.1"))
+        zero = evaluate_forward_return(
+            self.records, "2024-01-02", self.dates, horizon=5, delisted_valuation="zero"
+        )
+        self.assertEqual(zero["price_return"], Decimal("-1"))
 
     def test_invalid_horizons(self):
         for horizon in (0, -1, True, 1.5):
@@ -221,6 +247,22 @@ class TestRankingEvaluation(unittest.TestCase):
             result["details"][0]["unavailable_stocks"],
             {"BBB": "unavailable_exit_price"},
         )
+
+    def test_stale_exits_are_counted_in_valid_samples(self):
+        self.records["BBB"][-1].update(
+            close=None,
+            tradable=False,
+            valuation_close=self.records["BBB"][-2]["close"],
+            valuation_price_date=self.records["BBB"][-2]["date"],
+            market_status="NO_PRICE",
+        )
+        # 第 2 個行情日出場：進場日（第 1 日）照常可交易，出場日 BBB 無成交價。
+        result = evaluate_rankings(
+            self.history, self.records, self.dates, horizons=(2,), top_ns=(1,)
+        )
+        self.assertEqual(result["details"][0]["status"], "ok")
+        self.assertEqual(result["details"][0]["stale_exit_stocks"], ["BBB"])
+        self.assertEqual(result["summaries"][0]["stale_exits"], 1)
 
     def test_no_candidates_is_not_zero_return(self):
         self.history[0]["candidates"] = []

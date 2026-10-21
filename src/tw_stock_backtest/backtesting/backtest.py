@@ -1,5 +1,7 @@
+from collections.abc import Sequence
 from datetime import date
 from decimal import Decimal
+from typing import Any, cast
 
 from tw_stock_backtest.backtesting.corporate_actions import Schedule, apply_due
 from tw_stock_backtest.backtesting.costs import CostSettings, calculate_transaction
@@ -9,24 +11,26 @@ from tw_stock_backtest.data.market_events import (
     not_tradable_reason,
     prepare_market_records,
 )
+from tw_stock_backtest.typedefs import Action, Halts, Record, Row
 
 
 def run_backtest(
-    records,
-    signals,
-    initial_cash,
-    quantity,
-    cost_settings=None,
-    confirmed_halts=None,
-    corporate_actions=(),
-):
+    records: Sequence[Record],
+    signals: Sequence[str],
+    initial_cash: Decimal,
+    quantity: int,
+    cost_settings: CostSettings | None = None,
+    confirmed_halts: Halts | None = None,
+    corporate_actions: Sequence[Action] = (),
+) -> dict[str, Any]:
     """前日訊號、次筆開盤成交；可傳入交易成本設定。
 
     corporate_actions 是這檔的公司行動；與多股票引擎相同，生效日開盤前依前一日收盤的持股
     入帳股利與退還股款並調整股數（見 backtesting/corporate_actions.py）。
 
     停牌與無成交價日使用與多股票回測相同的檢查（prepare_market_records）：
-    當日不成交，持股沿用最近有效收盤估值，不補價格。
+    當日不成交，持股沿用最近有效收盤估值，不補價格。賣出訊號遇到不可交易日時保留，
+    在下一個可交易日開盤賣出；買進訊號遇到不可交易日則作廢（docs/HALT-POLICY.md 3.23）。
     """
     # 沒有提供設定時，維持原本的零成本模式。
     # 讓舊測試繼續驗證原本的交易邏輯。
@@ -47,7 +51,8 @@ def run_backtest(
         raise ValueError("買入股數必須是正整數")
 
     previous_date = None
-    stock_id = records[0]["stock_id"] if records else None
+    # 沒有行情時為 None（迴圈不會執行）；cast 只告訴型別檢查器，不影響執行。
+    stock_id = cast(str, records[0]["stock_id"] if records else None)
 
     for record, signal in zip(records, signals, strict=True):
         current_date = date.fromisoformat(record["date"])
@@ -72,15 +77,17 @@ def run_backtest(
 
     cash = initial_cash
     shares = 0
-    trades = []
-    equity_curve = []
+    trades: list[Row] = []
+    equity_curve: list[Row] = []
     total_commission = Decimal("0")
     total_tax = Decimal("0")
-    skipped_orders = []
-    market_events = []
+    skipped_orders: list[Row] = []
+    market_events: list[Row] = []
 
     schedule = Schedule({stock_id: list(corporate_actions)}, "")
-    corporate_action_events = []
+    corporate_action_events: list[Row] = []
+    # 因不可交易而沒賣成的賣出訊號日；之後第一個可交易日開盤賣出。
+    sell_intent = None
 
     for index, record in enumerate(records):
         held = {stock_id: shares} if shares else {}
@@ -100,6 +107,9 @@ def run_backtest(
             market_events.append(
                 {"stock_id": stock_id, "date": record["date"], **market_event(record, events)}
             )
+
+            if signal == "SELL" and shares > 0 and sell_intent is None:
+                sell_intent = records[index - 1]["date"]
 
             if (signal == "BUY" and shares == 0) or (signal == "SELL" and shares > 0):
                 skipped_orders.append(
@@ -128,7 +138,7 @@ def run_backtest(
                 executed_quantity = quantity
                 action = "BUY"
 
-        elif signal == "SELL" and shares > 0:
+        elif (signal == "SELL" or sell_intent is not None) and shares > 0:
             executed_quantity = shares
 
             transaction = calculate_transaction(
@@ -158,8 +168,16 @@ def run_backtest(
                     "tax": transaction["tax"],
                     "cash_change": transaction["cash_change"],
                     "cash_after": cash,
+                    # 不可交易日後重試的賣出：記錄最初的賣出訊號日。
+                    **(
+                        {"intent_date": sell_intent}
+                        if action == "SELL" and sell_intent is not None
+                        else {}
+                    ),
                 }
             )
+            if action == "SELL":
+                sell_intent = None
 
         # 不可交易日沿用最近有效收盤；尚未持股時不需要估值價格。
         equity = cash + (record["valuation_close"] * shares if shares else Decimal("0"))

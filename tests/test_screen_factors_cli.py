@@ -3,9 +3,9 @@ import unittest
 from decimal import Decimal
 from unittest.mock import patch
 
-from tw_stock_backtest.cli.screen_factors import collect_factor_rows
+from tw_stock_backtest.factor_rows import collect_factor_rows
 
-MODULE = "tw_stock_backtest.cli.screen_factors"
+MODULE = "tw_stock_backtest.factor_rows"
 
 
 class TestCollectFactorRows(unittest.TestCase):
@@ -159,22 +159,41 @@ class TestAnalysisDateMessages(unittest.TestCase):
         self.assertEqual(rows, [])
         return errors[0]["reason"]
 
-    def test_weekend_is_not_reported_as_stale_data(self):
-        reason = self.reason("2026-08-01")
-        self.assertIn("2026-08-01 沒有這檔股票的行情（可能是休市日或當日未交易）", reason)
-        self.assertIn("前一個行情日為 2026-07-31，下一個為 2026-08-03", reason)
-        self.assertNotIn("未更新", reason)
+    def test_a_day_without_any_market_rows_does_not_look_ahead(self):
+        # 週末與行情庫最新日之後，都只能說「這天全市場沒有行情」，不查之後的資料分辨。
+        for as_of, latest in (("2026-08-01", "2026-07-31"), ("2026-08-05", "2026-08-03")):
+            with self.subTest(as_of):
+                self.assertEqual(
+                    self.reason(as_of),
+                    f"行情庫在 {as_of} 沒有任何股票的行情（休市日，或行情尚未更新到這天）；"
+                    f"這檔最後行情日期為 {latest}",
+                )
 
-    def test_date_after_latest_data_is_still_stale(self):
-        reason = self.reason("2026-08-05")
-        self.assertEqual(reason, "行情未更新至分析日期；最後行情日期為 2026-08-03")
+    def test_a_missing_row_when_others_trade_is_unconfirmed(self):
+        from tw_stock_backtest.data.database import save_records
 
-    def test_missing_database_keeps_the_original_message(self):
-        from tw_stock_backtest.data.database import next_record_date
+        other = {
+            "stock_id": "2317",
+            "date": "2026-08-04",
+            "open": Decimal("10"),
+            "high": Decimal("10"),
+            "low": Decimal("10"),
+            "close": Decimal("10"),
+            "volume": 1,
+            "turnover": 1,
+            "trade_count": 1,
+        }
+        save_records([other], db_path=self.db)
+        reason = self.reason("2026-08-04")
+        self.assertIn("2026-08-04 其他股票有行情、這檔沒有列（原因未確認，不認定為停牌", reason)
+        self.assertIn("最後行情日期為 2026-08-03", reason)
 
-        self.assertIsNone(next_record_date("2330", "2026-08-01", db_path="no-such.db"))
-        self.assertEqual(next_record_date("2330", "2026-08-01", db_path=self.db), "2026-08-03")
-        self.assertIsNone(next_record_date("2330", "2026-08-03", db_path=self.db))
+    def test_market_rows_only_checks_that_day(self):
+        from tw_stock_backtest.data.database import market_has_rows
+
+        self.assertFalse(market_has_rows("2026-08-01", db_path="no-such.db"))
+        self.assertTrue(market_has_rows("2026-08-03", db_path=self.db))
+        self.assertFalse(market_has_rows("2026-08-01", db_path=self.db))
 
 
 if __name__ == "__main__":

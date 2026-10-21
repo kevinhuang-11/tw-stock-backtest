@@ -1,0 +1,2486 @@
+{
+ "budget_per_position": null,
+ "cash": "867314.70000",
+ "corporate_action_events": [],
+ "delisted_valuation": "last_close",
+ "delisting_events": [],
+ "equity_curve": [
+  {
+   "cash": "1000000",
+   "date": "2026-03-30",
+   "equity": "1000000",
+   "holdings": {},
+   "market_value": "0",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "880729.95000",
+   "date": "2026-03-31",
+   "equity": "1000379.95000",
+   "holdings": {
+    "BBB": 1000,
+    "CCC": 1000
+   },
+   "market_value": "119650.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "863622.50000",
+   "date": "2026-04-01",
+   "equity": "997822.50000",
+   "holdings": {
+    "BBB": 1000,
+    "EEE": 1000
+   },
+   "market_value": "134200.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "884345.60000",
+   "date": "2026-04-02",
+   "equity": "999795.60000",
+   "holdings": {
+    "AAA": 1000,
+    "DDD": 1000
+   },
+   "market_value": "115450.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "916373.35000",
+   "date": "2026-04-03",
+   "equity": "1000923.35000",
+   "holdings": {
+    "EEE": 1000
+   },
+   "market_value": "84550.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "841334.45000",
+   "date": "2026-04-06",
+   "equity": "998584.45000",
+   "holdings": {
+    "DDD": 1000,
+    "EEE": 1000
+   },
+   "market_value": "157250.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "872128.15000",
+   "date": "2026-04-07",
+   "equity": "997378.15000",
+   "holdings": {
+    "BBB": 1000,
+    "DDD": 1000
+   },
+   "market_value": "125250.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "916913.40000",
+   "date": "2026-04-08",
+   "equity": "998813.40000",
+   "holdings": {
+    "EEE": 1000
+   },
+   "market_value": "81900.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "861653.30000",
+   "date": "2026-04-09",
+   "equity": "1000203.30000",
+   "holdings": {
+    "CCC": 1000,
+    "DDD": 1000
+   },
+   "market_value": "138550.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "882814.15000",
+   "date": "2026-04-10",
+   "equity": "998414.15000",
+   "holdings": {
+    "AAA": 1000,
+    "DDD": 1000
+   },
+   "market_value": "115600.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "863997.85000",
+   "date": "2026-04-13",
+   "equity": "999747.85000",
+   "holdings": {
+    "BBB": 1000,
+    "EEE": 1000
+   },
+   "market_value": "135750.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "925588.45000",
+   "date": "2026-04-14",
+   "equity": "1001688.45000",
+   "holdings": {
+    "DDD": 1000
+   },
+   "market_value": "76100.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "842184.20000",
+   "date": "2026-04-15",
+   "equity": "998784.20000",
+   "holdings": {
+    "DDD": 1000,
+    "EEE": 1000
+   },
+   "market_value": "156600.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "1000961.65000",
+   "date": "2026-04-16",
+   "equity": "1000961.65000",
+   "holdings": {},
+   "market_value": "0",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "866513.45000",
+   "date": "2026-04-17",
+   "equity": "1000913.45000",
+   "holdings": {
+    "BBB": 1000,
+    "EEE": 1000
+   },
+   "market_value": "134400.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "1003299.00000",
+   "date": "2026-04-20",
+   "equity": "1003299.00000",
+   "holdings": {},
+   "market_value": "0",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "1003299.00000",
+   "date": "2026-04-21",
+   "equity": "1003299.00000",
+   "holdings": {},
+   "market_value": "0",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "918842.70000",
+   "date": "2026-04-22",
+   "equity": "1003242.70000",
+   "holdings": {
+    "EEE": 1000
+   },
+   "market_value": "84400.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "886506.10000",
+   "date": "2026-04-23",
+   "equity": "1004456.10000",
+   "holdings": {
+    "BBB": 1000,
+    "CCC": 1000
+   },
+   "market_value": "117950.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "865993.65000",
+   "date": "2026-04-24",
+   "equity": "1001893.65000",
+   "holdings": {
+    "BBB": 1000,
+    "EEE": 1000
+   },
+   "market_value": "135900.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "890114.55000",
+   "date": "2026-04-27",
+   "equity": "1003864.55000",
+   "holdings": {
+    "AAA": 1000,
+    "DDD": 1000
+   },
+   "market_value": "113750.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "917440.40000",
+   "date": "2026-04-28",
+   "equity": "1005390.40000",
+   "holdings": {
+    "EEE": 1000
+   },
+   "market_value": "87950.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "840899.00000",
+   "date": "2026-04-29",
+   "equity": "1003249.00000",
+   "holdings": {
+    "DDD": 1000,
+    "EEE": 1000
+   },
+   "market_value": "162350.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "876781.40000",
+   "date": "2026-04-30",
+   "equity": "1002031.40000",
+   "holdings": {
+    "BBB": 1000,
+    "DDD": 1000
+   },
+   "market_value": "125250.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "918554.05000",
+   "date": "2026-05-01",
+   "equity": "1003854.05000",
+   "holdings": {
+    "EEE": 1000
+   },
+   "market_value": "85300.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "865175.45000",
+   "date": "2026-05-04",
+   "equity": "1005425.45000",
+   "holdings": {
+    "CCC": 1000,
+    "DDD": 1000
+   },
+   "market_value": "140250.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "889743.10000",
+   "date": "2026-05-05",
+   "equity": "1003643.10000",
+   "holdings": {
+    "AAA": 1000,
+    "DDD": 1000
+   },
+   "market_value": "113900.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "918269.85000",
+   "date": "2026-05-06",
+   "equity": "1005169.85000",
+   "holdings": {
+    "EEE": 1000
+   },
+   "market_value": "86900.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "928747.80000",
+   "date": "2026-05-07",
+   "equity": "1006547.80000",
+   "holdings": {
+    "DDD": 1000
+   },
+   "market_value": "77800.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "842138.35000",
+   "date": "2026-05-08",
+   "equity": "1003838.35000",
+   "holdings": {
+    "DDD": 1000,
+    "EEE": 1000
+   },
+   "market_value": "161700.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "1006787.90000",
+   "date": "2026-05-11",
+   "equity": "1006787.90000",
+   "holdings": {},
+   "market_value": "0",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "846792.20000",
+   "date": "2026-05-12",
+   "equity": "1007092.20000",
+   "holdings": {
+    "DDD": 1000,
+    "EEE": 1000
+   },
+   "market_value": "160300.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "1009650.55000",
+   "date": "2026-05-13",
+   "equity": "1009650.55000",
+   "holdings": {},
+   "market_value": "0",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "1009650.55000",
+   "date": "2026-05-14",
+   "equity": "1009650.55000",
+   "holdings": {},
+   "market_value": "0",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "921989.05000",
+   "date": "2026-05-15",
+   "equity": "1009789.05000",
+   "holdings": {
+    "EEE": 1000
+   },
+   "market_value": "87800.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "1011205.40000",
+   "date": "2026-05-18",
+   "equity": "1011205.40000",
+   "holdings": {},
+   "market_value": "0",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "923493.85000",
+   "date": "2026-05-19",
+   "equity": "1010943.85000",
+   "holdings": {
+    "EEE": 1000
+   },
+   "market_value": "87450.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "975544.20000",
+   "date": "2026-05-20",
+   "equity": "1012394.20000",
+   "holdings": {
+    "AAA": 1000
+   },
+   "market_value": "36850.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "921245.65000",
+   "date": "2026-05-21",
+   "equity": "1012595.65000",
+   "holdings": {
+    "EEE": 1000
+   },
+   "market_value": "91350.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "921245.65000",
+   "date": "2026-05-22",
+   "equity": "1010295.65000",
+   "holdings": {
+    "EEE": 1000
+   },
+   "market_value": "89050.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "962215.75000",
+   "date": "2026-05-25",
+   "equity": "1011715.75000",
+   "holdings": {
+    "BBB": 1000
+   },
+   "market_value": "49500.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "923509.85000",
+   "date": "2026-05-26",
+   "equity": "1012209.85000",
+   "holdings": {
+    "EEE": 1000
+   },
+   "market_value": "88700.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "950604.00000",
+   "date": "2026-05-27",
+   "equity": "1013604.00000",
+   "holdings": {
+    "CCC": 1000
+   },
+   "market_value": "63000.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "886109.15000",
+   "date": "2026-05-28",
+   "equity": "1014609.15000",
+   "holdings": {
+    "AAA": 1000,
+    "EEE": 1000
+   },
+   "market_value": "128500.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "873444.05000",
+   "date": "2026-05-29",
+   "equity": "1012594.05000",
+   "holdings": {
+    "BBB": 1000,
+    "EEE": 1000
+   },
+   "market_value": "139150.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "935209.25000",
+   "date": "2026-06-01",
+   "equity": "1014709.25000",
+   "holdings": {
+    "DDD": 1000
+   },
+   "market_value": "79500.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "845393.60000",
+   "date": "2026-06-02",
+   "equity": "1012193.60000",
+   "holdings": {
+    "DDD": 1000,
+    "EEE": 1000
+   },
+   "market_value": "166800.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "1014720.45000",
+   "date": "2026-06-03",
+   "equity": "1014720.45000",
+   "holdings": {},
+   "market_value": "0",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "876465.45000",
+   "date": "2026-06-04",
+   "equity": "1014265.45000",
+   "holdings": {
+    "BBB": 1000,
+    "EEE": 1000
+   },
+   "market_value": "137800.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "1015838.40000",
+   "date": "2026-06-05",
+   "equity": "1015838.40000",
+   "holdings": {},
+   "market_value": "0",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "1015838.40000",
+   "date": "2026-06-08",
+   "equity": "1015838.40000",
+   "holdings": {},
+   "market_value": "0",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "1015838.40000",
+   "date": "2026-06-09",
+   "equity": "1015838.40000",
+   "holdings": {},
+   "market_value": "0",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "901677.45000",
+   "date": "2026-06-10",
+   "equity": "1016227.45000",
+   "holdings": {
+    "BBB": 1000,
+    "CCC": 1000
+   },
+   "market_value": "114550.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "885672.10000",
+   "date": "2026-06-11",
+   "equity": "1013672.10000",
+   "holdings": {
+    "BBB": 1000,
+    "DDD": 1000
+   },
+   "market_value": "128000.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "901271.10000",
+   "date": "2026-06-12",
+   "equity": "1011621.10000",
+   "holdings": {
+    "AAA": 1000,
+    "DDD": 1000
+   },
+   "market_value": "110350.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "1012631.20000",
+   "date": "2026-06-15",
+   "equity": "1012631.20000",
+   "holdings": {},
+   "market_value": "0",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "932483.20000",
+   "date": "2026-06-16",
+   "equity": "1012583.20000",
+   "holdings": {
+    "DDD": 1000
+   },
+   "market_value": "80100.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "884495.30000",
+   "date": "2026-06-17",
+   "equity": "1009745.30000",
+   "holdings": {
+    "BBB": 1000,
+    "DDD": 1000
+   },
+   "market_value": "125250.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "1011029.15000",
+   "date": "2026-06-18",
+   "equity": "1011029.15000",
+   "holdings": {},
+   "market_value": "0",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  },
+  {
+   "cash": "867314.70000",
+   "date": "2026-06-19",
+   "equity": "1010964.70000",
+   "holdings": {
+    "CCC": 1000,
+    "DDD": 1000
+   },
+   "market_value": "143650.00",
+   "stale_prices": {},
+   "unrealizable_value": "0"
+  }
+ ],
+ "final_equity": "1010964.70000",
+ "final_positions": [
+  {
+   "delisting_announced": null,
+   "price": "63.00",
+   "price_date": "2026-06-19",
+   "shares": 1000,
+   "status": "NORMAL",
+   "status_label": "正常",
+   "stock_id": "CCC",
+   "value": "63000.00"
+  },
+  {
+   "delisting_announced": null,
+   "price": "80.65",
+   "price_date": "2026-06-19",
+   "shares": 1000,
+   "status": "NORMAL",
+   "status_label": "正常",
+   "stock_id": "DDD",
+   "value": "80650.00"
+  }
+ ],
+ "holdings": {
+  "CCC": 1000,
+  "DDD": 1000
+ },
+ "initial_cash": "1000000",
+ "market_events": [
+  {
+   "date": "2026-05-04",
+   "market_status": "CONFIRMED_HALT",
+   "reason": "合成停牌",
+   "source": "https://x",
+   "sources": [
+    "https://x"
+   ],
+   "stock_id": "BBB"
+  },
+  {
+   "date": "2026-05-05",
+   "market_status": "CONFIRMED_HALT",
+   "reason": "合成停牌",
+   "source": "https://x",
+   "sources": [
+    "https://x"
+   ],
+   "stock_id": "BBB"
+  },
+  {
+   "date": "2026-05-06",
+   "market_status": "CONFIRMED_HALT",
+   "reason": "合成停牌",
+   "source": "https://x",
+   "sources": [
+    "https://x"
+   ],
+   "stock_id": "BBB"
+  },
+  {
+   "date": "2026-05-07",
+   "market_status": "CONFIRMED_HALT",
+   "reason": "合成停牌",
+   "source": "https://x",
+   "sources": [
+    "https://x"
+   ],
+   "stock_id": "BBB"
+  },
+  {
+   "date": "2026-05-13",
+   "market_status": "NO_PRICE",
+   "reason": "無成交價（原因未確認，不認定為停牌）",
+   "source": "行情來源當日有這一列，但沒有開高低收",
+   "stock_id": "CCC"
+  },
+  {
+   "date": "2026-05-18",
+   "market_status": "MISSING_ROW",
+   "reason": "缺少行情列（原因未確認，不認定為停牌）",
+   "source": "其他股票當天有行情，這檔沒有列；查不到停止買賣公告",
+   "stock_id": "DDD"
+  }
+ ],
+ "ranking_method": "rules",
+ "sizing_mode": "fixed_quantity",
+ "skipped_orders": [],
+ "skipped_rebalances": [
+  {
+   "date": "2026-05-04",
+   "errors": {
+    "BBB": "已確認停牌，僅暫停本股票訊號更新"
+   }
+  },
+  {
+   "date": "2026-05-05",
+   "errors": {
+    "BBB": "已確認停牌，僅暫停本股票訊號更新"
+   }
+  },
+  {
+   "date": "2026-05-06",
+   "errors": {
+    "BBB": "已確認停牌，僅暫停本股票訊號更新"
+   }
+  },
+  {
+   "date": "2026-05-07",
+   "errors": {
+    "BBB": "已確認停牌，僅暫停本股票訊號更新"
+   }
+  },
+  {
+   "date": "2026-05-08",
+   "errors": {
+    "BBB": "2026-05-07 收盤價缺失或無效，在 8 筆計算窗口內，窗口內共 4 筆缺價；之後再 7 個行情日都有有效價格，缺價移出窗口後即可恢復評估"
+   }
+  },
+  {
+   "date": "2026-05-11",
+   "errors": {
+    "BBB": "2026-05-07 收盤價缺失或無效，在 8 筆計算窗口內，窗口內共 4 筆缺價；之後再 6 個行情日都有有效價格，缺價移出窗口後即可恢復評估"
+   }
+  },
+  {
+   "date": "2026-05-12",
+   "errors": {
+    "BBB": "2026-05-07 收盤價缺失或無效，在 8 筆計算窗口內，窗口內共 4 筆缺價；之後再 5 個行情日都有有效價格，缺價移出窗口後即可恢復評估"
+   }
+  },
+  {
+   "date": "2026-05-13",
+   "errors": {
+    "BBB": "2026-05-07 收盤價缺失或無效，在 8 筆計算窗口內，窗口內共 4 筆缺價；之後再 4 個行情日都有有效價格，缺價移出窗口後即可恢復評估",
+    "CCC": "無成交價（原因未確認），僅暫停本股票訊號更新"
+   }
+  },
+  {
+   "date": "2026-05-14",
+   "errors": {
+    "BBB": "2026-05-07 收盤價缺失或無效，在 8 筆計算窗口內，窗口內共 3 筆缺價；之後再 3 個行情日都有有效價格，缺價移出窗口後即可恢復評估",
+    "CCC": "2026-05-13 收盤價缺失或無效，在 8 筆計算窗口內；之後再 7 個行情日都有有效價格，缺價移出窗口後即可恢復評估"
+   }
+  },
+  {
+   "date": "2026-05-15",
+   "errors": {
+    "BBB": "2026-05-07 收盤價缺失或無效，在 8 筆計算窗口內，窗口內共 2 筆缺價；之後再 2 個行情日都有有效價格，缺價移出窗口後即可恢復評估",
+    "CCC": "2026-05-13 收盤價缺失或無效，在 8 筆計算窗口內；之後再 6 個行情日都有有效價格，缺價移出窗口後即可恢復評估"
+   }
+  },
+  {
+   "date": "2026-05-18",
+   "errors": {
+    "BBB": "2026-05-07 收盤價缺失或無效，在 8 筆計算窗口內；之後再 1 個行情日都有有效價格，缺價移出窗口後即可恢復評估",
+    "CCC": "2026-05-13 收盤價缺失或無效，在 8 筆計算窗口內；之後再 5 個行情日都有有效價格，缺價移出窗口後即可恢復評估",
+    "DDD": "缺少行情列（原因未確認），僅暫停本股票訊號更新"
+   }
+  },
+  {
+   "date": "2026-05-19",
+   "errors": {
+    "CCC": "2026-05-13 收盤價缺失或無效，在 8 筆計算窗口內；之後再 4 個行情日都有有效價格，缺價移出窗口後即可恢復評估",
+    "DDD": "2026-05-18 收盤價缺失或無效，在 8 筆計算窗口內；之後再 7 個行情日都有有效價格，缺價移出窗口後即可恢復評估"
+   }
+  },
+  {
+   "date": "2026-05-20",
+   "errors": {
+    "CCC": "2026-05-13 收盤價缺失或無效，在 8 筆計算窗口內；之後再 3 個行情日都有有效價格，缺價移出窗口後即可恢復評估",
+    "DDD": "2026-05-18 收盤價缺失或無效，在 8 筆計算窗口內；之後再 6 個行情日都有有效價格，缺價移出窗口後即可恢復評估"
+   }
+  },
+  {
+   "date": "2026-05-21",
+   "errors": {
+    "CCC": "2026-05-13 收盤價缺失或無效，在 8 筆計算窗口內；之後再 2 個行情日都有有效價格，缺價移出窗口後即可恢復評估",
+    "DDD": "2026-05-18 收盤價缺失或無效，在 8 筆計算窗口內；之後再 5 個行情日都有有效價格，缺價移出窗口後即可恢復評估"
+   }
+  },
+  {
+   "date": "2026-05-22",
+   "errors": {
+    "CCC": "2026-05-13 收盤價缺失或無效，在 8 筆計算窗口內；之後再 1 個行情日都有有效價格，缺價移出窗口後即可恢復評估",
+    "DDD": "2026-05-18 收盤價缺失或無效，在 8 筆計算窗口內；之後再 4 個行情日都有有效價格，缺價移出窗口後即可恢復評估"
+   }
+  },
+  {
+   "date": "2026-05-25",
+   "errors": {
+    "DDD": "2026-05-18 收盤價缺失或無效，在 8 筆計算窗口內；之後再 3 個行情日都有有效價格，缺價移出窗口後即可恢復評估"
+   }
+  },
+  {
+   "date": "2026-05-26",
+   "errors": {
+    "DDD": "2026-05-18 收盤價缺失或無效，在 8 筆計算窗口內；之後再 2 個行情日都有有效價格，缺價移出窗口後即可恢復評估"
+   }
+  },
+  {
+   "date": "2026-05-27",
+   "errors": {
+    "DDD": "2026-05-18 收盤價缺失或無效，在 8 筆計算窗口內；之後再 1 個行情日都有有效價格，缺價移出窗口後即可恢復評估"
+   }
+  }
+ ],
+ "slippage_rate": "0.001",
+ "total_commission": "6678",
+ "total_return": "0.0109647",
+ "total_tax": "11624",
+ "trades": [
+  {
+   "action": "BUY",
+   "amount": "62512.45000",
+   "cash_after": "937434.55000",
+   "cash_change": "-62565.45000",
+   "commission": "53",
+   "date": "2026-03-31",
+   "price": "62.51245",
+   "quantity": 1000,
+   "raw_price": "62.45",
+   "signal_date": "2026-03-30",
+   "stock_id": "CCC",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "56656.60000",
+   "cash_after": "880729.95000",
+   "cash_change": "-56704.60000",
+   "commission": "48",
+   "date": "2026-03-31",
+   "price": "56.65660",
+   "quantity": 1000,
+   "raw_price": "56.60",
+   "signal_date": "2026-03-30",
+   "stock_id": "BBB",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "63836.10000",
+   "cash_after": "944321.05000",
+   "cash_change": "63591.10000",
+   "commission": "54",
+   "date": "2026-04-01",
+   "price": "63.83610",
+   "quantity": 1000,
+   "raw_price": "63.90",
+   "signal_date": "2026-03-31",
+   "stock_id": "CCC",
+   "tax": "191"
+  },
+  {
+   "action": "BUY",
+   "amount": "80630.55000",
+   "cash_after": "863622.50000",
+   "cash_change": "-80698.55000",
+   "commission": "68",
+   "date": "2026-04-01",
+   "price": "80.63055",
+   "quantity": 1000,
+   "raw_price": "80.55",
+   "signal_date": "2026-03-31",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "54495.45000",
+   "cash_after": "917908.95000",
+   "cash_change": "54286.45000",
+   "commission": "46",
+   "date": "2026-04-02",
+   "price": "54.49545",
+   "quantity": 1000,
+   "raw_price": "54.55",
+   "signal_date": "2026-04-01",
+   "stock_id": "BBB",
+   "tax": "163"
+  },
+  {
+   "action": "SELL",
+   "amount": "82617.30000",
+   "cash_after": "1000209.25000",
+   "cash_change": "82300.30000",
+   "commission": "70",
+   "date": "2026-04-02",
+   "price": "82.61730",
+   "quantity": 1000,
+   "raw_price": "82.70",
+   "signal_date": "2026-04-01",
+   "stock_id": "EEE",
+   "tax": "247"
+  },
+  {
+   "action": "BUY",
+   "amount": "43793.75000",
+   "cash_after": "956378.50000",
+   "cash_change": "-43830.75000",
+   "commission": "37",
+   "date": "2026-04-02",
+   "price": "43.79375",
+   "quantity": 1000,
+   "raw_price": "43.75",
+   "signal_date": "2026-04-01",
+   "stock_id": "AAA",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "71971.90000",
+   "cash_after": "884345.60000",
+   "cash_change": "-72032.90000",
+   "commission": "61",
+   "date": "2026-04-02",
+   "price": "71.97190",
+   "quantity": 1000,
+   "raw_price": "71.90",
+   "signal_date": "2026-04-01",
+   "stock_id": "DDD",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "43856.10000",
+   "cash_after": "928033.70000",
+   "cash_change": "43688.10000",
+   "commission": "37",
+   "date": "2026-04-03",
+   "price": "43.85610",
+   "quantity": 1000,
+   "raw_price": "43.90",
+   "signal_date": "2026-04-02",
+   "stock_id": "AAA",
+   "tax": "131"
+  },
+  {
+   "action": "SELL",
+   "amount": "73026.90000",
+   "cash_after": "1000779.60000",
+   "cash_change": "72745.90000",
+   "commission": "62",
+   "date": "2026-04-03",
+   "price": "73.02690",
+   "quantity": 1000,
+   "raw_price": "73.10",
+   "signal_date": "2026-04-02",
+   "stock_id": "DDD",
+   "tax": "219"
+  },
+  {
+   "action": "BUY",
+   "amount": "84334.25000",
+   "cash_after": "916373.35000",
+   "cash_change": "-84406.25000",
+   "commission": "72",
+   "date": "2026-04-03",
+   "price": "84.33425",
+   "quantity": 1000,
+   "raw_price": "84.25",
+   "signal_date": "2026-04-02",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "74974.90000",
+   "cash_after": "841334.45000",
+   "cash_change": "-75038.90000",
+   "commission": "64",
+   "date": "2026-04-06",
+   "price": "74.97490",
+   "quantity": 1000,
+   "raw_price": "74.90",
+   "signal_date": "2026-04-03",
+   "stock_id": "DDD",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "84215.70000",
+   "cash_after": "925226.15000",
+   "cash_change": "83891.70000",
+   "commission": "72",
+   "date": "2026-04-07",
+   "price": "84.21570",
+   "quantity": 1000,
+   "raw_price": "84.30",
+   "signal_date": "2026-04-06",
+   "stock_id": "EEE",
+   "tax": "252"
+  },
+  {
+   "action": "BUY",
+   "amount": "53053.00000",
+   "cash_after": "872128.15000",
+   "cash_change": "-53098.00000",
+   "commission": "45",
+   "date": "2026-04-07",
+   "price": "53.05300",
+   "quantity": 1000,
+   "raw_price": "53.00",
+   "signal_date": "2026-04-06",
+   "stock_id": "BBB",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "53446.50000",
+   "cash_after": "925369.65000",
+   "cash_change": "53241.50000",
+   "commission": "45",
+   "date": "2026-04-08",
+   "price": "53.44650",
+   "quantity": 1000,
+   "raw_price": "53.50",
+   "signal_date": "2026-04-07",
+   "stock_id": "BBB",
+   "tax": "160"
+  },
+  {
+   "action": "SELL",
+   "amount": "73576.35000",
+   "cash_after": "998664.00000",
+   "cash_change": "73294.35000",
+   "commission": "62",
+   "date": "2026-04-08",
+   "price": "73.57635",
+   "quantity": 1000,
+   "raw_price": "73.65",
+   "signal_date": "2026-04-07",
+   "stock_id": "DDD",
+   "tax": "220"
+  },
+  {
+   "action": "BUY",
+   "amount": "81681.60000",
+   "cash_after": "916913.40000",
+   "cash_change": "-81750.60000",
+   "commission": "69",
+   "date": "2026-04-08",
+   "price": "81.68160",
+   "quantity": 1000,
+   "raw_price": "81.60",
+   "signal_date": "2026-04-07",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "83666.25000",
+   "cash_after": "1000258.65000",
+   "cash_change": "83345.25000",
+   "commission": "71",
+   "date": "2026-04-09",
+   "price": "83.66625",
+   "quantity": 1000,
+   "raw_price": "83.75",
+   "signal_date": "2026-04-08",
+   "stock_id": "EEE",
+   "tax": "250"
+  },
+  {
+   "action": "BUY",
+   "amount": "62962.90000",
+   "cash_after": "937242.75000",
+   "cash_change": "-63015.90000",
+   "commission": "53",
+   "date": "2026-04-09",
+   "price": "62.96290",
+   "quantity": 1000,
+   "raw_price": "62.90",
+   "signal_date": "2026-04-08",
+   "stock_id": "CCC",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "75525.45000",
+   "cash_after": "861653.30000",
+   "cash_change": "-75589.45000",
+   "commission": "64",
+   "date": "2026-04-09",
+   "price": "75.52545",
+   "quantity": 1000,
+   "raw_price": "75.45",
+   "signal_date": "2026-04-08",
+   "stock_id": "DDD",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "64285.65000",
+   "cash_after": "925692.95000",
+   "cash_change": "64039.65000",
+   "commission": "54",
+   "date": "2026-04-10",
+   "price": "64.28565",
+   "quantity": 1000,
+   "raw_price": "64.35",
+   "signal_date": "2026-04-09",
+   "stock_id": "CCC",
+   "tax": "192"
+  },
+  {
+   "action": "BUY",
+   "amount": "42842.80000",
+   "cash_after": "882814.15000",
+   "cash_change": "-42878.80000",
+   "commission": "36",
+   "date": "2026-04-10",
+   "price": "42.84280",
+   "quantity": 1000,
+   "raw_price": "42.80",
+   "signal_date": "2026-04-09",
+   "stock_id": "AAA",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "42907.05000",
+   "cash_after": "925557.20000",
+   "cash_change": "42743.05000",
+   "commission": "36",
+   "date": "2026-04-13",
+   "price": "42.90705",
+   "quantity": 1000,
+   "raw_price": "42.95",
+   "signal_date": "2026-04-10",
+   "stock_id": "AAA",
+   "tax": "128"
+  },
+  {
+   "action": "SELL",
+   "amount": "74125.80000",
+   "cash_after": "999398.00000",
+   "cash_change": "73840.80000",
+   "commission": "63",
+   "date": "2026-04-13",
+   "price": "74.12580",
+   "quantity": 1000,
+   "raw_price": "74.20",
+   "signal_date": "2026-04-10",
+   "stock_id": "DDD",
+   "tax": "222"
+  },
+  {
+   "action": "BUY",
+   "amount": "83283.20000",
+   "cash_after": "916043.80000",
+   "cash_change": "-83354.20000",
+   "commission": "71",
+   "date": "2026-04-13",
+   "price": "83.28320",
+   "quantity": 1000,
+   "raw_price": "83.20",
+   "signal_date": "2026-04-10",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "52001.95000",
+   "cash_after": "863997.85000",
+   "cash_change": "-52045.95000",
+   "commission": "44",
+   "date": "2026-04-13",
+   "price": "52.00195",
+   "quantity": 1000,
+   "raw_price": "51.95",
+   "signal_date": "2026-04-10",
+   "stock_id": "BBB",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "52996.95000",
+   "cash_after": "916791.80000",
+   "cash_change": "52793.95000",
+   "commission": "45",
+   "date": "2026-04-14",
+   "price": "52.99695",
+   "quantity": 1000,
+   "raw_price": "53.05",
+   "signal_date": "2026-04-13",
+   "stock_id": "BBB",
+   "tax": "158"
+  },
+  {
+   "action": "SELL",
+   "amount": "85264.65000",
+   "cash_after": "1001729.45000",
+   "cash_change": "84937.65000",
+   "commission": "72",
+   "date": "2026-04-14",
+   "price": "85.26465",
+   "quantity": 1000,
+   "raw_price": "85.35",
+   "signal_date": "2026-04-13",
+   "stock_id": "EEE",
+   "tax": "255"
+  },
+  {
+   "action": "BUY",
+   "amount": "76076.00000",
+   "cash_after": "925588.45000",
+   "cash_change": "-76141.00000",
+   "commission": "65",
+   "date": "2026-04-14",
+   "price": "76.07600",
+   "quantity": 1000,
+   "raw_price": "76.00",
+   "signal_date": "2026-04-13",
+   "stock_id": "DDD",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "83333.25000",
+   "cash_after": "842184.20000",
+   "cash_change": "-83404.25000",
+   "commission": "71",
+   "date": "2026-04-15",
+   "price": "83.33325",
+   "quantity": 1000,
+   "raw_price": "83.25",
+   "signal_date": "2026-04-14",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "74675.25000",
+   "cash_after": "916572.45000",
+   "cash_change": "74388.25000",
+   "commission": "63",
+   "date": "2026-04-16",
+   "price": "74.67525",
+   "quantity": 1000,
+   "raw_price": "74.75",
+   "signal_date": "2026-04-15",
+   "stock_id": "DDD",
+   "tax": "224"
+  },
+  {
+   "action": "SELL",
+   "amount": "84715.20000",
+   "cash_after": "1000961.65000",
+   "cash_change": "84389.20000",
+   "commission": "72",
+   "date": "2026-04-16",
+   "price": "84.71520",
+   "quantity": 1000,
+   "raw_price": "84.80",
+   "signal_date": "2026-04-15",
+   "stock_id": "EEE",
+   "tax": "254"
+  },
+  {
+   "action": "BUY",
+   "amount": "82782.70000",
+   "cash_after": "918108.95000",
+   "cash_change": "-82852.70000",
+   "commission": "70",
+   "date": "2026-04-17",
+   "price": "82.78270",
+   "quantity": 1000,
+   "raw_price": "82.70",
+   "signal_date": "2026-04-16",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "51551.50000",
+   "cash_after": "866513.45000",
+   "cash_change": "-51595.50000",
+   "commission": "44",
+   "date": "2026-04-17",
+   "price": "51.55150",
+   "quantity": 1000,
+   "raw_price": "51.50",
+   "signal_date": "2026-04-16",
+   "stock_id": "BBB",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "52547.40000",
+   "cash_after": "918859.85000",
+   "cash_change": "52346.40000",
+   "commission": "44",
+   "date": "2026-04-20",
+   "price": "52.54740",
+   "quantity": 1000,
+   "raw_price": "52.60",
+   "signal_date": "2026-04-17",
+   "stock_id": "BBB",
+   "tax": "157"
+  },
+  {
+   "action": "SELL",
+   "amount": "84765.15000",
+   "cash_after": "1003299.00000",
+   "cash_change": "84439.15000",
+   "commission": "72",
+   "date": "2026-04-20",
+   "price": "84.76515",
+   "quantity": 1000,
+   "raw_price": "84.85",
+   "signal_date": "2026-04-17",
+   "stock_id": "EEE",
+   "tax": "254"
+  },
+  {
+   "action": "BUY",
+   "amount": "84384.30000",
+   "cash_after": "918842.70000",
+   "cash_change": "-84456.30000",
+   "commission": "72",
+   "date": "2026-04-22",
+   "price": "84.38430",
+   "quantity": 1000,
+   "raw_price": "84.30",
+   "signal_date": "2026-04-21",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "86363.55000",
+   "cash_after": "1004874.25000",
+   "cash_change": "86031.55000",
+   "commission": "73",
+   "date": "2026-04-23",
+   "price": "86.36355",
+   "quantity": 1000,
+   "raw_price": "86.45",
+   "signal_date": "2026-04-22",
+   "stock_id": "EEE",
+   "tax": "259"
+  },
+  {
+   "action": "BUY",
+   "amount": "62912.85000",
+   "cash_after": "941908.40000",
+   "cash_change": "-62965.85000",
+   "commission": "53",
+   "date": "2026-04-23",
+   "price": "62.91285",
+   "quantity": 1000,
+   "raw_price": "62.85",
+   "signal_date": "2026-04-22",
+   "stock_id": "CCC",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "55355.30000",
+   "cash_after": "886506.10000",
+   "cash_change": "-55402.30000",
+   "commission": "47",
+   "date": "2026-04-23",
+   "price": "55.35530",
+   "quantity": 1000,
+   "raw_price": "55.30",
+   "signal_date": "2026-04-22",
+   "stock_id": "BBB",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "63636.30000",
+   "cash_after": "949898.40000",
+   "cash_change": "63392.30000",
+   "commission": "54",
+   "date": "2026-04-24",
+   "price": "63.63630",
+   "quantity": 1000,
+   "raw_price": "63.70",
+   "signal_date": "2026-04-23",
+   "stock_id": "CCC",
+   "tax": "190"
+  },
+  {
+   "action": "BUY",
+   "amount": "83833.75000",
+   "cash_after": "865993.65000",
+   "cash_change": "-83904.75000",
+   "commission": "71",
+   "date": "2026-04-24",
+   "price": "83.83375",
+   "quantity": 1000,
+   "raw_price": "83.75",
+   "signal_date": "2026-04-23",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "52597.35000",
+   "cash_after": "918390.00000",
+   "cash_change": "52396.35000",
+   "commission": "44",
+   "date": "2026-04-27",
+   "price": "52.59735",
+   "quantity": 1000,
+   "raw_price": "52.65",
+   "signal_date": "2026-04-24",
+   "stock_id": "BBB",
+   "tax": "157"
+  },
+  {
+   "action": "SELL",
+   "amount": "85814.10000",
+   "cash_after": "1003874.10000",
+   "cash_change": "85484.10000",
+   "commission": "73",
+   "date": "2026-04-27",
+   "price": "85.81410",
+   "quantity": 1000,
+   "raw_price": "85.90",
+   "signal_date": "2026-04-24",
+   "stock_id": "EEE",
+   "tax": "257"
+  },
+  {
+   "action": "BUY",
+   "amount": "40190.15000",
+   "cash_after": "963649.95000",
+   "cash_change": "-40224.15000",
+   "commission": "34",
+   "date": "2026-04-27",
+   "price": "40.19015",
+   "quantity": 1000,
+   "raw_price": "40.15",
+   "signal_date": "2026-04-24",
+   "stock_id": "AAA",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "73473.40000",
+   "cash_after": "890114.55000",
+   "cash_change": "-73535.40000",
+   "commission": "62",
+   "date": "2026-04-27",
+   "price": "73.47340",
+   "quantity": 1000,
+   "raw_price": "73.40",
+   "signal_date": "2026-04-24",
+   "stock_id": "DDD",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "40859.10000",
+   "cash_after": "930817.65000",
+   "cash_change": "40703.10000",
+   "commission": "34",
+   "date": "2026-04-28",
+   "price": "40.85910",
+   "quantity": 1000,
+   "raw_price": "40.90",
+   "signal_date": "2026-04-27",
+   "stock_id": "AAA",
+   "tax": "122"
+  },
+  {
+   "action": "SELL",
+   "amount": "75124.80000",
+   "cash_after": "1005653.45000",
+   "cash_change": "74835.80000",
+   "commission": "64",
+   "date": "2026-04-28",
+   "price": "75.12480",
+   "quantity": 1000,
+   "raw_price": "75.20",
+   "signal_date": "2026-04-27",
+   "stock_id": "DDD",
+   "tax": "225"
+  },
+  {
+   "action": "BUY",
+   "amount": "88138.05000",
+   "cash_after": "917440.40000",
+   "cash_change": "-88213.05000",
+   "commission": "75",
+   "date": "2026-04-28",
+   "price": "88.13805",
+   "quantity": 1000,
+   "raw_price": "88.05",
+   "signal_date": "2026-04-27",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "76476.40000",
+   "cash_after": "840899.00000",
+   "cash_change": "-76541.40000",
+   "commission": "65",
+   "date": "2026-04-29",
+   "price": "76.47640",
+   "quantity": 1000,
+   "raw_price": "76.40",
+   "signal_date": "2026-04-28",
+   "stock_id": "DDD",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "87412.50000",
+   "cash_after": "927975.50000",
+   "cash_change": "87076.50000",
+   "commission": "74",
+   "date": "2026-04-30",
+   "price": "87.41250",
+   "quantity": 1000,
+   "raw_price": "87.50",
+   "signal_date": "2026-04-29",
+   "stock_id": "EEE",
+   "tax": "262"
+  },
+  {
+   "action": "BUY",
+   "amount": "51151.10000",
+   "cash_after": "876781.40000",
+   "cash_change": "-51194.10000",
+   "commission": "43",
+   "date": "2026-04-30",
+   "price": "51.15110",
+   "quantity": 1000,
+   "raw_price": "51.10",
+   "signal_date": "2026-04-29",
+   "stock_id": "BBB",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "52147.80000",
+   "cash_after": "928729.20000",
+   "cash_change": "51947.80000",
+   "commission": "44",
+   "date": "2026-05-01",
+   "price": "52.14780",
+   "quantity": 1000,
+   "raw_price": "52.20",
+   "signal_date": "2026-04-30",
+   "stock_id": "BBB",
+   "tax": "156"
+  },
+  {
+   "action": "SELL",
+   "amount": "75674.25000",
+   "cash_after": "1004112.45000",
+   "cash_change": "75383.25000",
+   "commission": "64",
+   "date": "2026-05-01",
+   "price": "75.67425",
+   "quantity": 1000,
+   "raw_price": "75.75",
+   "signal_date": "2026-04-30",
+   "stock_id": "DDD",
+   "tax": "227"
+  },
+  {
+   "action": "BUY",
+   "amount": "85485.40000",
+   "cash_after": "918554.05000",
+   "cash_change": "-85558.40000",
+   "commission": "73",
+   "date": "2026-05-01",
+   "price": "85.48540",
+   "quantity": 1000,
+   "raw_price": "85.40",
+   "signal_date": "2026-04-30",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "86863.05000",
+   "cash_after": "1005083.10000",
+   "cash_change": "86529.05000",
+   "commission": "74",
+   "date": "2026-05-04",
+   "price": "86.86305",
+   "quantity": 1000,
+   "raw_price": "86.95",
+   "signal_date": "2026-05-01",
+   "stock_id": "EEE",
+   "tax": "260"
+  },
+  {
+   "action": "BUY",
+   "amount": "62762.70000",
+   "cash_after": "942267.40000",
+   "cash_change": "-62815.70000",
+   "commission": "53",
+   "date": "2026-05-04",
+   "price": "62.76270",
+   "quantity": 1000,
+   "raw_price": "62.70",
+   "signal_date": "2026-05-01",
+   "stock_id": "CCC",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "77026.95000",
+   "cash_after": "865175.45000",
+   "cash_change": "-77091.95000",
+   "commission": "65",
+   "date": "2026-05-04",
+   "price": "77.02695",
+   "quantity": 1000,
+   "raw_price": "76.95",
+   "signal_date": "2026-05-01",
+   "stock_id": "DDD",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "64085.85000",
+   "cash_after": "929015.30000",
+   "cash_change": "63839.85000",
+   "commission": "54",
+   "date": "2026-05-05",
+   "price": "64.08585",
+   "quantity": 1000,
+   "raw_price": "64.15",
+   "signal_date": "2026-05-04",
+   "stock_id": "CCC",
+   "tax": "192"
+  },
+  {
+   "action": "BUY",
+   "amount": "39239.20000",
+   "cash_after": "889743.10000",
+   "cash_change": "-39272.20000",
+   "commission": "33",
+   "date": "2026-05-05",
+   "price": "39.23920",
+   "quantity": 1000,
+   "raw_price": "39.20",
+   "signal_date": "2026-05-04",
+   "stock_id": "AAA",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "39910.05000",
+   "cash_after": "929500.15000",
+   "cash_change": "39757.05000",
+   "commission": "34",
+   "date": "2026-05-06",
+   "price": "39.91005",
+   "quantity": 1000,
+   "raw_price": "39.95",
+   "signal_date": "2026-05-05",
+   "stock_id": "AAA",
+   "tax": "119"
+  },
+  {
+   "action": "SELL",
+   "amount": "76223.70000",
+   "cash_after": "1005430.85000",
+   "cash_change": "75930.70000",
+   "commission": "65",
+   "date": "2026-05-06",
+   "price": "76.22370",
+   "quantity": 1000,
+   "raw_price": "76.30",
+   "signal_date": "2026-05-05",
+   "stock_id": "DDD",
+   "tax": "228"
+  },
+  {
+   "action": "BUY",
+   "amount": "87087.00000",
+   "cash_after": "918269.85000",
+   "cash_change": "-87161.00000",
+   "commission": "74",
+   "date": "2026-05-06",
+   "price": "87.08700",
+   "quantity": 1000,
+   "raw_price": "87.00",
+   "signal_date": "2026-05-05",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "88461.45000",
+   "cash_after": "1006391.30000",
+   "cash_change": "88121.45000",
+   "commission": "75",
+   "date": "2026-05-07",
+   "price": "88.46145",
+   "quantity": 1000,
+   "raw_price": "88.55",
+   "signal_date": "2026-05-06",
+   "stock_id": "EEE",
+   "tax": "265"
+  },
+  {
+   "action": "BUY",
+   "amount": "77577.50000",
+   "cash_after": "928747.80000",
+   "cash_change": "-77643.50000",
+   "commission": "66",
+   "date": "2026-05-07",
+   "price": "77.57750",
+   "quantity": 1000,
+   "raw_price": "77.50",
+   "signal_date": "2026-05-06",
+   "stock_id": "DDD",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "86536.45000",
+   "cash_after": "842138.35000",
+   "cash_change": "-86609.45000",
+   "commission": "73",
+   "date": "2026-05-08",
+   "price": "86.53645",
+   "quantity": 1000,
+   "raw_price": "86.45",
+   "signal_date": "2026-05-07",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "76773.15000",
+   "cash_after": "918616.50000",
+   "cash_change": "76478.15000",
+   "commission": "65",
+   "date": "2026-05-11",
+   "price": "76.77315",
+   "quantity": 1000,
+   "raw_price": "76.85",
+   "signal_date": "2026-05-08",
+   "stock_id": "DDD",
+   "tax": "230"
+  },
+  {
+   "action": "SELL",
+   "amount": "88511.40000",
+   "cash_after": "1006787.90000",
+   "cash_change": "88171.40000",
+   "commission": "75",
+   "date": "2026-05-11",
+   "price": "88.51140",
+   "quantity": 1000,
+   "raw_price": "88.60",
+   "signal_date": "2026-05-08",
+   "stock_id": "EEE",
+   "tax": "265"
+  },
+  {
+   "action": "BUY",
+   "amount": "85985.90000",
+   "cash_after": "920729.00000",
+   "cash_change": "-86058.90000",
+   "commission": "73",
+   "date": "2026-05-12",
+   "price": "85.98590",
+   "quantity": 1000,
+   "raw_price": "85.90",
+   "signal_date": "2026-05-11",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "73873.80000",
+   "cash_after": "846792.20000",
+   "cash_change": "-73936.80000",
+   "commission": "63",
+   "date": "2026-05-12",
+   "price": "73.87380",
+   "quantity": 1000,
+   "raw_price": "73.80",
+   "signal_date": "2026-05-11",
+   "stock_id": "DDD",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "75524.40000",
+   "cash_after": "922026.60000",
+   "cash_change": "75234.40000",
+   "commission": "64",
+   "date": "2026-05-13",
+   "price": "75.52440",
+   "quantity": 1000,
+   "raw_price": "75.60",
+   "signal_date": "2026-05-12",
+   "stock_id": "DDD",
+   "tax": "226"
+  },
+  {
+   "action": "SELL",
+   "amount": "87961.95000",
+   "cash_after": "1009650.55000",
+   "cash_change": "87623.95000",
+   "commission": "75",
+   "date": "2026-05-13",
+   "price": "87.96195",
+   "quantity": 1000,
+   "raw_price": "88.05",
+   "signal_date": "2026-05-12",
+   "stock_id": "EEE",
+   "tax": "263"
+  },
+  {
+   "action": "BUY",
+   "amount": "87587.50000",
+   "cash_after": "921989.05000",
+   "cash_change": "-87661.50000",
+   "commission": "74",
+   "date": "2026-05-15",
+   "price": "87.58750",
+   "quantity": 1000,
+   "raw_price": "87.50",
+   "signal_date": "2026-05-14",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "89560.35000",
+   "cash_after": "1011205.40000",
+   "cash_change": "89216.35000",
+   "commission": "76",
+   "date": "2026-05-18",
+   "price": "89.56035",
+   "quantity": 1000,
+   "raw_price": "89.65",
+   "signal_date": "2026-05-15",
+   "stock_id": "EEE",
+   "tax": "268"
+  },
+  {
+   "action": "BUY",
+   "amount": "87637.55000",
+   "cash_after": "923493.85000",
+   "cash_change": "-87711.55000",
+   "commission": "74",
+   "date": "2026-05-19",
+   "price": "87.63755",
+   "quantity": 1000,
+   "raw_price": "87.55",
+   "signal_date": "2026-05-18",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "89010.90000",
+   "cash_after": "1012161.75000",
+   "cash_change": "88667.90000",
+   "commission": "76",
+   "date": "2026-05-20",
+   "price": "89.01090",
+   "quantity": 1000,
+   "raw_price": "89.10",
+   "signal_date": "2026-05-19",
+   "stock_id": "EEE",
+   "tax": "267"
+  },
+  {
+   "action": "BUY",
+   "amount": "36586.55000",
+   "cash_after": "975544.20000",
+   "cash_change": "-36617.55000",
+   "commission": "31",
+   "date": "2026-05-20",
+   "price": "36.58655",
+   "quantity": 1000,
+   "raw_price": "36.55",
+   "signal_date": "2026-05-19",
+   "stock_id": "AAA",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "37262.70000",
+   "cash_after": "1012664.90000",
+   "cash_change": "37120.70000",
+   "commission": "31",
+   "date": "2026-05-21",
+   "price": "37.26270",
+   "quantity": 1000,
+   "raw_price": "37.30",
+   "signal_date": "2026-05-20",
+   "stock_id": "AAA",
+   "tax": "111"
+  },
+  {
+   "action": "BUY",
+   "amount": "91341.25000",
+   "cash_after": "921245.65000",
+   "cash_change": "-91419.25000",
+   "commission": "78",
+   "date": "2026-05-21",
+   "price": "91.34125",
+   "quantity": 1000,
+   "raw_price": "91.25",
+   "signal_date": "2026-05-20",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "90609.30000",
+   "cash_after": "1011506.95000",
+   "cash_change": "90261.30000",
+   "commission": "77",
+   "date": "2026-05-25",
+   "price": "90.60930",
+   "quantity": 1000,
+   "raw_price": "90.70",
+   "signal_date": "2026-05-22",
+   "stock_id": "EEE",
+   "tax": "271"
+  },
+  {
+   "action": "BUY",
+   "amount": "49249.20000",
+   "cash_after": "962215.75000",
+   "cash_change": "-49291.20000",
+   "commission": "42",
+   "date": "2026-05-25",
+   "price": "49.24920",
+   "quantity": 1000,
+   "raw_price": "49.20",
+   "signal_date": "2026-05-22",
+   "stock_id": "BBB",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "50249.70000",
+   "cash_after": "1012273.45000",
+   "cash_change": "50057.70000",
+   "commission": "42",
+   "date": "2026-05-26",
+   "price": "50.24970",
+   "quantity": 1000,
+   "raw_price": "50.30",
+   "signal_date": "2026-05-25",
+   "stock_id": "BBB",
+   "tax": "150"
+  },
+  {
+   "action": "BUY",
+   "amount": "88688.60000",
+   "cash_after": "923509.85000",
+   "cash_change": "-88763.60000",
+   "commission": "75",
+   "date": "2026-05-26",
+   "price": "88.68860",
+   "quantity": 1000,
+   "raw_price": "88.60",
+   "signal_date": "2026-05-25",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "90659.25000",
+   "cash_after": "1013821.10000",
+   "cash_change": "90311.25000",
+   "commission": "77",
+   "date": "2026-05-27",
+   "price": "90.65925",
+   "quantity": 1000,
+   "raw_price": "90.75",
+   "signal_date": "2026-05-26",
+   "stock_id": "EEE",
+   "tax": "271"
+  },
+  {
+   "action": "BUY",
+   "amount": "63163.10000",
+   "cash_after": "950604.00000",
+   "cash_change": "-63217.10000",
+   "commission": "54",
+   "date": "2026-05-27",
+   "price": "63.16310",
+   "quantity": 1000,
+   "raw_price": "63.10",
+   "signal_date": "2026-05-26",
+   "stock_id": "CCC",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "63886.05000",
+   "cash_after": "1014245.05000",
+   "cash_change": "63641.05000",
+   "commission": "54",
+   "date": "2026-05-28",
+   "price": "63.88605",
+   "quantity": 1000,
+   "raw_price": "63.95",
+   "signal_date": "2026-05-27",
+   "stock_id": "CCC",
+   "tax": "191"
+  },
+  {
+   "action": "BUY",
+   "amount": "35635.60000",
+   "cash_after": "978579.45000",
+   "cash_change": "-35665.60000",
+   "commission": "30",
+   "date": "2026-05-28",
+   "price": "35.63560",
+   "quantity": 1000,
+   "raw_price": "35.60",
+   "signal_date": "2026-05-27",
+   "stock_id": "AAA",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "92392.30000",
+   "cash_after": "886109.15000",
+   "cash_change": "-92470.30000",
+   "commission": "78",
+   "date": "2026-05-28",
+   "price": "92.39230",
+   "quantity": 1000,
+   "raw_price": "92.30",
+   "signal_date": "2026-05-27",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "36313.65000",
+   "cash_after": "922283.80000",
+   "cash_change": "36174.65000",
+   "commission": "31",
+   "date": "2026-05-29",
+   "price": "36.31365",
+   "quantity": 1000,
+   "raw_price": "36.35",
+   "signal_date": "2026-05-28",
+   "stock_id": "AAA",
+   "tax": "108"
+  },
+  {
+   "action": "BUY",
+   "amount": "48798.75000",
+   "cash_after": "873444.05000",
+   "cash_change": "-48839.75000",
+   "commission": "41",
+   "date": "2026-05-29",
+   "price": "48.79875",
+   "quantity": 1000,
+   "raw_price": "48.75",
+   "signal_date": "2026-05-28",
+   "stock_id": "BBB",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "49800.15000",
+   "cash_after": "923053.20000",
+   "cash_change": "49609.15000",
+   "commission": "42",
+   "date": "2026-06-01",
+   "price": "49.80015",
+   "quantity": 1000,
+   "raw_price": "49.85",
+   "signal_date": "2026-05-29",
+   "stock_id": "BBB",
+   "tax": "149"
+  },
+  {
+   "action": "SELL",
+   "amount": "92257.65000",
+   "cash_after": "1014956.85000",
+   "cash_change": "91903.65000",
+   "commission": "78",
+   "date": "2026-06-01",
+   "price": "92.25765",
+   "quantity": 1000,
+   "raw_price": "92.35",
+   "signal_date": "2026-05-29",
+   "stock_id": "EEE",
+   "tax": "276"
+  },
+  {
+   "action": "BUY",
+   "amount": "79679.60000",
+   "cash_after": "935209.25000",
+   "cash_change": "-79747.60000",
+   "commission": "68",
+   "date": "2026-06-01",
+   "price": "79.67960",
+   "quantity": 1000,
+   "raw_price": "79.60",
+   "signal_date": "2026-05-29",
+   "stock_id": "DDD",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "89739.65000",
+   "cash_after": "845393.60000",
+   "cash_change": "-89815.65000",
+   "commission": "76",
+   "date": "2026-06-02",
+   "price": "89.73965",
+   "quantity": 1000,
+   "raw_price": "89.65",
+   "signal_date": "2026-06-01",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "78271.65000",
+   "cash_after": "923365.25000",
+   "cash_change": "77971.65000",
+   "commission": "66",
+   "date": "2026-06-03",
+   "price": "78.27165",
+   "quantity": 1000,
+   "raw_price": "78.35",
+   "signal_date": "2026-06-02",
+   "stock_id": "DDD",
+   "tax": "234"
+  },
+  {
+   "action": "SELL",
+   "amount": "91708.20000",
+   "cash_after": "1014720.45000",
+   "cash_change": "91355.20000",
+   "commission": "78",
+   "date": "2026-06-03",
+   "price": "91.70820",
+   "quantity": 1000,
+   "raw_price": "91.80",
+   "signal_date": "2026-06-02",
+   "stock_id": "EEE",
+   "tax": "275"
+  },
+  {
+   "action": "BUY",
+   "amount": "89789.70000",
+   "cash_after": "924854.75000",
+   "cash_change": "-89865.70000",
+   "commission": "76",
+   "date": "2026-06-04",
+   "price": "89.78970",
+   "quantity": 1000,
+   "raw_price": "89.70",
+   "signal_date": "2026-06-03",
+   "stock_id": "EEE",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "48348.30000",
+   "cash_after": "876465.45000",
+   "cash_change": "-48389.30000",
+   "commission": "41",
+   "date": "2026-06-04",
+   "price": "48.34830",
+   "quantity": 1000,
+   "raw_price": "48.30",
+   "signal_date": "2026-06-03",
+   "stock_id": "BBB",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "48751.20000",
+   "cash_after": "925029.65000",
+   "cash_change": "48564.20000",
+   "commission": "41",
+   "date": "2026-06-05",
+   "price": "48.75120",
+   "quantity": 1000,
+   "raw_price": "48.80",
+   "signal_date": "2026-06-04",
+   "stock_id": "BBB",
+   "tax": "146"
+  },
+  {
+   "action": "SELL",
+   "amount": "91158.75000",
+   "cash_after": "1015838.40000",
+   "cash_change": "90808.75000",
+   "commission": "77",
+   "date": "2026-06-05",
+   "price": "91.15875",
+   "quantity": 1000,
+   "raw_price": "91.25",
+   "signal_date": "2026-06-04",
+   "stock_id": "EEE",
+   "tax": "273"
+  },
+  {
+   "action": "BUY",
+   "amount": "62512.45000",
+   "cash_after": "953272.95000",
+   "cash_change": "-62565.45000",
+   "commission": "53",
+   "date": "2026-06-10",
+   "price": "62.51245",
+   "quantity": 1000,
+   "raw_price": "62.45",
+   "signal_date": "2026-06-09",
+   "stock_id": "CCC",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "51551.50000",
+   "cash_after": "901677.45000",
+   "cash_change": "-51595.50000",
+   "commission": "44",
+   "date": "2026-06-10",
+   "price": "51.55150",
+   "quantity": 1000,
+   "raw_price": "51.50",
+   "signal_date": "2026-06-09",
+   "stock_id": "BBB",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "63836.10000",
+   "cash_after": "965268.55000",
+   "cash_change": "63591.10000",
+   "commission": "54",
+   "date": "2026-06-11",
+   "price": "63.83610",
+   "quantity": 1000,
+   "raw_price": "63.90",
+   "signal_date": "2026-06-10",
+   "stock_id": "CCC",
+   "tax": "191"
+  },
+  {
+   "action": "BUY",
+   "amount": "79529.45000",
+   "cash_after": "885672.10000",
+   "cash_change": "-79596.45000",
+   "commission": "67",
+   "date": "2026-06-11",
+   "price": "79.52945",
+   "quantity": 1000,
+   "raw_price": "79.45",
+   "signal_date": "2026-06-10",
+   "stock_id": "DDD",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "49400.55000",
+   "cash_after": "934882.65000",
+   "cash_change": "49210.55000",
+   "commission": "42",
+   "date": "2026-06-12",
+   "price": "49.40055",
+   "quantity": 1000,
+   "raw_price": "49.45",
+   "signal_date": "2026-06-11",
+   "stock_id": "BBB",
+   "tax": "148"
+  },
+  {
+   "action": "BUY",
+   "amount": "33583.55000",
+   "cash_after": "901271.10000",
+   "cash_change": "-33611.55000",
+   "commission": "28",
+   "date": "2026-06-12",
+   "price": "33.58355",
+   "quantity": 1000,
+   "raw_price": "33.55",
+   "signal_date": "2026-06-11",
+   "stock_id": "AAA",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "33666.30000",
+   "cash_after": "934809.40000",
+   "cash_change": "33538.30000",
+   "commission": "28",
+   "date": "2026-06-15",
+   "price": "33.66630",
+   "quantity": 1000,
+   "raw_price": "33.70",
+   "signal_date": "2026-06-12",
+   "stock_id": "AAA",
+   "tax": "100"
+  },
+  {
+   "action": "SELL",
+   "amount": "78121.80000",
+   "cash_after": "1012631.20000",
+   "cash_change": "77821.80000",
+   "commission": "66",
+   "date": "2026-06-15",
+   "price": "78.12180",
+   "quantity": 1000,
+   "raw_price": "78.20",
+   "signal_date": "2026-06-12",
+   "stock_id": "DDD",
+   "tax": "234"
+  },
+  {
+   "action": "BUY",
+   "amount": "80080.00000",
+   "cash_after": "932483.20000",
+   "cash_change": "-80148.00000",
+   "commission": "68",
+   "date": "2026-06-16",
+   "price": "80.08000",
+   "quantity": 1000,
+   "raw_price": "80.00",
+   "signal_date": "2026-06-15",
+   "stock_id": "DDD",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "47947.90000",
+   "cash_after": "884495.30000",
+   "cash_change": "-47987.90000",
+   "commission": "40",
+   "date": "2026-06-17",
+   "price": "47.94790",
+   "quantity": 1000,
+   "raw_price": "47.90",
+   "signal_date": "2026-06-16",
+   "stock_id": "BBB",
+   "tax": "0"
+  },
+  {
+   "action": "SELL",
+   "amount": "48351.60000",
+   "cash_after": "932660.90000",
+   "cash_change": "48165.60000",
+   "commission": "41",
+   "date": "2026-06-18",
+   "price": "48.35160",
+   "quantity": 1000,
+   "raw_price": "48.40",
+   "signal_date": "2026-06-17",
+   "stock_id": "BBB",
+   "tax": "145"
+  },
+  {
+   "action": "SELL",
+   "amount": "78671.25000",
+   "cash_after": "1011029.15000",
+   "cash_change": "78368.25000",
+   "commission": "67",
+   "date": "2026-06-18",
+   "price": "78.67125",
+   "quantity": 1000,
+   "raw_price": "78.75",
+   "signal_date": "2026-06-17",
+   "stock_id": "DDD",
+   "tax": "236"
+  },
+  {
+   "action": "BUY",
+   "amount": "62962.90000",
+   "cash_after": "948013.25000",
+   "cash_change": "-63015.90000",
+   "commission": "53",
+   "date": "2026-06-19",
+   "price": "62.96290",
+   "quantity": 1000,
+   "raw_price": "62.90",
+   "signal_date": "2026-06-18",
+   "stock_id": "CCC",
+   "tax": "0"
+  },
+  {
+   "action": "BUY",
+   "amount": "80630.55000",
+   "cash_after": "867314.70000",
+   "cash_change": "-80698.55000",
+   "commission": "68",
+   "date": "2026-06-19",
+   "price": "80.63055",
+   "quantity": 1000,
+   "raw_price": "80.55",
+   "signal_date": "2026-06-18",
+   "stock_id": "DDD",
+   "tax": "0"
+  }
+ ],
+ "unconfirmed_gaps": [
+  {
+   "days": 1,
+   "first": "2026-05-18",
+   "last": "2026-05-18",
+   "stock_id": "DDD"
+  }
+ ],
+ "unrealizable": {}
+}

@@ -349,30 +349,47 @@ def universe_path_for(db_path):
     return Path(db_path).with_name("listed_stocks.json")
 
 
-def listing_exclusions(stock_ids, db_path, start):
-    """回測開始日還沒上市的股票，依代號排序，每筆附上市日與原因。
+def listing_exclusions(stock_ids, db_path, start, delistings=None):
+    """回測開始日還沒上市、或已經終止上市的股票，依代號排序，每筆附日期與原因。
 
-    這些股票在開始日不可能持有，開始日以前也沒有行情，回測從股票池排除並在
-    報表列出，不在上市後中途加入。上市日取自行情庫旁的名單；名單不存在或沒有
-    上市日（合成示例）時不排除任何股票，缺列仍由回測報錯。
+    開始日還沒上市的股票在開始日不可能持有，開始日以前也沒有行情，回測從股票池排除並在
+    報表列出，不在上市後中途加入。上市日取自行情庫旁的名單；名單不存在或沒有上市日
+    （合成示例）時不依上市日排除。
+
+    終止上市日不晚於開始日的股票（delistings 預設為已確認的終止上市清單）整段期間都不能
+    交易，同樣排除（docs/HALT-POLICY.md 3.10）。
     """
-    path = universe_path_for(db_path)
-    if not path.is_file():
-        return []
+    from tw_stock_backtest.data.market_events import CONFIRMED_DELISTINGS
 
+    delistings = CONFIRMED_DELISTINGS if delistings is None else delistings
     start_text = start.isoformat() if isinstance(start, date) else str(start)
-    listed = {
-        stock["stock_id"]: stock.get("listed_date") for stock in load_universe(path)["stocks"]
-    }
-    return [
-        {
-            "stock_id": stock_id,
-            "listed_date": listed[stock_id],
-            "reason": f"{listed[stock_id]} 上市，晚於回測開始日 {start_text}，不納入股票池",
-        }
-        for stock_id in sorted(set(stock_ids))
-        if listed.get(stock_id) and listed[stock_id] > start_text
-    ]
+    path = universe_path_for(db_path)
+    listed = (
+        {stock["stock_id"]: stock.get("listed_date") for stock in load_universe(path)["stocks"]}
+        if path.is_file()
+        else {}
+    )
+    result = []
+    for stock_id in sorted(set(stock_ids)):
+        gone = delistings.get(stock_id, {}).get("effective")
+        if gone and gone <= start_text:
+            result.append(
+                {
+                    "stock_id": stock_id,
+                    "listed_date": listed.get(stock_id),
+                    "delisted_date": gone,
+                    "reason": f"{gone} 終止上市，不晚於回測開始日 {start_text}，不納入股票池",
+                }
+            )
+        elif listed.get(stock_id) and listed[stock_id] > start_text:
+            result.append(
+                {
+                    "stock_id": stock_id,
+                    "listed_date": listed[stock_id],
+                    "reason": f"{listed[stock_id]} 上市，晚於回測開始日 {start_text}，不納入股票池",
+                }
+            )
+    return result
 
 
 def offline_reason(db_path):

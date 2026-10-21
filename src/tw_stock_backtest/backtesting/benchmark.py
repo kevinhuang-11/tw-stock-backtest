@@ -1,4 +1,6 @@
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
+from typing import Any
 
 from tw_stock_backtest.backtesting.corporate_actions import Schedule, apply_due
 from tw_stock_backtest.backtesting.costs import (
@@ -6,14 +8,23 @@ from tw_stock_backtest.backtesting.costs import (
     apply_slippage,
     calculate_transaction,
 )
+from tw_stock_backtest.backtesting.delisting import (
+    check_valuation_mode,
+    retire_delisted,
+    unrealizable_value,
+)
+from tw_stock_backtest.backtesting.positions import final_positions
 from tw_stock_backtest.data.market_events import (
+    CONFIRMED_DELISTINGS,
     CONFIRMED_HALTS,
     prepare_backtest_market,
+    unconfirmed_gaps,
 )
 from tw_stock_backtest.date_range import parse_date_range
+from tw_stock_backtest.typedefs import Action, Delistings, Halts, Record, Row
 
 
-def affordable_quantity(price, budget, cost_settings):
+def affordable_quantity(price: Decimal, budget: Decimal, cost_settings: CostSettings) -> int:
     """使用二分搜尋，找出包含手續費後能負擔的最大整數股數。"""
     low = 0
     high = int(budget // price)
@@ -39,16 +50,18 @@ def affordable_quantity(price, budget, cost_settings):
 
 
 def run_buy_and_hold(
-    records_by_stock,
-    start_text,
-    end_text,
+    records_by_stock: Mapping[str, Sequence[Record]],
+    start_text: str,
+    end_text: str,
     *,
-    initial_cash,
-    cost_settings,
-    confirmed_halts=None,
-    slippage_rate=Decimal("0"),
-    corporate_actions=None,
-):
+    initial_cash: Decimal,
+    cost_settings: CostSettings,
+    confirmed_halts: Halts | None = None,
+    slippage_rate: Decimal = Decimal("0"),
+    corporate_actions: Mapping[str, Sequence[Action]] | None = None,
+    delistings: Delistings | None = None,
+    delisted_valuation: str = "last_close",
+) -> dict[str, Any]:
     """各檔平均分配預算，在第一個可交易日開盤買進並持有到期末。
 
     corporate_actions（{股票: 公司行動}）與多股票引擎使用相同的公司行動帳：
@@ -66,31 +79,40 @@ def run_buy_and_hold(
     apply_slippage(Decimal("1"), "BUY", slippage_rate)
 
     events = CONFIRMED_HALTS if confirmed_halts is None else confirmed_halts
+    delistings = CONFIRMED_DELISTINGS if delistings is None else delistings
+    check_valuation_mode(delisted_valuation)
 
     market, trading_dates = prepare_backtest_market(
         records_by_stock,
         start,
         end,
         confirmed_halts=events,
+        delistings=delistings,
     )
 
     budget = (initial_cash * 100 // len(market)) / Decimal("100")
 
     cash = initial_cash
-    holdings = {}
-    trades = []
-    equity_curve = []
+    holdings: dict[str, int] = {}
+    trades: list[Row] = []
+    equity_curve: list[Row] = []
     total_commission = Decimal("0")
     waiting = set(market)
-    unbought = []
+    unbought: list[str] = []
 
     schedule = Schedule(corporate_actions, "")
-    corporate_action_events = []
+    corporate_action_events: list[Row] = []
+    # 終止上市的持股與策略相同的規則（docs/HALT-POLICY.md 3.16）。
+    unrealizable: dict[str, Row] = {}
+    delisting_events: list[Row] = []
 
     for trading_date in trading_dates:
         received, applied = apply_due(schedule, trading_date, holdings)
         cash += received
         corporate_action_events.extend(applied)
+        delisting_events.extend(
+            retire_delisted(holdings, unrealizable, market, trading_date, delistings)
+        )
 
         # 每檔在期間內第一個可交易日，使用保留給它的預算買入。
         for stock_id in sorted(waiting):
@@ -149,12 +171,14 @@ def run_buy_and_hold(
             Decimal("0"),
         )
 
+        frozen_value = unrealizable_value(unrealizable, delisted_valuation)
         equity_curve.append(
             {
                 "date": trading_date,
                 "cash": cash,
                 "market_value": market_value,
-                "equity": cash + market_value,
+                "unrealizable_value": frozen_value,
+                "equity": cash + market_value + frozen_value,
                 "holdings": holdings.copy(),
                 "stale_prices": {
                     stock_id: market[stock_id][trading_date]["valuation_price_date"]
@@ -179,5 +203,17 @@ def run_buy_and_hold(
         "corporate_action_events": corporate_action_events,
         "unbought": sorted(unbought),
         "unavailable_entire_period": sorted(waiting),
+        "unconfirmed_gaps": unconfirmed_gaps(market),
+        "unrealizable": unrealizable,
+        "final_positions": final_positions(
+            holdings,
+            unrealizable,
+            market,
+            trading_dates[-1],
+            delistings,
+            delisted_valuation,
+        ),
+        "delisting_events": delisting_events,
+        "delisted_valuation": delisted_valuation,
         "slippage_rate": slippage_rate,
     }

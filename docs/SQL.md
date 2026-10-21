@@ -79,6 +79,8 @@ MIGRATIONS = (
     (1, (TABLE,)),      # 行情表；舊版程式建立的資料庫已有此表，這一步不會改動它
     (2, INDEXES),       # 日期索引與缺價部分索引
     (3, CORPORATE_ACTIONS),  # 公司行動表（見下一節）
+    (4, CORPORATE_ACTION_COVERAGE),  # 公司行動已下載的期間
+    (5, TRADING_RESTRICTIONS),  # 處置與全額交割的期間與已下載範圍（見 HALT-POLICY.md 3.17、3.18）
 )
 ```
 

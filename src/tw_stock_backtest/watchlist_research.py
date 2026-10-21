@@ -11,7 +11,6 @@ from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
-from tw_stock_backtest.cli.download_universe import save_progress
 from tw_stock_backtest.data.database import load_records
 from tw_stock_backtest.data.supplemental import timestamp
 from tw_stock_backtest.data.universe import NetworkDisabled
@@ -19,6 +18,7 @@ from tw_stock_backtest.prices import PriceSource, report_price_basis
 from tw_stock_backtest.research import program_version
 from tw_stock_backtest.research_digest import render_digest
 from tw_stock_backtest.security import public_data
+from tw_stock_backtest.serialization import save_progress
 from tw_stock_backtest.stock_research import (
     CONDITION_LABELS,
     MAX_ROWS,

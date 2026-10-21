@@ -8,7 +8,6 @@ from pathlib import Path
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from tw_stock_backtest.cli.download_universe import save_progress
 from tw_stock_backtest.config import DEFAULT_CONFIG_PATH, load_config
 from tw_stock_backtest.data.supplemental import (
     Client,
@@ -22,6 +21,7 @@ from tw_stock_backtest.data.supplemental import (
     validate_month_range,
 )
 from tw_stock_backtest.security import safe_text
+from tw_stock_backtest.serialization import save_progress
 
 
 def update(

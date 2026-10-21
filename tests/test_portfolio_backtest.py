@@ -174,14 +174,21 @@ class TestPortfolioBacktest(unittest.TestCase):
             "AAA",
         )
 
-    def test_missing_daily_record_is_rejected(self):
+    def test_missing_daily_record_is_unconfirmed_not_fatal(self):
         records = {
             "AAA": self.make_records("AAA", [10, 11, 12, 13]),
             "BBB": self.make_records("BBB", [10, 12, 14]),
         }
 
-        with self.assertRaises(ValueError):
-            self.run_engine(records)
+        result = self.run_engine(records)
+        self.assertEqual(
+            result["unconfirmed_gaps"],
+            [{"stock_id": "BBB", "first": "2026-01-04", "last": "2026-01-04", "days": 1}],
+        )
+        self.assertIn(
+            ("BBB", "2026-01-04", "MISSING_ROW"),
+            [(e["stock_id"], e["date"], e["market_status"]) for e in result["market_events"]],
+        )
 
 
 class TestPortfolioBudget(unittest.TestCase):

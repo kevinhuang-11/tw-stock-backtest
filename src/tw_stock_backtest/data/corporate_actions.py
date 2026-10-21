@@ -14,12 +14,20 @@
 import json
 import re
 import sqlite3
+from collections.abc import Iterable, Sequence
 from contextlib import closing
 from datetime import date, timedelta
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
+from typing import Any, cast
 
 from tw_stock_backtest.data.database import migrate_database
+from tw_stock_backtest.typedefs import Action, Halts
+
+# 證交所回應的一列（欄位名稱已去除空白與冒號）。
+SourceRow = dict[str, Any]
+# 資料庫路徑。
+DbPath = str | Path
 
 DIVIDEND = "dividend"
 CAPITAL_REDUCTION = "capital_reduction"
@@ -68,7 +76,7 @@ DECIMAL_COLUMNS = (
 # ---------- 欄位與數值 ----------
 
 
-def roc_date(text):
+def roc_date(text: str) -> str:
     """民國日期（115年03月17日、115/09/29）轉成 ISO 字串。"""
     numbers = re.findall(r"\d+", text or "")
     if len(numbers) != 3:
@@ -77,7 +85,7 @@ def roc_date(text):
     return date(year + 1911, month, day).isoformat()
 
 
-def amount(text):
+def amount(text: str | None) -> Decimal | None:
     """「1,845.00」「6.000035 元／股」「30 股」轉成 Decimal；空白或 -- 視為 None。"""
     cleaned = (text or "").replace(",", "").strip()
     match = re.match(r"^-?\d+(\.\d+)?", cleaned)
@@ -91,11 +99,11 @@ def amount(text):
         raise ValueError(f"數值格式無法辨識：{text!r}") from error
 
 
-def _key(field):
+def _key(field: str) -> str:
     return re.sub(r"[\s:：]", "", field)
 
 
-def records(payload):
+def records(payload: Any) -> list[SourceRow]:
     """把 {"fields", "data"} 轉成以去除空白與冒號後的欄位名稱為鍵的列。"""
     if not isinstance(payload, dict) or str(payload.get("stat", "")).lower() != "ok":
         raise ValueError(
@@ -110,7 +118,7 @@ def records(payload):
     return rows
 
 
-def _field(row, *fragments):
+def _field(row: SourceRow, *fragments: str) -> Any:
     """依欄位名稱片段取值；必須剛好對到一個欄位，避免改版後默默取錯欄。"""
     keys = [key for key in row if all(fragment in key for fragment in fragments)]
     if len(keys) != 1:
@@ -118,15 +126,24 @@ def _field(row, *fragments):
     return row[keys[0]]
 
 
-def _stock(row):
-    return _field(row, "股票代號").strip()
+def _stock(row: SourceRow) -> str:
+    stock_id: str = _field(row, "股票代號").strip()
+    return stock_id
 
 
-def _close_enough(computed, official):
+def _close_enough(computed: Decimal, official: Decimal) -> bool:
     return abs(computed - official) < TOLERANCE
 
 
-def _new(stock_id, effective_date, kind, previous_close, reference_price, sources, raw):
+def _new(
+    stock_id: str,
+    effective_date: str,
+    kind: str,
+    previous_close: Decimal | None,
+    reference_price: Decimal | None,
+    sources: Iterable[str],
+    raw: dict[str, Any],
+) -> Action:
     return {
         "stock_id": stock_id,
         "effective_date": effective_date,
@@ -147,7 +164,7 @@ def _new(stock_id, effective_date, kind, previous_close, reference_price, source
     }
 
 
-def _review(action, note):
+def _review(action: Action, note: str) -> None:
     action["needs_review"] = True
     action["review_notes"].append(note)
 
@@ -155,7 +172,9 @@ def _review(action, note):
 # ---------- 除權除息 ----------
 
 
-def dividend_rows(payload, stocks):
+def dividend_rows(
+    payload: Any, stocks: Iterable[str]
+) -> list[tuple[SourceRow, tuple[str, str], bool]]:
     """除權除息表中屬於 stocks 的列，回傳 (列, 詳細資料鍵 (代號, YYYYMMDD), 是否需要詳細資料)。
 
     權／息欄只有「息」時，權值＋息值就是每股現金股利，不需要詳細資料；
@@ -172,12 +191,13 @@ def dividend_rows(payload, stocks):
     return result
 
 
-def parse_dividend(row, detail=None, *, list_url):
+def parse_dividend(row: SourceRow, detail: Any = None, *, list_url: str) -> Action:
     """一列除權除息資料（及必要時的詳細資料）轉成公司行動。"""
     stock_id = _stock(row)
     effective_date = roc_date(_field(row, "資料日期"))
-    previous_close = amount(_field(row, "除權息前收盤價"))
-    reference_price = amount(_field(row, "除權息參考價"))
+    # 欄位空白時 amount 回傳 None（既有行為，見 REVIEW）；cast 只告訴型別檢查器。
+    previous_close = cast(Decimal, amount(_field(row, "除權息前收盤價")))
+    reference_price = cast(Decimal, amount(_field(row, "除權息參考價")))
     flag = _field(row, "權/息")
     detail_stock, detail_date = _field(row, "詳細資料").replace(" ", "").split(",")[:2]
     detail_url = (
@@ -198,7 +218,7 @@ def parse_dividend(row, detail=None, *, list_url):
     else:
         if detail is None:
             raise ValueError(f"{stock_id} {effective_date} 含除權，需要詳細資料")
-        values = records(detail)
+        values: Any = records(detail)
         if len(values) != 1 or _stock(values[0]) != stock_id:
             raise ValueError(f"{stock_id} {effective_date} 的除權息詳細資料不符")
         values = values[0]
@@ -251,7 +271,9 @@ COMBINED_NOTE = re.compile(
 )
 
 
-def reduction_rows(payload, stocks):
+def reduction_rows(
+    payload: Any, stocks: Iterable[str]
+) -> tuple[list[tuple[SourceRow, tuple[str, str]]], dict[str, Decimal]]:
     """減資表中屬於 stocks 的列與詳細資料鍵 (代號, FILE_DATE)，以及注意事項中的併案股利 {代號: 金額}。"""
     wanted = set(stocks)
     result = []
@@ -268,7 +290,13 @@ def reduction_rows(payload, stocks):
     return result, combined
 
 
-def parse_reduction(row, detail, *, list_url, combined_dividend=None):
+def parse_reduction(
+    row: SourceRow,
+    detail: Any,
+    *,
+    list_url: str,
+    combined_dividend: Decimal | None = None,
+) -> Action:
     """一列減資資料與其詳細資料轉成公司行動；生效日是恢復買賣日。
 
     combined_dividend：減資表注意事項中「除息併案辦理減資」的每股股利。注意事項是針對
@@ -277,8 +305,8 @@ def parse_reduction(row, detail, *, list_url, combined_dividend=None):
     """
     stock_id = _stock(row)
     effective_date = roc_date(_field(row, "恢復買賣日期"))
-    previous_close = amount(_field(row, "停止買賣前收盤價格"))
-    reference_price = amount(_field(row, "恢復買賣參考價"))
+    previous_close = cast(Decimal, amount(_field(row, "停止買賣前收盤價格")))
+    reference_price = cast(Decimal, amount(_field(row, "恢復買賣參考價")))
     detail_stock, detail_date = _field(row, "詳細資料").replace(" ", "").split(",")[:2]
     detail_url = f"{TWSE}/zh/announcement/reduction/twtavu-detail.html?{detail_stock},{detail_date}"
     action = _new(
@@ -291,7 +319,7 @@ def parse_reduction(row, detail, *, list_url, combined_dividend=None):
         {"list": row},
     )
 
-    values = records(detail)
+    values: Any = records(detail)
     if len(values) != 1 or _stock(values[0]) != stock_id:
         raise ValueError(f"{stock_id} {effective_date} 的減資詳細資料不符")
     values = values[0]
@@ -340,12 +368,12 @@ def parse_reduction(row, detail, *, list_url, combined_dividend=None):
 # ---------- 變更面額 ----------
 
 
-def parse_par_change(row, *, list_url):
+def parse_par_change(row: SourceRow, *, list_url: str) -> Action:
     """一列變更面額資料轉成公司行動；換股率由前收與參考價反推，只接受常見面額。"""
     stock_id = _stock(row)
     effective_date = roc_date(_field(row, "恢復買賣日期"))
-    previous_close = amount(_field(row, "停止買賣前收盤價格"))
-    reference_price = amount(_field(row, "恢復買賣參考價"))
+    previous_close = cast(Decimal, amount(_field(row, "停止買賣前收盤價格")))
+    reference_price = cast(Decimal, amount(_field(row, "恢復買賣參考價")))
     keys = _field(row, "詳細資料").replace(" ", "").split(",")
     detail_url = f"{TWSE}/zh/announcement/change/twtb8u-detail.html?{','.join(keys)}"
     action = _new(
@@ -378,7 +406,7 @@ def parse_par_change(row, *, list_url):
     return action
 
 
-def par_change_rows(payload, stocks):
+def par_change_rows(payload: Any, stocks: Iterable[str]) -> list[SourceRow]:
     wanted = set(stocks)
     return [row for row in records(payload) if _stock(row) in wanted]
 
@@ -386,7 +414,7 @@ def par_change_rows(payload, stocks):
 # ---------- 與已確認停牌的一致性 ----------
 
 
-def check_halts(actions, confirmed_halts):
+def check_halts(actions: list[Action], confirmed_halts: Halts) -> list[Action]:
     """減資的停止買賣首日應列在已確認停牌清單；沒有時列入人工確認，不自行補登。"""
     for action in actions:
         start = action.get("halt_start")
@@ -402,7 +430,7 @@ def check_halts(actions, confirmed_halts):
 # ---------- 儲存 ----------
 
 
-def _encode(action, fetched_at):
+def _encode(action: Action, fetched_at: str) -> list[Any]:
     row = []
     for column in COLUMNS:
         value = fetched_at if column == "fetched_at" else action[column]
@@ -416,7 +444,13 @@ def _encode(action, fetched_at):
     return row
 
 
-def save_actions(actions, db_path, *, fetched_at, coverage=()):
+def save_actions(
+    actions: Sequence[Action],
+    db_path: DbPath,
+    *,
+    fetched_at: str,
+    coverage: Iterable[tuple[str, str, str]] = (),
+) -> int:
     """寫入或更新公司行動（主鍵：股票、生效日、類型）；寫入前先升級 schema。
 
     coverage：[(股票, 開始日, 結束日)]，這次已完整下載的期間。和公司行動在同一個交易中寫入，
@@ -445,7 +479,9 @@ def save_actions(actions, db_path, *, fetched_at, coverage=()):
     return len(actions)
 
 
-def load_coverage(db_path, stock_ids=None):
+def load_coverage(
+    db_path: DbPath, stock_ids: Iterable[str] | None = None
+) -> dict[str, list[tuple[str, str]]]:
     """{股票: [(開始日, 結束日)]}，依開始日排序；資料庫或表不存在時為空。"""
     path = Path(db_path).resolve()
     if not path.is_file():
@@ -460,19 +496,19 @@ def load_coverage(db_path, stock_ids=None):
             "ORDER BY stock_id, start_date, end_date"
         ).fetchall()
     wanted = None if stock_ids is None else set(stock_ids)
-    result = {}
+    result: dict[str, list[tuple[str, str]]] = {}
     for stock_id, start, end in rows:
         if wanted is None or stock_id in wanted:
             result.setdefault(stock_id, []).append((start, end))
     return result
 
 
-def uncovered(ranges, start, end):
+def uncovered(ranges: Iterable[tuple[str, str]], start: str, end: str) -> list[tuple[str, str]]:
     """[start, end]（ISO 日期，含頭尾）中沒有被 ranges 涵蓋的日曆日區間。"""
     gaps, cursor = [], date.fromisoformat(start)
     last = date.fromisoformat(end)
-    for range_start, range_end in sorted(ranges):
-        range_start, range_end = date.fromisoformat(range_start), date.fromisoformat(range_end)
+    for start_text, end_text in sorted(ranges):
+        range_start, range_end = date.fromisoformat(start_text), date.fromisoformat(end_text)
         if range_end < cursor:
             continue
         if range_start > cursor:
@@ -487,7 +523,7 @@ def uncovered(ranges, start, end):
     return gaps
 
 
-def update_review(actions, db_path):
+def update_review(actions: Sequence[Action], db_path: DbPath) -> int:
     """只更新待人工確認的標記與原因；其餘欄位（金額、來源、原始列）不變。"""
     if not actions:
         return 0
@@ -509,7 +545,12 @@ def update_review(actions, db_path):
     return len(actions)
 
 
-def load_actions(db_path, stock_id=None, start=None, end=None):
+def load_actions(
+    db_path: DbPath,
+    stock_id: str | None = None,
+    start: str | None = None,
+    end: str | None = None,
+) -> list[Action]:
     """依生效日排序讀出公司行動；資料庫或表不存在時回傳空清單，不建立檔案。"""
     path = Path(db_path).resolve()
     if not path.is_file():
@@ -540,7 +581,7 @@ def load_actions(db_path, stock_id=None, start=None, end=None):
     return result
 
 
-def summary(db_path):
+def summary(db_path: DbPath) -> dict[str, Any] | None:
     """inspect_db 用的摘要：筆數、最新生效日、待人工確認筆數；沒有資料時為 None。"""
     path = Path(db_path).resolve()
     if not path.is_file():
@@ -564,7 +605,7 @@ CLEARED = "cleared"
 REVIEW_LABELS = {PENDING: "待確認", NOT_APPLICABLE: "不適用", CLEARED: "依目前規則已解除"}
 
 
-def recheck(action, confirmed_halts):
+def recheck(action: Action, confirmed_halts: Halts) -> Action:
     """以目前的解析規則重新檢查已儲存的公司行動（只用儲存的原始列，不連網）。
 
     除權息依儲存的列表列與詳細資料重新解析；減資與變更面額的金額不變，只重新檢查與已確認
@@ -589,7 +630,7 @@ def recheck(action, confirmed_halts):
     return check_halts([fresh], confirmed_halts)[0]
 
 
-def _first_dates(db_path):
+def _first_dates(db_path: DbPath) -> dict[str, str]:
     path = Path(db_path).resolve()
     if not path.is_file():
         return {}
@@ -603,7 +644,7 @@ def _first_dates(db_path):
         )
 
 
-def _impact(action):
+def _impact(action: Action) -> str:
     """這筆公司行動目前對計算的影響（依 adjusted 模式的規則）。"""
     if action.get("rights_per_1000") and action["rights_per_1000"] > 0:
         return (
@@ -627,7 +668,7 @@ def _impact(action):
     )
 
 
-def review_items(db_path, confirmed_halts):
+def review_items(db_path: DbPath, confirmed_halts: Halts) -> list[dict[str, Any]]:
     """所有曾被標為待確認、或依目前規則需要確認的公司行動，附狀態、原因與對計算的影響。"""
     first = _first_dates(db_path)
     items = []

@@ -77,6 +77,9 @@
     </section>
   </div>
 
+  {% set coverage = detail.get('restriction_coverage') %}
+  <p class="muted small">處置與全額交割（只標示，不改變成交）：{% if coverage %}{% if coverage.full_delivery %}全額交割名單 {{ coverage.full_delivery.first }} ～ {{ coverage.full_delivery.last }}（{{ coverage.full_delivery.days }} 個行情日）{% endif %}{% for c in coverage.disposition %}；處置公告 {{ c[0] }} ～ {{ c[1] }}{% endfor %}。其他期間沒有下載，不能當成沒有限制。{% else %}沒有下載資料，未標示。{% endif %}</p>
+
   <section class="card">
     <div class="card-header"><div><h2>成交紀錄</h2><p>訊號在收盤後產生，下一個行情日開盤成交。</p></div></div>
     {% if trades %}
@@ -85,7 +88,7 @@
       <tbody>{% for t in trades[:200] %}<tr>
         <td class="nowrap">{{ t.date }}<span class="cell-sub">訊號 {{ t.signal_date or '—' }}</span></td>
         <td>{{ '策略' if t.source == 'strategy' else '基準' }}</td>
-        <td><a href="/stocks/{{ t.stock_id }}">{{ t.stock_id }}</a></td>
+        <td><a href="/stocks/{{ t.stock_id }}">{{ t.stock_id }}</a>{% for r in t.restrictions or [] %} {{ ui.badge(r, 'warn') }}{% endfor %}</td>
         <td>{{ ui.badge('買進', 'info') if t.action == 'BUY' else ui.badge('賣出', 'neutral') }}</td>
         <td class="num">{{ t.price | num }}</td><td class="num">{{ t.quantity | int }}</td>
         <td class="num">{{ t.commission | int }}</td><td class="num">{{ t.tax | int }}</td><td class="num">{{ t.cash_after | int }}</td>
@@ -134,13 +137,63 @@
 
   {% if detail.get('universe_exclusions') %}
   <section class="card">
-    <div class="card-header"><div><h2>未納入股票池</h2><p>回測開始日還沒上市的股票不能在開始日持有，不納入股票池，也不在上市後中途加入。</p></div></div>
+    <div class="card-header"><div><h2>未納入股票池</h2><p>回測開始日還沒上市的股票不能在開始日持有，不納入股票池，也不在上市後中途加入；開始日以前已終止上市的股票也不納入。</p></div></div>
     <div class="table-wrap"><table class="table table-compact">
-      <thead><tr><th>股票</th><th>上市日</th><th>說明</th></tr></thead>
+      <thead><tr><th>股票</th><th>日期</th><th>說明</th></tr></thead>
       <tbody>{% for e in detail.universe_exclusions %}<tr>
         <td><a href="/stocks/{{ e.stock_id }}">{{ e.stock_id }}</a></td>
-        <td class="nowrap">{{ e.listed_date }}</td>
+        <td class="nowrap">{{ e.delisted_date or e.listed_date }}</td>
         <td>{{ e.reason }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  {% endif %}
+
+  {% if detail.get('final_positions') or detail.get('benchmark_positions') %}
+  <section class="card">
+    <div class="card-header"><div><h2>期末持股</h2><p>期末不強制賣出，以結束日收盤估值。停牌、無成交價或缺列的持股沿用最近一筆收盤並標示日期；已終止上市的列為無法變現（{{ '以 0 估值，壓力測試' if detail.delisted_valuation == 'zero' else '以最後收盤凍結估值' }}），不占持股名額也不能動用。基準只列出不是正常狀態的持股。</p></div></div>
+    <div class="table-wrap"><table class="table table-compact">
+      <thead><tr><th>來源</th><th>股票</th><th class="num">股數</th><th>狀態</th><th class="num">估值價</th><th>價格日期</th><th class="num">金額</th><th>說明</th></tr></thead>
+      <tbody>{% for p in detail.get('final_positions', []) %}<tr>
+        <td>策略</td>
+        <td><a href="/stocks/{{ p.stock_id }}">{{ p.stock_id }}</a></td>
+        <td class="num">{{ p.shares | int }}</td>
+        <td>{{ ui.badge(p.status_label, 'neutral' if p.status == 'NORMAL' else 'warn') }}</td>
+        <td class="num">{{ p.price | num }}</td><td class="nowrap">{{ p.price_date }}</td>
+        <td class="num">{{ p.value | int }}</td>
+        <td>{% if p.delisting_announced %}{{ p.delisting_announced.announced }} 公告、{{ p.delisting_announced.effective }} 終止上市{% endif %}{% for r in p.restrictions or [] %} {{ ui.badge(r, 'warn') }}{% endfor %}</td>
+      </tr>{% endfor %}{% for p in detail.get('benchmark_positions', []) %}<tr>
+        <td>基準</td>
+        <td><a href="/stocks/{{ p.stock_id }}">{{ p.stock_id }}</a></td>
+        <td class="num">{{ p.shares | int }}</td>
+        <td>{{ ui.badge(p.status_label, 'warn') }}</td>
+        <td class="num">{{ p.price | num }}</td><td class="nowrap">{{ p.price_date }}</td>
+        <td class="num">{{ p.value | int }}</td>
+        <td>{% if p.delisting_announced %}{{ p.delisting_announced.announced }} 公告、{{ p.delisting_announced.effective }} 終止上市{% endif %}{% for r in p.restrictions or [] %} {{ ui.badge(r, 'warn') }}{% endfor %}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  {% endif %}
+
+  {% if detail.get('benchmark_unbought') or detail.get('benchmark_unavailable') %}
+  <section class="card">
+    <div class="card-header"><div><h2>基準未買進的股票</h2><p>每檔的預算在開始日依股票數固定，未買進的那一份維持現金。</p></div></div>
+    <div class="card-body">
+      {% if detail.get('benchmark_unavailable') %}<p>整段期間都無法交易：{{ detail.benchmark_unavailable | join('、') }}</p>{% endif %}
+      {% if detail.get('benchmark_unbought') %}<p>預算不足以買進一股：{{ detail.benchmark_unbought | join('、') }}</p>{% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if detail.get('unconfirmed_gaps') %}
+  <section class="card">
+    <div class="card-header"><div><h2>原因未確認的缺列</h2><p>其他股票當天有行情、這檔卻沒有列，而且查不到停止買賣公告。缺列期間視為不可交易、持股沿用最近收盤估值；不認定為停牌，這次結果不完整。</p></div></div>
+    <div class="table-wrap"><table class="table table-compact">
+      <thead><tr><th>股票</th><th>起</th><th>迄</th><th class="num">行情日數</th></tr></thead>
+      <tbody>{% for g in detail.unconfirmed_gaps %}<tr>
+        <td><a href="/stocks/{{ g.stock_id }}">{{ g.stock_id }}</a></td>
+        <td class="nowrap">{{ g.first }}</td><td class="nowrap">{{ g.last }}</td>
+        <td class="num">{{ g.days | int }}</td>
       </tr>{% endfor %}</tbody>
     </table></div>
   </section>
@@ -148,13 +201,13 @@
 
   {% if detail.get('market_events') %}
   <section class="card">
-    <div class="card-header"><div><h2>停牌與無成交價日</h2><p>這些日子該股不成交、不更新訊號，持股沿用最近一筆收盤估值。無成交價只表示來源當天沒有開高低收，不認定為停牌。</p></div></div>
+    <div class="card-header"><div><h2>停牌與無成交價日</h2><p>這些日子該股不成交、不更新訊號，持股沿用最近一筆收盤估值。無成交價與缺少行情列只表示來源當天沒有價格或沒有列，不認定為停牌。</p></div></div>
     <div class="table-wrap"><table class="table table-compact">
       <thead><tr><th>日期</th><th>股票</th><th>狀態</th><th>說明</th></tr></thead>
       <tbody>{% for e in detail.market_events %}<tr>
         <td class="nowrap">{{ e.date }}</td>
         <td><a href="/stocks/{{ e.stock_id }}">{{ e.stock_id }}</a></td>
-        <td>{{ ui.badge('無成交價', 'neutral') if e.market_status == 'NO_PRICE' else ui.badge('已確認停牌', 'warn') }}</td>
+        <td>{{ ui.badge('無成交價', 'neutral') if e.market_status == 'NO_PRICE' else ui.badge('缺少行情列', 'neutral') if e.market_status == 'MISSING_ROW' else ui.badge('已確認停牌', 'warn') }}</td>
         <td>{{ e.reason }}</td>
       </tr>{% endfor %}</tbody>
     </table></div>

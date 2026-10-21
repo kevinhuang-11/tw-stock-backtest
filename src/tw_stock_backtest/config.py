@@ -61,6 +61,8 @@ OPTIONAL_SECTIONS = {
     # 公司行動：adjusted 依截至分析日的還原價計算指標；raw 使用原始價格，可重現舊報表。
     # rights 是 adjusted 模式下現金增資的處理方式：refuse 拒絕跨過計算，decline 放棄認購。
     "corporate_actions": {"mode": "adjusted", "rights": "refuse"},
+    # 停牌與終止上市（docs/HALT-POLICY.md）：終止上市持股的估值，last_close 或 zero（壓力測試）。
+    "halts": {"delisted_valuation": "last_close"},
 }
 PRICE_MODES = ("adjusted", "raw")
 RIGHTS_MODES = ("refuse", "decline")
@@ -165,6 +167,8 @@ def validate_settings(settings):
         raise ValueError("corporate_actions.mode 必須是 adjusted 或 raw")
     if result["corporate_actions"]["rights"] not in RIGHTS_MODES:
         raise ValueError("corporate_actions.rights 必須是 refuse 或 decline")
+    if result["halts"]["delisted_valuation"] not in ("last_close", "zero"):
+        raise ValueError("halts.delisted_valuation 必須是 last_close 或 zero")
     sizing_mode = result["backtest"]["sizing_mode"]
 
     if sizing_mode not in ("fixed_quantity", "fixed_budget"):

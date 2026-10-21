@@ -67,7 +67,7 @@ class OfflineDemoTests(unittest.TestCase):
         # 任何一個被呼叫都代表有網路請求漏出去。
         self.network = Mock(side_effect=AssertionError("不應發出網路請求"))
         for target in (
-            "tw_stock_backtest.cli.fetch_stock.urlopen",
+            "tw_stock_backtest.data.stock_data.urlopen",
             "tw_stock_backtest.cli.fetch_corporate_actions.urlopen",
             "tw_stock_backtest.data.supplemental.urlopen",
             "tw_stock_backtest.data.universe.urlopen",

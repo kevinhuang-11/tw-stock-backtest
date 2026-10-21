@@ -4,7 +4,7 @@ from contextlib import redirect_stdout
 from unittest.mock import call, patch
 from urllib.error import HTTPError
 
-from tw_stock_backtest.cli import fetch_stock
+from tw_stock_backtest.data import stock_data as fetch_stock
 
 
 class TestFetchRetry(unittest.TestCase):

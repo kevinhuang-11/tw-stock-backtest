@@ -1,6 +1,7 @@
 import argparse
 import sqlite3
 from pathlib import Path
+from types import SimpleNamespace
 
 from tw_stock_backtest.backtesting.benchmark import (
     run_buy_and_hold,
@@ -20,6 +21,11 @@ from tw_stock_backtest.config import (
     load_config,
 )
 from tw_stock_backtest.data.database import load_records
+from tw_stock_backtest.data.restrictions import (
+    annotate_backtest,
+    coverage_summary,
+    load_restrictions,
+)
 from tw_stock_backtest.data.universe import listing_exclusions
 from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.prices import PriceSource, describe_prices
@@ -109,117 +115,168 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def main():
-    args = parse_arguments()
+def position_text(position):
+    """期末持股一行；不是正常狀態時附上狀態、估值價與日期（docs/HALT-POLICY.md 3.14）。"""
+    text = f"{position['stock_id']}：{position['shares']} 股"
+    if position["status"] != "NORMAL":
+        text += (
+            f"｜{position['status_label']}，以 {position['price_date']} 收盤 {position['price']}"
+            f" 估值，金額 {position['value']}"
+        )
+    notice = position["delisting_announced"]
+    if notice and position["status"] != "UNREALIZABLE":
+        text += f"｜已於 {notice['announced']} 公告 {notice['effective']} 終止上市"
+    return text
 
-    try:
-        start, end = parse_date_range(args.start, args.end)
 
-        settings = apply_overrides(
-            load_config(args.config),
-            {
-                "universe": {
-                    "stocks": args.stocks,
-                },
-                "screening": {
-                    "top_n": (args.top if args.ranking == "rules" else None),
-                },
-                "factors": {
-                    "top_n": (args.top if args.ranking == "factors" else None),
-                },
-                "backtest": {
-                    "initial_cash": args.cash,
-                    "quantity": args.quantity,
-                    "max_positions": args.max_positions,
-                    "sizing_mode": args.sizing,
-                    "slippage_rate": args.slippage,
-                },
+def _load_settings(args):
+    """設定檔加上 CLI 覆寫與策略；回傳 (settings, strategy)，並把 args.ranking 定為實際模式。"""
+    settings = apply_overrides(
+        load_config(args.config),
+        {
+            "universe": {
+                "stocks": args.stocks,
             },
-        )
+            "screening": {
+                "top_n": (args.top if args.ranking == "rules" else None),
+            },
+            "factors": {
+                "top_n": (args.top if args.ranking == "factors" else None),
+            },
+            "backtest": {
+                "initial_cash": args.cash,
+                "quantity": args.quantity,
+                "max_positions": args.max_positions,
+                "sizing_mode": args.sizing,
+                "slippage_rate": args.slippage,
+            },
+        },
+    )
 
-        strategy = None
-        if args.strategy:
-            from tw_stock_backtest.strategies import effective_settings, load_strategy
+    strategy = None
+    if args.strategy:
+        from tw_stock_backtest.strategies import effective_settings, load_strategy
 
-            strategy = load_strategy(args.strategy)
-            if args.ranking is not None and args.ranking != strategy["ranking_mode"]:
-                raise ValueError("--ranking 與策略排名模式衝突")
-            args.ranking = strategy["ranking_mode"]
-            settings = effective_settings(settings, strategy, args.top)
-            if args.top is not None:
-                strategy["factors"]["top_n"] = strategy["screening"]["top_n"] = args.top
-        args.ranking = args.ranking or "rules"
-        stocks = settings["universe"]["stocks"]
-        screening_settings = settings["screening"]
-        backtest_settings = settings["backtest"]
-        db_path = settings["storage"]["database_path"]
-        cost_settings = CostSettings(**settings["costs"])
+        strategy = load_strategy(args.strategy)
+        if args.ranking is not None and args.ranking != strategy["ranking_mode"]:
+            raise ValueError("--ranking 與策略排名模式衝突")
+        args.ranking = strategy["ranking_mode"]
+        settings = effective_settings(settings, strategy, args.top)
+        if args.top is not None:
+            strategy["factors"]["top_n"] = strategy["screening"]["top_n"] = args.top
+    args.ranking = args.ranking or "rules"
+    return settings, strategy
 
-        # 開始日還沒上市的股票不納入股票池（原因列在輸出與報表）。
-        listing_excluded = listing_exclusions(stocks, db_path, start)
-        excluded_ids = {item["stock_id"] for item in listing_excluded}
-        stocks = [stock_id for stock_id in stocks if stock_id not in excluded_ids]
-        if not stocks:
-            raise ValueError("股票池在回測開始日都還沒上市")
 
-        # 載入開始日前的資料，供篩選指標暖機。
-        # 資金與持股仍從回測開始日才開始模擬。
-        records_by_stock = {
-            stock_id: load_records(
-                stock_id,
-                "1900-01-01",
-                end.isoformat(),
-                db_path=db_path,
-            )
-            for stock_id in stocks
-        }
+def _run(args):
+    """讀設定、排除股票、載入行情，執行策略與買進持有基準；失敗時丟出例外，由 main 處理。"""
+    start, end = parse_date_range(args.start, args.end)
+    settings, strategy = _load_settings(args)
+    stocks = settings["universe"]["stocks"]
+    screening_settings = settings["screening"]
+    backtest_settings = settings["backtest"]
+    db_path = settings["storage"]["database_path"]
+    cost_settings = CostSettings(**settings["costs"])
 
-        # 訊號依價格模式計算；成交與估值用原始價格，持股與現金依公司行動調整（raw 模式不調整）。
-        prices = PriceSource(settings)
-        corporate_actions = prices.actions_by_stock(records_by_stock, end.isoformat())
-        result = run_portfolio_backtest(
-            records_by_stock,
-            start.isoformat(),
+    # 開始日還沒上市的股票不納入股票池（原因列在輸出與報表）。
+    listing_excluded = listing_exclusions(stocks, db_path, start)
+    excluded_ids = {item["stock_id"] for item in listing_excluded}
+    stocks = [stock_id for stock_id in stocks if stock_id not in excluded_ids]
+    if not stocks:
+        raise ValueError("股票池在回測開始日都還沒上市")
+
+    # 載入開始日前的資料，供篩選指標暖機。
+    # 資金與持股仍從回測開始日才開始模擬。
+    records_by_stock = {
+        stock_id: load_records(
+            stock_id,
+            "1900-01-01",
             end.isoformat(),
-            screening_settings=screening_settings,
-            initial_cash=backtest_settings["initial_cash"],
-            quantity=backtest_settings["quantity"],
-            max_positions=backtest_settings["max_positions"],
-            cost_settings=cost_settings,
-            ranking_method=args.ranking,
-            strategy=strategy,
-            factor_settings=settings["factors"],
-            sizing_mode=backtest_settings["sizing_mode"],
-            slippage_rate=backtest_settings["slippage_rate"],
-            corporate_actions=corporate_actions,
+            db_path=db_path,
         )
-        result["price_adjustment"] = prices.describe()
-        result["universe_exclusions"] = listing_excluded
-        performance = summarize_performance(
-            result["equity_curve"],
-            result["initial_cash"],
-        )
-        performance.update(summarize_exposure(result["equity_curve"]))
-        benchmark = run_buy_and_hold(
-            records_by_stock,
-            start.isoformat(),
-            end.isoformat(),
-            initial_cash=backtest_settings["initial_cash"],
-            cost_settings=cost_settings,
-            slippage_rate=backtest_settings["slippage_rate"],
-            corporate_actions=corporate_actions,
-        )
+        for stock_id in stocks
+    }
 
-        benchmark_performance = summarize_performance(
-            benchmark["equity_curve"],
-            benchmark["initial_cash"],
-        )
-        benchmark_performance.update(summarize_exposure(benchmark["equity_curve"]))
+    # 訊號依價格模式計算；成交與估值用原始價格，持股與現金依公司行動調整（raw 模式不調整）。
+    prices = PriceSource(settings)
+    corporate_actions = prices.actions_by_stock(records_by_stock, end.isoformat())
+    result = run_portfolio_backtest(
+        records_by_stock,
+        start.isoformat(),
+        end.isoformat(),
+        screening_settings=screening_settings,
+        initial_cash=backtest_settings["initial_cash"],
+        quantity=backtest_settings["quantity"],
+        max_positions=backtest_settings["max_positions"],
+        cost_settings=cost_settings,
+        ranking_method=args.ranking,
+        strategy=strategy,
+        factor_settings=settings["factors"],
+        sizing_mode=backtest_settings["sizing_mode"],
+        slippage_rate=backtest_settings["slippage_rate"],
+        corporate_actions=corporate_actions,
+        delisted_valuation=settings["halts"]["delisted_valuation"],
+    )
+    result["price_adjustment"] = prices.describe()
+    result["universe_exclusions"] = listing_excluded
+    performance = summarize_performance(
+        result["equity_curve"],
+        result["initial_cash"],
+    )
+    performance.update(summarize_exposure(result["equity_curve"]))
+    benchmark = run_buy_and_hold(
+        records_by_stock,
+        start.isoformat(),
+        end.isoformat(),
+        initial_cash=backtest_settings["initial_cash"],
+        cost_settings=cost_settings,
+        slippage_rate=backtest_settings["slippage_rate"],
+        corporate_actions=corporate_actions,
+        delisted_valuation=settings["halts"]["delisted_valuation"],
+    )
 
-    except (ValueError, sqlite3.Error, OSError) as error:
-        print(f"多股票回測失敗：{error}")
-        return 1
+    # 處置與全額交割：只標示成交與期末持股，不改變任何數字（docs/HALT-POLICY.md 3.17）。
+    restrictions = load_restrictions(db_path)
+    for data in (result, benchmark):
+        annotate_backtest(data, restrictions)
+    result["restriction_coverage"] = coverage_summary(db_path)
 
+    benchmark_performance = summarize_performance(
+        benchmark["equity_curve"],
+        benchmark["initial_cash"],
+    )
+    benchmark_performance.update(summarize_exposure(benchmark["equity_curve"]))
+
+    return SimpleNamespace(
+        start=start,
+        end=end,
+        settings=settings,
+        strategy=strategy,
+        stocks=stocks,
+        screening_settings=screening_settings,
+        backtest_settings=backtest_settings,
+        db_path=db_path,
+        cost_settings=cost_settings,
+        listing_excluded=listing_excluded,
+        records_by_stock=records_by_stock,
+        result=result,
+        performance=performance,
+        benchmark=benchmark,
+        benchmark_performance=benchmark_performance,
+    )
+
+
+def _print_overview(run):
+    """期間、股票池、價格口徑與公司行動。"""
+    start, end, stocks, db_path, listing_excluded, result, benchmark = (
+        run.start,
+        run.end,
+        run.stocks,
+        run.db_path,
+        run.listing_excluded,
+        run.result,
+        run.benchmark,
+    )
     first_date = result["equity_curve"][0]["date"]
     last_date = result["equity_curve"][-1]["date"]
 
@@ -246,6 +303,16 @@ def main():
             f" | 基準 {dilution_total(benchmark['corporate_action_events'])} 元"
         )
 
+
+def _print_settings(args, run):
+    """排名模式、配置模式、費稅與滑價。"""
+    settings, screening_settings, backtest_settings, cost_settings, result = (
+        run.settings,
+        run.screening_settings,
+        run.backtest_settings,
+        run.cost_settings,
+        run.result,
+    )
     if args.ranking == "rules":
         print("\n排名模式：規則篩選")
         print(
@@ -295,6 +362,16 @@ def main():
     print(f"交易稅取整：{cost_settings.tax_rounding}")
     print(f"單邊不利滑價率：{backtest_settings['slippage_rate']:.4%}")
     print("策略與基準採相同滑價率；持股估值仍使用原始收盤價")
+
+
+def _print_performance(run):
+    """資產、績效統計與買進持有基準的比較。"""
+    result, performance, benchmark, benchmark_performance = (
+        run.result,
+        run.performance,
+        run.benchmark,
+        run.benchmark_performance,
+    )
     print(f"\n初始資金：{result['initial_cash']:.2f}")
     print(f"期末現金：{result['cash']:.2f}")
     print(f"期末總資產：{result['final_equity']:.2f}")
@@ -337,8 +414,8 @@ def main():
     )
 
     print("基準持股：")
-    for stock_id, shares in sorted(benchmark["holdings"].items()):
-        print(f"  {stock_id}：{shares} 股")
+    for position in benchmark["final_positions"]:
+        print(f"  {position_text(position)}")
 
     if benchmark["unbought"]:
         print("基準因單檔預算不足而未買進：" + ", ".join(benchmark["unbought"]))
@@ -346,13 +423,18 @@ def main():
         print(
             "基準因整段期間皆無法交易而未買進：" + ", ".join(benchmark["unavailable_entire_period"])
         )
+
+
+def _print_records(run):
+    """期末持股、成交、未成交、不可交易日與未更新訊號的日期。"""
+    result, benchmark = (run.result, run.benchmark)
     print("\n期末持股：")
 
-    if not result["holdings"]:
+    if not result["final_positions"]:
         print("無")
     else:
-        for stock_id, quantity in sorted(result["holdings"].items()):
-            print(f"{stock_id}：{quantity} 股")
+        for position in result["final_positions"]:
+            print(position_text(position))
 
     print("\n成交紀錄：")
 
@@ -382,11 +464,33 @@ def main():
         )
 
     print(
-        f"\n停牌與無成交價日：{len(result['market_events'])} 筆（當日不成交，持股沿用最近收盤估值）"
+        f"\n停牌、無成交價與缺列日：{len(result['market_events'])} 筆"
+        "（當日不成交，持股沿用最近收盤估值）"
     )
 
     for event in result["market_events"]:
         print(f"{event['date']} | {event['stock_id']} | {event['reason']}")
+
+    gaps = result["unconfirmed_gaps"]
+    if gaps:
+        print(
+            f"\n原因未確認的缺列：{len(gaps)} 檔（視為不可交易、沿用最近收盤估值；"
+            "結果不完整，退出碼 2）"
+        )
+        for gap in gaps:
+            print(f"{gap['stock_id']} | {gap['first']} ～ {gap['last']} | {gap['days']} 個行情日")
+
+    for source, data in (("策略", result), ("基準", benchmark)):
+        for item in data["unrealizable"].values():
+            value = (
+                "以 0 估值（壓力測試）"
+                if data["delisted_valuation"] == "zero"
+                else f"以 {item['price_date']} 收盤 {item['last_close']} 估值"
+            )
+            print(
+                f"\n{source}無法變現：{item['stock_id']} {item['shares']} 股，"
+                f"{item['effective']} 終止上市（{item['kind_label']}：{item['reason']}），{value}"
+            )
 
     print(f"\n有個別股票未更新訊號的日期：{len(result['skipped_rebalances'])} 日")
 
@@ -396,53 +500,101 @@ def main():
         )
         print(f"{item['date']} | {reasons}")
 
-    if args.show_equity:
-        print("\n每日資產：")
-        print("日期 | 現金 | 持股市值 | 總資產 | 持股")
 
-        for point in result["equity_curve"]:
-            holdings_text = (
-                ", ".join(
-                    f"{stock_id}:{quantity}"
-                    for stock_id, quantity in sorted(point["holdings"].items())
-                )
-                or "無"
-            )
+def _print_equity(run):
+    """每日資產（--show-equity）。"""
+    result = run.result
+    print("\n每日資產：")
+    print("日期 | 現金 | 持股市值 | 總資產 | 持股")
 
-            print(
-                f"{point['date']}"
-                f" | {point['cash']:.2f}"
-                f" | {point['market_value']:.2f}"
-                f" | {point['equity']:.2f}"
-                f" | {holdings_text}"
+    for point in result["equity_curve"]:
+        holdings_text = (
+            ", ".join(
+                f"{stock_id}:{quantity}" for stock_id, quantity in sorted(point["holdings"].items())
             )
-    if args.export:
-        output_root = (
-            Path(args.output_dir)
-            if args.output_dir is not None
-            else DEFAULT_CONFIG_PATH.parent / "reports"
+            or "無"
         )
 
-        try:
-            report_dir = export_portfolio_report(
-                output_root,
-                settings=settings,
-                strategy=strategy,
-                start_text=start.isoformat(),
-                end_text=end.isoformat(),
-                records_by_stock=records_by_stock,
-                result=result,
-                performance=performance,
-                benchmark=benchmark,
-                benchmark_performance=benchmark_performance,
-            )
-        except (ValueError, TypeError, OSError) as error:
-            print(f"\n回測已完成，但報表匯出失敗：{error}")
-            return 1
+        print(
+            f"{point['date']}"
+            f" | {point['cash']:.2f}"
+            f" | {point['market_value']:.2f}"
+            f" | {point['equity']:.2f}"
+            f" | {holdings_text}"
+        )
 
-        print(f"\n報表已匯出：{report_dir}")
 
-    return 0
+def _export(args, run):
+    """匯出報表；失敗時回傳退出碼 1，成功時回傳 None。"""
+    (
+        start,
+        end,
+        settings,
+        strategy,
+        records_by_stock,
+        result,
+        performance,
+        benchmark,
+        benchmark_performance,
+    ) = (
+        run.start,
+        run.end,
+        run.settings,
+        run.strategy,
+        run.records_by_stock,
+        run.result,
+        run.performance,
+        run.benchmark,
+        run.benchmark_performance,
+    )
+    output_root = (
+        Path(args.output_dir)
+        if args.output_dir is not None
+        else DEFAULT_CONFIG_PATH.parent / "reports"
+    )
+
+    try:
+        report_dir = export_portfolio_report(
+            output_root,
+            settings=settings,
+            strategy=strategy,
+            start_text=start.isoformat(),
+            end_text=end.isoformat(),
+            records_by_stock=records_by_stock,
+            result=result,
+            performance=performance,
+            benchmark=benchmark,
+            benchmark_performance=benchmark_performance,
+        )
+    except (ValueError, TypeError, OSError) as error:
+        print(f"\n回測已完成，但報表匯出失敗：{error}")
+        return 1
+
+    print(f"\n報表已匯出：{report_dir}")
+
+
+def main():
+    args = parse_arguments()
+
+    try:
+        run = _run(args)
+    except (ValueError, sqlite3.Error, OSError) as error:
+        print(f"多股票回測失敗：{error}")
+        return 1
+
+    _print_overview(run)
+    _print_settings(args, run)
+    _print_performance(run)
+    _print_records(run)
+    if args.show_equity:
+        _print_equity(run)
+    if args.export:
+        code = _export(args, run)
+        if code is not None:
+            return code
+
+    # 有原因未確認的缺列時結果不完整：沿用研究類 CLI 的約定，退出碼 2。
+    return 2 if run.result["unconfirmed_gaps"] else 0
 
 
 if __name__ == "__main__":
