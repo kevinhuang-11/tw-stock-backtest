@@ -103,7 +103,7 @@
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-測試全部離線執行，涵蓋缺值處理、時間界線、資金與費稅計算。
+測試全部離線執行，涵蓋缺值處理、停牌規則、時間界線、資金與費稅計算。排版、lint 與型別檢查的指令見 [OPERATIONS.md](OPERATIONS.md#版本庫內容與驗證)。
 
 ## 回測報表例圖
 

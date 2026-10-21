@@ -50,7 +50,7 @@ Windows：目前不支援在 Windows 上直接執行（工作台使用只有 Lin
 - **可追查的報表**：每份研究與回測都固定保存當時的設定、股票池、輸入資料與策略 SHA-256，之後修改策略或更新資料都不會改變舊報表。
 - **離線示範與連網防護**：合成示範名單會讓所有下載入口在發出請求前拒絕執行，測試以攔截網路函式確認（[test_offline_demo.py](tests/test_offline_demo.py)）。
 - **不依賴前端框架與 CDN**：Flask＋Jinja＋原生 JS，自繪 SVG 圖示、系統字型；可鍵盤操作的股票選擇器，與個股搜尋頁共用同一套搜尋與排序（代號、名稱、產業）；台股慣例紅漲綠跌，狀態標籤刻意不用綠色以免與下跌混淆。
-- **工程流程**：離線單元與整合測試、CI 以安裝後的套件從乾淨目錄執行測試，並以 ruff 檢查排版與 lint；Playwright 只在開發依賴，用來截圖與檢查瀏覽器互動（[tools/](tools/)）。
+- **工程流程**：離線單元與整合測試、CI 以安裝後的套件從乾淨目錄執行測試，並以 ruff 檢查排版與 lint、以 mypy 嚴格檢查核心模組的型別（回測、指標、停牌與公司行動、股票搜尋）；核心模組不可匯入 CLI 由測試把關，重構以黃金輸出測試確認行為不變；Playwright 只在開發依賴，用來截圖與檢查瀏覽器互動（[tools/](tools/)）。
 
 ## 開發方式
 
@@ -155,14 +155,15 @@ Private notes SQLite: workbench only; excluded from report exports
 # 只跑名稱符合的測試
 .venv/bin/python -m unittest discover -s tests -k future -v
 
-# 排版與 lint（ruff，需先安裝 dev 依賴：pip install -e '.[dev]'）
+# 排版、lint 與型別檢查（需先安裝 dev 依賴：pip install -e '.[dev]'）
 .venv/bin/ruff format --check
 .venv/bin/ruff check
+.venv/bin/mypy              # 只檢查 pyproject.toml [tool.mypy] 列出的模組
 ```
 
-測試全部離線執行，不需要網路或任何憑證。涵蓋範圍包含未來資料隔離、策略與交易成本、資料修訂、快照比較與安全邊界。
+測試全部離線執行，不需要網路或任何憑證。涵蓋範圍包含未來資料隔離、策略與交易成本、資料修訂、快照比較與安全邊界；停牌規則的每個情況都有對應測試（`tests/test_halt_policy.py` 與 [HALT-POLICY.md](docs/HALT-POLICY.md) 的編號一一對照），`tests/test_module_layers.py` 確認核心模組不匯入 CLI，`tests/test_golden_outputs.py` 記錄回測與 CLI 的完整輸出供重構比對。
 
-CI 以 ruff 檢查排版與 lint，並在乾淨的 runner 上安裝套件後執行同一組測試。另有一個研究 workflow 會取得行情並產出排名，只能在 GitHub Actions 頁面手動觸發，沒有排程。
+CI 以 ruff 檢查排版與 lint、以 mypy 檢查型別，並在乾淨的 runner 上安裝套件後執行同一組測試。另有一個研究 workflow 會取得行情並產出排名，只能在 GitHub Actions 頁面手動觸發，沒有排程。
 
 ## 專案結構
 
@@ -192,7 +193,7 @@ docs/                 操作導覽、操作與設計細節、README 截圖
 - 目前上市股票池存在倖存者偏差：已下市的股票不在名單內（已查證的終止上市案例列在停牌清單，但沒有它們的行情）。回測開始日之後才上市、或開始日以前已終止上市的股票會排除並在報表列出，不在上市後中途加入。
 - 成交以日線開盤價簡化模擬：不模擬漲跌停鎖死（開盤即漲跌停仍會成交）與盤中暫停交易；處置股與全額交割只標示、不模擬交易限制。停牌、缺價與交易限制的完整規則見 [docs/HALT-POLICY.md](docs/HALT-POLICY.md)。
 - 公司行動調整是簡化：股利在除息日入帳（實際發放日較晚）、不扣稅、面額假設為 10 元；含現金增資的除權預設不跨過還原、回測持有跨過時拒絕計算，可設定 `rights = "decline"` 改為放棄認購，「認購」尚未支援；只涵蓋已下載公司行動資料的期間，報表會列出未涵蓋的部分。
-- 自動化測試涵蓋到 HTTP 層（Flask 測試用戶端）。瀏覽器端另有 Playwright 腳本，檢查股票選擇器的互動（含手機寬度與沒有 JavaScript 時的退路）並產生截圖；它需要開發依賴、手動執行，**不在 CI 中**，也沒有視覺回歸比對。
+- 自動化測試涵蓋到 HTTP 層（Flask 測試用戶端）。瀏覽器端另有 Playwright 腳本，檢查股票選擇器與股票搜尋的互動（含手機寬度與沒有 JavaScript 時的退路）並產生截圖；它需要開發依賴、手動執行，**不在 CI 中**，也沒有視覺回歸比對。
 - 工作台未設計為公開或多人服務。
 
 ## 後續方向

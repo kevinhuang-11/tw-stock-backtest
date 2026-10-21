@@ -284,7 +284,7 @@ STOCKS=$(.venv/bin/python -c "import json; print(' '.join(s['stock_id'] for s in
 
 ## CI 與研究工作流程
 
-- `.github/workflows/ci.yml`：push／pull request／手動觸發；Python 3.12、安裝套件後從乾淨目錄執行離線完整測試、Matplotlib Agg。
+- `.github/workflows/ci.yml`：push／pull request／手動觸發；Python 3.12。lint job 執行 `ruff format --check`、`ruff check` 與 `mypy`（版本與 dev 依賴相同）；test job 安裝套件後從乾淨目錄執行離線完整測試、Matplotlib Agg。
 - `.github/workflows/research.yml`：只能在 Actions 頁面手動觸發（workflow_dispatch），可指定 `as_of`、`stocks`、`allow_partial`；沒有排程，也不需要任何 secret 或 repository variable。股票池最多 10 檔、請求間隔至少 3 秒，否則在發出請求前就停止。
 - cache 只保存 `data/research-cache.db`，每 run／attempt 有新 key，restore prefix 取先前版本；cache 可失效，空 cache 只有限初始化 90 日。
 - artifacts 保存明列研究摘要／排名／診斷，保留 14 天；不包括 SQLite、私人工作台筆記或郵件。資料與產物不 commit 回儲存庫。
@@ -313,6 +313,12 @@ STOCKS=$(.venv/bin/python -c "import json; print(' '.join(s['stock_id'] for s in
 .venv/bin/ruff check --fix     # lint；CI 執行 ruff check
 ```
 
+型別檢查使用 mypy，設定在 `pyproject.toml` 的 `[tool.mypy]`：只檢查已加上型別提示的核心模組（`files` 清單），並對它們啟用嚴格選項；其他模組暫時放寬。mypy 版本鎖定在 dev 依賴，CI 使用同一版本，只裝 mypy 就能執行。
+
+```bash
+.venv/bin/mypy
+```
+
 全專案的一次性排版記錄在 `.git-blame-ignore-revs`。GitHub 的 blame 會自動略過；本機執行 `git config blame.ignoreRevsFile .git-blame-ignore-revs` 後，`git blame` 也會略過。
 
-自動化測試涵蓋到 HTTP 層（以 Flask 測試用戶端請求頁面）。瀏覽器端的互動由 `tools/check_stock_picker.py`（Playwright）檢查，需安裝開發依賴後手動執行，不在 CI 中。
+自動化測試涵蓋到 HTTP 層（以 Flask 測試用戶端請求頁面）。瀏覽器端的互動由 `tools/check_stock_picker.py`（Playwright）檢查：股票選擇器的鍵盤操作、貼上、上限與手機觸控，以及股票搜尋的排序、筆數提示、產業篩選、最近查看與沒有 JavaScript 時的退路。需安裝開發依賴後手動執行，不在 CI 中。
