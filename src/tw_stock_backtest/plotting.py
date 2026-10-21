@@ -6,6 +6,7 @@ from pathlib import Path
 from tw_stock_backtest.backtesting.metrics import (
     summarize_performance,
 )
+from tw_stock_backtest.prices import report_price_mode
 
 
 def prepare_series(result):
@@ -62,6 +63,13 @@ def plot_portfolio_report(report_dir):
     if document.get("schema_version") != 1:
         raise ValueError("不支援的報表格式版本")
 
+    settings_path = report_dir / "settings.json"
+    configuration = (
+        json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.is_file() else {}
+    )
+    # 舊報表沒有價格口徑的紀錄，視為原始價格。
+    price_mode = report_price_mode(document["strategy"]["result"], configuration.get("settings"))
+
     strategy = prepare_series(document["strategy"]["result"])
     benchmark = prepare_series(document["benchmark"]["result"])
 
@@ -85,6 +93,7 @@ def plot_portfolio_report(report_dir):
         MUTED,
         STRATEGY_COLORS,
         TEXT,
+        limits_text,
         style,
     )
 
@@ -184,7 +193,7 @@ def plot_portfolio_report(report_dir):
             fig.text(
                 0.5,
                 0.025,
-                costs + "\n" + text["limits"],
+                costs + "\n" + limits_text(text, price_mode),
                 ha="center",
                 fontsize=9,
                 color=MUTED,

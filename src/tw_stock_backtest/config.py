@@ -56,6 +56,13 @@ REQUIRED_FIELDS = {
         "volatility_weight",
     },
 }
+# 整個區段可以省略的設定及其預設值。
+OPTIONAL_SECTIONS = {
+    # 公司行動：adjusted 依截至分析日的還原價計算指標；raw 使用原始價格，可重現舊報表。
+    "corporate_actions": {"mode": "adjusted"},
+}
+PRICE_MODES = ("adjusted", "raw")
+
 # 選填欄位及其預設值。
 OPTIONAL_DEFAULTS = {
     "backtest": {
@@ -117,7 +124,7 @@ def validate_settings(settings):
     """檢查設定並回傳獨立副本，不修改傳入的字典。"""
     result = deepcopy(settings)
 
-    unknown_sections = set(result) - set(REQUIRED_FIELDS)
+    unknown_sections = set(result) - set(REQUIRED_FIELDS) - set(OPTIONAL_SECTIONS)
     if unknown_sections:
         raise ValueError(f"未知設定區段：{', '.join(sorted(unknown_sections))}")
 
@@ -141,6 +148,19 @@ def validate_settings(settings):
         # 只在沒提供欄位時補預設值，不掩蓋無效值。
         for key, default in optional.items():
             values.setdefault(key, default)
+
+    for section, defaults in OPTIONAL_SECTIONS.items():
+        values = result.setdefault(section, {})
+        if not isinstance(values, dict):
+            raise ValueError(f"無效的設定區段：{section}")
+        unknown = set(values) - set(defaults)
+        if unknown:
+            raise ValueError(f"{section} 有未知欄位：{', '.join(sorted(unknown))}")
+        for key, default in defaults.items():
+            values.setdefault(key, default)
+
+    if result["corporate_actions"]["mode"] not in PRICE_MODES:
+        raise ValueError("corporate_actions.mode 必須是 adjusted 或 raw")
     sizing_mode = result["backtest"]["sizing_mode"]
 
     if sizing_mode not in ("fixed_quantity", "fixed_budget"):

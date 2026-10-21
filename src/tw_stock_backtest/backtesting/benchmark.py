@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from tw_stock_backtest.backtesting.corporate_actions import Schedule, apply_due
 from tw_stock_backtest.backtesting.costs import (
     CostSettings,
     apply_slippage,
@@ -46,7 +47,13 @@ def run_buy_and_hold(
     cost_settings,
     confirmed_halts=None,
     slippage_rate=Decimal("0"),
+    corporate_actions=None,
 ):
+    """各檔平均分配預算，在第一個可交易日開盤買進並持有到期末。
+
+    corporate_actions（{股票: 公司行動}）與多股票引擎使用相同的公司行動帳：
+    生效日開盤前依前一日收盤的持股入帳股利、退還股款並調整股數，策略與基準因此可以公平比較。
+    """
     start, end = parse_date_range(start_text, end_text)
 
     if not isinstance(initial_cash, Decimal) or not initial_cash.is_finite() or initial_cash <= 0:
@@ -77,7 +84,14 @@ def run_buy_and_hold(
     waiting = set(market)
     unbought = []
 
+    schedule = Schedule(corporate_actions, "")
+    corporate_action_events = []
+
     for trading_date in trading_dates:
+        received, applied = apply_due(schedule, trading_date, holdings)
+        cash += received
+        corporate_action_events.extend(applied)
+
         # 每檔在期間內第一個可交易日，使用保留給它的預算買入。
         for stock_id in sorted(waiting):
             record = market[stock_id][trading_date]
@@ -162,6 +176,7 @@ def run_buy_and_hold(
         "total_tax": Decimal("0"),
         "trades": trades,
         "equity_curve": equity_curve,
+        "corporate_action_events": corporate_action_events,
         "unbought": sorted(unbought),
         "unavailable_entire_period": sorted(waiting),
         "slippage_rate": slippage_rate,

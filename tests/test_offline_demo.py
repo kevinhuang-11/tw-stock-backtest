@@ -12,6 +12,7 @@ from test_end_to_end import TEST_CONFIG
 
 from tw_stock_backtest.cli import (
     download_universe,
+    fetch_corporate_actions,
     fetch_stock,
     run_research,
     update_supplemental,
@@ -67,6 +68,7 @@ class OfflineDemoTests(unittest.TestCase):
         self.network = Mock(side_effect=AssertionError("不應發出網路請求"))
         for target in (
             "tw_stock_backtest.cli.fetch_stock.urlopen",
+            "tw_stock_backtest.cli.fetch_corporate_actions.urlopen",
             "tw_stock_backtest.data.supplemental.urlopen",
             "tw_stock_backtest.data.universe.urlopen",
         ):
@@ -188,6 +190,11 @@ class OfflineDemoTests(unittest.TestCase):
                 True,
             ),
             (update_universe.main, ["--output", str(self.listed)], True),
+            (
+                fetch_corporate_actions.main,
+                [*config, "--stocks", "9001", "--start", "2026-01-01", "--end", "2026-09-29"],
+                False,
+            ),
         ]
         original = self.listed.read_bytes()
 

@@ -13,6 +13,7 @@ from tw_stock_backtest.config import (
 )
 from tw_stock_backtest.data.database import load_records, next_record_date
 from tw_stock_backtest.data.universe import load_universe
+from tw_stock_backtest.prices import PriceSource, describe_prices
 
 
 def parse_arguments():
@@ -69,8 +70,13 @@ def collect_factor_rows(
     *,
     db_path,
     factor_settings,
+    prices=None,
 ):
-    """逐檔計算因子，收集成功結果與無法評估的原因。"""
+    """逐檔計算因子，收集成功結果與無法評估的原因。
+
+    prices：PriceSource；提供時依它的模式讀取（adjusted 為截至分析日的還原價），
+    省略時讀原始價格。
+    """
     factor_rows = []
     errors = []
 
@@ -79,11 +85,10 @@ def collect_factor_rows(
 
         # 資料庫故障應讓整個命令失敗，
         # 不把系統故障當成個別股票資料不足。
-        records = load_records(
-            stock_id,
-            "1900-01-01",
-            as_of,
-            db_path=db_path,
+        records = (
+            prices.load(stock_id, "1900-01-01", as_of)
+            if prices is not None
+            else load_records(stock_id, "1900-01-01", as_of, db_path=db_path)
         )
 
         try:
@@ -113,11 +118,12 @@ def collect_factor_rows(
             factor_rows.append(row)
 
         except ValueError as error:
+            note = prices.restart_note(stock_id, as_of) if prices is not None else ""
             errors.append(
                 {
                     "stock_id": stock_id,
                     "name": stock.get("name", ""),
-                    "reason": str(error),
+                    "reason": str(error) + note,
                 }
             )
 
@@ -176,14 +182,17 @@ def main():
             "volatility": factor_settings["volatility_weight"],
         }
 
+        prices = PriceSource(settings)
         factor_rows, errors = collect_factor_rows(
             stocks,
             as_of,
             db_path=db_path,
             factor_settings=factor_settings,
+            prices=prices,
         )
 
         print(f"分析日期：{as_of}")
+        print(describe_prices(prices.describe()))
         print(f"資料庫位置：{db_path}")
         print(f"指定股票數：{len(stocks)}")
         print(f"成功評估：{len(factor_rows)}")

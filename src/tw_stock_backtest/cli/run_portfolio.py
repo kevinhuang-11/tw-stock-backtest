@@ -20,6 +20,7 @@ from tw_stock_backtest.config import (
 )
 from tw_stock_backtest.data.database import load_records
 from tw_stock_backtest.date_range import parse_date_range
+from tw_stock_backtest.prices import PriceSource, describe_prices
 from tw_stock_backtest.reporting import export_portfolio_report
 
 
@@ -164,6 +165,9 @@ def main():
             for stock_id in stocks
         }
 
+        # 訊號依價格模式計算；成交與估值用原始價格，持股與現金依公司行動調整（raw 模式不調整）。
+        prices = PriceSource(settings)
+        corporate_actions = prices.actions_by_stock(records_by_stock, end.isoformat())
         result = run_portfolio_backtest(
             records_by_stock,
             start.isoformat(),
@@ -178,7 +182,9 @@ def main():
             factor_settings=settings["factors"],
             sizing_mode=backtest_settings["sizing_mode"],
             slippage_rate=backtest_settings["slippage_rate"],
+            corporate_actions=corporate_actions,
         )
+        result["price_adjustment"] = prices.describe()
         performance = summarize_performance(
             result["equity_curve"],
             result["initial_cash"],
@@ -191,6 +197,7 @@ def main():
             initial_cash=backtest_settings["initial_cash"],
             cost_settings=cost_settings,
             slippage_rate=backtest_settings["slippage_rate"],
+            corporate_actions=corporate_actions,
         )
 
         benchmark_performance = summarize_performance(
@@ -214,6 +221,12 @@ def main():
     print(f"指定期間：{start} ～ {end}")
     print(f"實際期間：{first_date} ～ {last_date}")
     print(f"回測行情日數：{len(result['equity_curve'])}")
+    print(describe_prices(result["price_adjustment"], backtest=True))
+    for event in result["corporate_action_events"]:
+        print(
+            f"公司行動 {event['applied_on']} | {event['stock_id']} | 持股 {event['shares_before']}"
+            f" → {event['shares_after']} | 入帳 {event['cash']} 元"
+        )
 
     if args.ranking == "rules":
         print("\n排名模式：規則篩選")

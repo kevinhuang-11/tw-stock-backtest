@@ -15,6 +15,9 @@ from functools import lru_cache
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from tw_stock_backtest.data.corporate_actions import review_items, summary
+from tw_stock_backtest.data.market_events import CONFIRMED_HALTS
+
 
 def _connect(path):
     return closing(sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True))
@@ -219,4 +222,20 @@ def data_status(db_path, today=None):
         "behind_oldest": behind_oldest,
         "listing": _listing(db_path.with_name("listed_stocks.json")),
         "supplemental": _supplemental(db_path.with_name("supplemental.sqlite3")),
+        "corporate_actions": _corporate_actions(db_path),
     }
+
+
+def _corporate_actions(db_path):
+    """公司行動筆數與待人工確認清單的分類計數（依目前規則重新檢查）；尚未下載時為 None。"""
+    try:
+        stored = summary(db_path)
+        if not stored:
+            return None
+        items = review_items(db_path, CONFIRMED_HALTS)
+    except (OSError, ValueError, sqlite3.Error):
+        return None
+    counts = {status: 0 for status in ("pending", "not_applicable", "cleared")}
+    for item in items:
+        counts[item["status"]] += 1
+    return {**stored, **counts}

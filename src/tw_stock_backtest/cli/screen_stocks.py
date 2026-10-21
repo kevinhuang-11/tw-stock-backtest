@@ -8,7 +8,7 @@ from tw_stock_backtest.config import (
     apply_overrides,
     load_config,
 )
-from tw_stock_backtest.data.database import load_records
+from tw_stock_backtest.prices import PriceSource, describe_prices
 
 
 def parse_arguments():
@@ -77,15 +77,11 @@ def main():
 
     evaluations = []
     errors = []
+    prices = PriceSource(settings)
 
     for stock_id in stock_ids:
         try:
-            records = load_records(
-                stock_id,
-                "1900-01-01",
-                as_of,
-                db_path=db_path,
-            )
+            records = prices.load(stock_id, "1900-01-01", as_of)
 
             result = evaluate_stock(
                 records,
@@ -103,6 +99,7 @@ def main():
             errors.append((stock_id, str(error)))
 
     print(f"分析日期：{as_of}")
+    print(describe_prices(prices.describe()))
     print(f"資料庫位置：{db_path}")
     print(f"趨勢條件：Close > SMA{short_window} > SMA{long_window}")
     print(f"量比條件：當日量 / 前 {volume_window} 筆均量 > {min_volume_ratio}")

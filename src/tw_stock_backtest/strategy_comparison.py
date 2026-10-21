@@ -14,6 +14,7 @@ from tw_stock_backtest.backtesting.portfolio import run_portfolio_backtest
 from tw_stock_backtest.data.database import load_records
 from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.plotting import prepare_series
+from tw_stock_backtest.prices import PriceSource
 from tw_stock_backtest.reporting import ResearchReport, export_portfolio_report
 from tw_stock_backtest.research import program_version
 from tw_stock_backtest.strategies import canonical, effective_settings, snapshot, validate_strategy
@@ -46,6 +47,9 @@ def compare_strategies(
     )
     backtest = settings["backtest"]
     costs = CostSettings(**settings["costs"])
+    # 訊號依價格模式計算；成交與估值用原始價格，持股與現金依公司行動調整（raw 模式不調整）。
+    prices = PriceSource(settings)
+    corporate_actions = prices.actions_by_stock(records, end)
     benchmark = run_buy_and_hold(
         records,
         start,
@@ -53,6 +57,7 @@ def compare_strategies(
         initial_cash=backtest["initial_cash"],
         cost_settings=costs,
         slippage_rate=backtest["slippage_rate"],
+        corporate_actions=corporate_actions,
     )
     bench_performance = performance(benchmark)
     report = ResearchReport(output_root)
@@ -63,6 +68,7 @@ def compare_strategies(
         "backtest": backtest,
         "costs": settings["costs"],
         "input_sha256": hashlib.sha256(canonical(records).encode()).hexdigest(),
+        "price_adjustment": prices.describe(),
     }
     report.write_json("common.json", {"execution": common, "version": program_version()})
     rows, series, failures = [], [], []
@@ -83,6 +89,7 @@ def compare_strategies(
                 cost_settings=costs,
                 sizing_mode=backtest["sizing_mode"],
                 slippage_rate=backtest["slippage_rate"],
+                corporate_actions=corporate_actions,
             )
             if [p["date"] for p in result["equity_curve"]] != [
                 p["date"] for p in benchmark["equity_curve"]
@@ -317,6 +324,7 @@ def compare_periods(settings, strategies, periods, output_root):
         "input_sha256": hashlib.sha256(canonical(records).encode()).hexdigest(),
         "strategy_snapshots": [snapshot(s) for s in strategies],
         "version": program_version(),
+        "price_adjustment": PriceSource(settings).describe_for(records, max_end),
     }
     overlap = [
         [a["id"], b["id"]]

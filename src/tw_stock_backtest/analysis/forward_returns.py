@@ -1,6 +1,9 @@
 from datetime import date
 from decimal import Decimal
 
+from tw_stock_backtest.analysis.adjustment import is_rights_offering
+from tw_stock_backtest.backtesting.corporate_actions import cash_per_share, share_ratio
+
 
 def _valid_price(value):
     return isinstance(value, Decimal) and value.is_finite() and value > 0
@@ -12,16 +15,20 @@ def evaluate_forward_return(
     trading_dates,
     *,
     horizon,
+    corporate_actions=(),
 ):
     """
-    計算訊號日之後的價格報酬。
+    計算訊號日之後的報酬。
 
     起算：下一行情日開盤。
     結束：進場日起第 horizon 個行情日收盤。
     進場日算第 1 日。
 
     trading_dates 必須是共用、嚴格遞增的行情日期清單。
-    本函式只評估價格，不包含費稅、滑價、股利或拆股。
+    不包含費稅與滑價。提供 corporate_actions 時，計入生效日晚於進場日、不晚於出場日的
+    公司行動（與回測相同：進場日開盤買進拿不到當天生效的權利）：
+    報酬 =（出場收盤 × 累計股數比 ＋ 每 1 股原始持股累計收到的現金）÷ 進場價 − 1。
+    這裡是單位報酬，股數比不取整、不做零股折現。沒有提供時只計價格報酬。
     """
     if isinstance(horizon, bool) or not isinstance(horizon, int) or horizon <= 0:
         raise ValueError("horizon 必須是正整數")
@@ -111,7 +118,20 @@ def evaluate_forward_return(
         return result
 
     result["exit_price"] = exit_price
-    result["price_return"] = exit_price / entry_price - Decimal("1")
+    shares, cash = Decimal("1"), Decimal("0")
+    applied = []
+    for action in sorted(corporate_actions, key=lambda a: a["effective_date"]):
+        if entry_date.isoformat() < action["effective_date"] <= exit_date.isoformat():
+            if is_rights_offering(action):
+                # 不模擬認購或轉讓認股權；跨過現金增資的報酬不可靠，不計算。
+                result["reason"] = "rights_offering"
+                return result
+            cash += shares * cash_per_share(action)
+            shares *= share_ratio(action)
+            applied.append(action["effective_date"])
+    result["price_return"] = (exit_price * shares + cash) / entry_price - Decimal("1")
+    result["return_basis"] = "total" if corporate_actions else "price"
+    result["corporate_actions"] = applied
     result["status"] = "ok"
 
     return result
@@ -135,6 +155,7 @@ def evaluate_rankings(
     *,
     horizons=(5, 20, 60),
     top_ns=(1, 2),
+    corporate_actions=None,
 ):
     """比較每日候選股與股票池的等權平均後續價格報酬。"""
     if not records_by_stock:
@@ -189,6 +210,7 @@ def evaluate_rankings(
                         signal_date,
                         trading_dates,
                         horizon=horizon,
+                        corporate_actions=(corporate_actions or {}).get(stock_id, ()),
                     )
                     for stock_id in stocks
                 }

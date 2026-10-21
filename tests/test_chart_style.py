@@ -142,3 +142,16 @@ class ChartStyleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LimitsTextTests(unittest.TestCase):
+    def test_footnote_follows_the_price_mode(self):
+        from tw_stock_backtest.chart_style import TEXT, limits_text
+
+        for language in ("zh", "en"):
+            self.assertEqual(limits_text(TEXT[language], "raw"), TEXT[language]["limits"])
+            self.assertEqual(
+                limits_text(TEXT[language], "adjusted"), TEXT[language]["limits_adjusted"]
+            )
+        self.assertIn("股利於除息日入帳", limits_text(TEXT["zh"], "adjusted"))
+        self.assertIn("未調整除權息", limits_text(TEXT["zh"], "raw"))

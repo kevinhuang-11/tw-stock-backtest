@@ -1,6 +1,7 @@
 import argparse
 import sqlite3
 
+from tw_stock_backtest.analysis.adjustment import point_in_time
 from tw_stock_backtest.analysis.indicators import windowed_moving_average
 from tw_stock_backtest.analysis.strategies import moving_average_crossover
 from tw_stock_backtest.config import (
@@ -9,6 +10,7 @@ from tw_stock_backtest.config import (
     load_config,
 )
 from tw_stock_backtest.data.database import load_records
+from tw_stock_backtest.prices import PriceSource, describe_prices
 
 
 def parse_arguments():
@@ -93,17 +95,20 @@ def main():
             print("資料庫中沒有符合條件的行情，請先下載資料。")
             return 0
 
-        closes = [record["close"] for record in records]
+        # 均線逐日以截至當日的序列計算（依價格模式；adjusted 只套用當日以前生效的公司行動），
+        # 窗口內有缺價的日子為空，不產生交叉訊號；與研究、回測同一套規則。
+        prices = PriceSource(settings)
+        actions = prices.actions_by_stock({stock_id: records}, records[-1]["date"]).get(
+            stock_id, []
+        )
 
-        # 窗口內有缺價的日子均線為空，不產生交叉訊號；與研究、回測同一套規則。
-        short_ma = windowed_moving_average(
-            closes,
-            short_window,
-        )
-        long_ma = windowed_moving_average(
-            closes,
-            long_window,
-        )
+        def average(window):
+            return lambda rows: windowed_moving_average(
+                [row["close"] for row in rows[-window:]], window
+            )[-1]
+
+        short_ma = point_in_time(records, actions, average(short_window))
+        long_ma = point_in_time(records, actions, average(long_window))
 
         signals = moving_average_crossover(
             short_ma,
@@ -117,6 +122,7 @@ def main():
     print(f"股票代號：{stock_id}")
     print(f"資料庫位置：{db_path}")
     print(f"均線期間：短期 {short_window}，長期 {long_window}")
+    print(describe_prices(prices.describe()) + "；收盤欄為原始價格")
     print(f"資料筆數：{len(records)}")
     print(f"實際期間：{records[0]['date']} ～ {records[-1]['date']}")
 

@@ -1,11 +1,13 @@
 from datetime import date
 from decimal import Decimal
 
+from tw_stock_backtest.analysis.adjustment import AdjustedHistory
 from tw_stock_backtest.analysis.factors import (
     calculate_factor_row,
     rank_factor_candidates,
 )
 from tw_stock_backtest.analysis.screening import evaluate_stock
+from tw_stock_backtest.backtesting.corporate_actions import Schedule, apply_due
 from tw_stock_backtest.backtesting.costs import (
     CostSettings,
     apply_slippage,
@@ -97,6 +99,7 @@ def run_portfolio_backtest(
     sizing_mode="fixed_quantity",
     slippage_rate=Decimal("0"),
     strategy=None,
+    corporate_actions=None,
 ):
 
     strategy_diagnostics = []
@@ -170,12 +173,16 @@ def run_portfolio_backtest(
 
     # 暖機資料保留停牌與無成交價的列，與研究排名使用同一套規則：
     # 窗口內有缺價就不計算，不刪列湊窗口。
+    # 訊號用的序列逐日累積：每個訊號日只套用該日以前生效的公司行動（corporate_actions 為
+    # {股票: 公司行動}；省略時為原始價格）。成交與估值使用 market 中的原始價格；
+    # 持股與現金在生效日開盤前依公司行動調整（見 backtesting/corporate_actions.py）。
+    actions = corporate_actions or {}
     histories = {
-        stock_id: [
+        stock_id: AdjustedHistory(actions.get(stock_id, ())).extend(
             record
             for record_date, record in prices.items()
             if date.fromisoformat(record_date) < start
-        ]
+        )
         for stock_id, prices in market.items()
     }
 
@@ -190,7 +197,15 @@ def run_portfolio_backtest(
     total_tax = Decimal("0")
     pending = None
 
+    # 公司行動帳：生效日開盤前，依前一日收盤的持股入帳股利、退還股款並調整股數。
+    schedule = Schedule(actions, "")
+    corporate_action_events = []
+
     for trading_date in trading_dates:
+        received, applied = apply_due(schedule, trading_date, holdings)
+        cash += received
+        corporate_action_events.extend(applied)
+
         # 開盤：執行上一行情日收盤後產生的計畫。
         if pending is not None:
             signal_date, plan = pending
@@ -334,13 +349,13 @@ def run_portfolio_backtest(
             try:
                 if ranking_method == "rules":
                     evaluation = evaluate_stock(
-                        histories[stock_id],
+                        histories[stock_id].rows,
                         trading_date,
                         **rule_parameters,
                     )
                 else:
                     evaluation = calculate_factor_row(
-                        histories[stock_id],
+                        histories[stock_id].rows,
                         trading_date,
                         factor_settings=factor_settings,
                     )
@@ -360,9 +375,8 @@ def run_portfolio_backtest(
             )
 
         if strategy is not None:
-            analysis = analyze_strategy(
-                histories, trading_date, strategy, indicator_records=records_by_stock
-            )
+            series = {stock_id: history.rows for stock_id, history in histories.items()}
+            analysis = analyze_strategy(series, trading_date, strategy, indicator_records=series)
             candidates = analysis["candidates"]
             errors.update(analysis["errors"])
             strategy_diagnostics.append({"date": trading_date, **analysis})
@@ -418,5 +432,6 @@ def run_portfolio_backtest(
         "skipped_orders": skipped_orders,
         "skipped_rebalances": skipped_rebalances,
         "market_events": market_events,
+        "corporate_action_events": corporate_action_events,
         "slippage_rate": slippage_rate,
     }

@@ -11,6 +11,7 @@ from tw_stock_backtest.config import (
 )
 from tw_stock_backtest.data.database import load_records
 from tw_stock_backtest.date_range import parse_date_range
+from tw_stock_backtest.prices import PriceSource, describe_prices
 
 
 def parse_arguments():
@@ -61,11 +62,13 @@ def main():
             for stock_id in stocks
         }
 
+        prices = PriceSource(settings)
         history = build_screening_history(
             records_by_stock,
             start.isoformat(),
             end.isoformat(),
             screening_settings=settings["screening"],
+            corporate_actions=prices.actions_by_stock(records_by_stock, end.isoformat()),
         )
 
     except (ValueError, sqlite3.Error, OSError) as error:
@@ -76,6 +79,7 @@ def main():
     print(f"指定期間：{start} ～ {end}")
     print(f"資料庫位置：{db_path}")
     print(f"評估日期數：{len(history)}")
+    print(describe_prices(prices.describe()))
     print("以下為歷史候選名單，尚未模擬交易。\n")
 
     if not history:

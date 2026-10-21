@@ -42,6 +42,7 @@ TEXT = {
         "slippage": "單邊滑價 {rate}。",
         "no_slippage": "未計滑價。",
         "limits": "未調整除權息與拆股；期末不強制平倉；策略與基準的資金配置不同。",
+        "limits_adjusted": "股利於除息日入帳、配股與減資已調整股數（簡化）；期末不強制平倉；策略與基準的資金配置不同。",
     },
     "en": {
         "portfolio_title": "Portfolio backtest vs buy-and-hold benchmark",
@@ -59,6 +60,8 @@ TEXT = {
         "slippage": "One-way slippage {rate}.",
         "no_slippage": "No slippage.",
         "limits": "Not adjusted for dividends or splits; no forced liquidation; allocations differ.",
+        "limits_adjusted": "Dividends credited on ex-dates, share changes applied (simplified); "
+        "no forced liquidation; allocations differ.",
     },
 }
 
@@ -130,3 +133,8 @@ def style(font=None):
 def label(text, fallback, font_path):
     """字型畫得出 text 就用它，否則用 fallback（例如策略名稱換成策略 ID）。"""
     return text if text and renders(font_path, text) else fallback
+
+
+def limits_text(text, price_mode):
+    """圖表註腳的限制說明，依報表的價格口徑（adjusted／raw）。"""
+    return text["limits_adjusted"] if price_mode == "adjusted" else text["limits"]
