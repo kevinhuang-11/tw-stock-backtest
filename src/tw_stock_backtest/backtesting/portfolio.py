@@ -193,8 +193,10 @@ def _ranker(
     strategy: dict[str, Any] | None,
 ) -> _Ranker:
     if ranking_method == "rules":
-        # 型別上可能是 None：rules 卻沒有篩選設定時會丟出 TypeError（既有行為，見 REVIEW）。
-        active_settings = cast(dict[str, Any], screening_settings)
+        # 與 factors 缺設定時一樣以 ValueError 說明，呼叫端（CLI、工作台）會顯示這個原因。
+        if screening_settings is None:
+            raise ValueError("規則篩選（rules）需要篩選設定（screening_settings）")
+        active_settings = screening_settings
         ranker = _Ranker(
             method="rules",
             top_n=0,

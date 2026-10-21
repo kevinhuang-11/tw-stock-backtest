@@ -410,6 +410,38 @@ class TestPortfolioBudget(unittest.TestCase):
             "已達持股上限",
         )
 
+    def test_rules_without_screening_settings_is_a_clear_error(self):
+        # 原本 screening_settings[key] 對 None 取值，丟出 TypeError；factors 缺設定則是 ValueError。
+        records = {"AAA": self.make_records("AAA", ["10", "10", "10"])}
+        with self.assertRaisesRegex(ValueError, "規則篩選（rules）需要篩選設定"):
+            run_portfolio_backtest(
+                records,
+                "2024-01-01",
+                "2024-01-03",
+                screening_settings=None,
+                ranking_method="rules",
+                initial_cash=Decimal("1000"),
+                quantity=10,
+                max_positions=1,
+                cost_settings=self.cost_settings,
+                confirmed_halts={},
+            )
+        # factors 缺設定的行為不變。
+        with self.assertRaisesRegex(ValueError, "排名模式或因子設定無效"):
+            run_portfolio_backtest(
+                records,
+                "2024-01-01",
+                "2024-01-03",
+                screening_settings=None,
+                ranking_method="factors",
+                factor_settings=None,
+                initial_cash=Decimal("1000"),
+                quantity=10,
+                max_positions=1,
+                cost_settings=self.cost_settings,
+                confirmed_halts={},
+            )
+
     def test_invalid_sizing_mode(self):
         records = {
             "AAA": self.make_records("AAA", ["10", "10", "10"]),
