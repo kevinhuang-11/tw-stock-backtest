@@ -109,6 +109,55 @@ class FetchCorporateActionsTests(unittest.TestCase):
             {stock: [("2024-01-01", "2026-10-15")] for stock in self.STOCKS},
         )
 
+    def test_blank_prices_are_listed_for_review_and_the_rest_is_saved(self):
+        # 原本前收或參考價空白時，算式對 None 運算丟出 TypeError，整批下載失敗。
+        blanks = {
+            ("TWT49U", "2330", "115年06月11日"): 3,  # 除權息前收盤價
+            ("TWTAUU", "1441", "115/09/29"): 4,  # 恢復買賣參考價
+            ("TWTB8U", "8476", "113/11/11"): 3,  # 停止買賣前收盤價格
+        }
+
+        def blank_source(url, *, timeout):
+            payload = fake_source(url, timeout=timeout)
+            for (code, stock, day), column in blanks.items():
+                if f"/{code}?" in url:
+                    for row in payload["data"]:
+                        if row[1] == stock and row[0] == day:
+                            row[column] = ""
+            return payload
+
+        code, output, _ = self.run_cli(
+            "--stocks",
+            *self.STOCKS,
+            "--start",
+            "2024-01-01",
+            "--end",
+            "2026-10-15",
+            source=blank_source,
+        )
+        self.assertEqual(code, 2, output)
+        saved = sorted((a["stock_id"], a["effective_date"]) for a in ca.load_actions(self.db))
+        self.assertEqual(
+            saved, [("2330", "2026-03-17"), ("2330", "2026-09-16"), ("6592", "2026-06-30")]
+        )
+        self.assertIn("需要人工確認、未寫入：3 筆", output)
+        self.assertIn("2026-06-11 | 2330 | 除權息 | 前收空白", output)
+        self.assertIn("2026-09-29 | 1441 | 減資 | 參考價空白", output)
+        self.assertIn("2024-11-11 | 8476 | 變更面額 | 前收空白", output)
+        # 有未寫入的列的股票不記錄已下載期間，報表會列為未涵蓋，不當成沒有公司行動。
+        self.assertEqual(sorted(ca.load_coverage(self.db)), ["6592"])
+
+    def test_parsers_raise_a_value_error_for_blank_prices(self):
+        payload = json.loads((FIXTURES / "twt49u.json").read_text(encoding="utf-8"))
+        payload["data"] = [payload["data"][1]]
+        payload["data"][0][4] = "--"  # 除權息參考價
+        (row,) = ca.records(payload)
+        with self.assertRaises(ca.IncompleteSourceRow) as caught:
+            ca.parse_dividend(row, list_url="https://www.twse.com.tw/x")
+        self.assertIsInstance(caught.exception, ValueError)
+        self.assertEqual(caught.exception.item["missing"], ["參考價"])
+        self.assertEqual(caught.exception.item["stock_id"], "2330")
+
     def test_budget_is_checked_before_details_and_nothing_is_saved(self):
         code, output, mock = self.run_cli(
             "--stocks",

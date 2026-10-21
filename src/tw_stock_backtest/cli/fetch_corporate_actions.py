@@ -141,18 +141,23 @@ def collect(client, stocks, start, end):
         )
 
     actions = []
+    incomplete = []  # 前收或參考價空白：不寫入，列給人工確認，其他筆照常處理
     for kind, row, detail_url, options in pending:
         detail = client.get(detail_url) if detail_url else None
-        if kind == ca.DIVIDEND:
-            actions.append(ca.parse_dividend(row, detail, **options))
-        elif kind == ca.CAPITAL_REDUCTION:
-            actions.append(ca.parse_reduction(row, detail, **options))
-        else:
-            actions.append(ca.parse_par_change(row, **options))
+        try:
+            if kind == ca.DIVIDEND:
+                actions.append(ca.parse_dividend(row, detail, **options))
+            elif kind == ca.CAPITAL_REDUCTION:
+                actions.append(ca.parse_reduction(row, detail, **options))
+            else:
+                actions.append(ca.parse_par_change(row, **options))
+        except ca.IncompleteSourceRow as error:
+            incomplete.append(error.item)
 
     first, last = start.isoformat(), end.isoformat()
     actions = [a for a in actions if first <= a["effective_date"] <= last]
-    return ca.check_halts(actions, CONFIRMED_HALTS)
+    incomplete = [a for a in incomplete if first <= a["effective_date"] <= last]
+    return ca.check_halts(actions, CONFIRMED_HALTS), incomplete
 
 
 def recheck_stored(args):
@@ -226,9 +231,16 @@ def main(argv=None):
 
         ensure_network_allowed(db_path)
         client = Client(settings["download"], args.max_requests)
-        actions = collect(client, set(stocks), start, end)
+        actions, incomplete = collect(client, set(stocks), start, end)
         fetched_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        coverage = [(stock, start.isoformat(), end.isoformat()) for stock in sorted(set(stocks))]
+        # 有未寫入的列的股票不記錄已下載期間：報表會把這段期間列為未涵蓋，
+        # 不會當成「沒有公司行動」。人工確認後重新下載即可補上。
+        unsure = {item["stock_id"] for item in incomplete}
+        coverage = [
+            (stock, start.isoformat(), end.isoformat())
+            for stock in sorted(set(stocks))
+            if stock not in unsure
+        ]
         ca.save_actions(actions, db_path, fetched_at=fetched_at, coverage=coverage)
 
     except NetworkDisabled as error:
@@ -253,6 +265,16 @@ def main(argv=None):
         print(f"{action['effective_date']} | {action['stock_id']} | {names[action['kind']]}{flag}")
         for note in action["review_notes"]:
             print(f"    {note}")
+    if incomplete:
+        print(f"需要人工確認、未寫入：{len(incomplete)} 筆（這幾檔的下載期間不記為已涵蓋）")
+        for item in incomplete:
+            missing = "、".join(f"{name}空白" for name in item["missing"])
+            print(
+                f"{item['effective_date']} | {item['stock_id']} | {names[item['kind']]} | {missing}"
+                f" | {item['sources'][0]}"
+            )
+        # 沿用研究類 CLI 的約定：部分完成、其餘結果有效時退出碼 2。
+        return 2
     return 0
 
 

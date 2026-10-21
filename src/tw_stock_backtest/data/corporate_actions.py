@@ -19,7 +19,7 @@ from contextlib import closing
 from datetime import date, timedelta
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from tw_stock_backtest.data.database import migrate_database
 from tw_stock_backtest.typedefs import Action, Halts
@@ -164,6 +164,55 @@ def _new(
     }
 
 
+KIND_NAMES = {DIVIDEND: "除權息", CAPITAL_REDUCTION: "減資", PAR_CHANGE: "變更面額"}
+
+
+class IncompleteSourceRow(ValueError):
+    """證交所回應的前收或參考價欄位空白：這一筆無法核對、也不能保存，需要人工確認。
+
+    資料表的前收與參考價不可為空，也不能用補值代替，所以這一筆不寫入；
+    下載指令會列出它，其他筆照常處理。item 是給下載指令顯示用的摘要。
+    """
+
+    def __init__(
+        self,
+        stock_id: str,
+        effective_date: str,
+        kind: str,
+        missing: list[str],
+        sources: Iterable[str],
+    ) -> None:
+        self.item = {
+            "stock_id": stock_id,
+            "effective_date": effective_date,
+            "kind": kind,
+            "missing": missing,
+            "sources": list(sources),
+        }
+        super().__init__(
+            f"{stock_id} {effective_date} {KIND_NAMES[kind]}的{'、'.join(missing)}空白，需要人工確認"
+        )
+
+
+def _require_prices(
+    stock_id: str,
+    effective_date: str,
+    kind: str,
+    previous_close: Decimal | None,
+    reference_price: Decimal | None,
+    sources: Iterable[str],
+) -> tuple[Decimal, Decimal]:
+    """前收與參考價都有值時原樣回傳（型別收斂為 Decimal）；任一空白時丟出 IncompleteSourceRow。"""
+    missing = [
+        name
+        for name, value in (("前收", previous_close), ("參考價", reference_price))
+        if value is None
+    ]
+    if missing or previous_close is None or reference_price is None:
+        raise IncompleteSourceRow(stock_id, effective_date, kind, missing, sources)
+    return previous_close, reference_price
+
+
 def _review(action: Action, note: str) -> None:
     action["needs_review"] = True
     action["review_notes"].append(note)
@@ -195,9 +244,14 @@ def parse_dividend(row: SourceRow, detail: Any = None, *, list_url: str) -> Acti
     """一列除權除息資料（及必要時的詳細資料）轉成公司行動。"""
     stock_id = _stock(row)
     effective_date = roc_date(_field(row, "資料日期"))
-    # 欄位空白時 amount 回傳 None（既有行為，見 REVIEW）；cast 只告訴型別檢查器。
-    previous_close = cast(Decimal, amount(_field(row, "除權息前收盤價")))
-    reference_price = cast(Decimal, amount(_field(row, "除權息參考價")))
+    previous_close, reference_price = _require_prices(
+        stock_id,
+        effective_date,
+        DIVIDEND,
+        amount(_field(row, "除權息前收盤價")),
+        amount(_field(row, "除權息參考價")),
+        [list_url],
+    )
     flag = _field(row, "權/息")
     detail_stock, detail_date = _field(row, "詳細資料").replace(" ", "").split(",")[:2]
     detail_url = (
@@ -305,10 +359,18 @@ def parse_reduction(
     """
     stock_id = _stock(row)
     effective_date = roc_date(_field(row, "恢復買賣日期"))
-    previous_close = cast(Decimal, amount(_field(row, "停止買賣前收盤價格")))
-    reference_price = cast(Decimal, amount(_field(row, "恢復買賣參考價")))
+    raw_previous = amount(_field(row, "停止買賣前收盤價格"))
+    raw_reference = amount(_field(row, "恢復買賣參考價"))
     detail_stock, detail_date = _field(row, "詳細資料").replace(" ", "").split(",")[:2]
     detail_url = f"{TWSE}/zh/announcement/reduction/twtavu-detail.html?{detail_stock},{detail_date}"
+    previous_close, reference_price = _require_prices(
+        stock_id,
+        effective_date,
+        CAPITAL_REDUCTION,
+        raw_previous,
+        raw_reference,
+        [list_url, detail_url],
+    )
     action = _new(
         stock_id,
         effective_date,
@@ -372,10 +434,18 @@ def parse_par_change(row: SourceRow, *, list_url: str) -> Action:
     """一列變更面額資料轉成公司行動；換股率由前收與參考價反推，只接受常見面額。"""
     stock_id = _stock(row)
     effective_date = roc_date(_field(row, "恢復買賣日期"))
-    previous_close = cast(Decimal, amount(_field(row, "停止買賣前收盤價格")))
-    reference_price = cast(Decimal, amount(_field(row, "恢復買賣參考價")))
+    raw_previous = amount(_field(row, "停止買賣前收盤價格"))
+    raw_reference = amount(_field(row, "恢復買賣參考價"))
     keys = _field(row, "詳細資料").replace(" ", "").split(",")
     detail_url = f"{TWSE}/zh/announcement/change/twtb8u-detail.html?{','.join(keys)}"
+    previous_close, reference_price = _require_prices(
+        stock_id,
+        effective_date,
+        PAR_CHANGE,
+        raw_previous,
+        raw_reference,
+        [list_url, detail_url],
+    )
     action = _new(
         stock_id,
         effective_date,
