@@ -53,14 +53,27 @@ REDUCTION = {
 class ConfigTests(unittest.TestCase):
     def test_mode_defaults_to_adjusted_and_rejects_unknown_values(self):
         base = tomllib.loads(TEST_CONFIG)
-        self.assertEqual(validate_settings(base)["corporate_actions"], {"mode": "adjusted"})
+        self.assertEqual(
+            validate_settings(base)["corporate_actions"], {"mode": "adjusted", "rights": "refuse"}
+        )
         self.assertEqual(
             validate_settings({**base, "corporate_actions": {"mode": "raw"}})["corporate_actions"][
                 "mode"
             ],
             "raw",
         )
-        for bad in ({"mode": "split"}, {"mode": "raw", "extra": 1}, "raw"):
+        self.assertEqual(
+            validate_settings({**base, "corporate_actions": {"rights": "decline"}})[
+                "corporate_actions"
+            ],
+            {"mode": "adjusted", "rights": "decline"},
+        )
+        for bad in (
+            {"mode": "split"},
+            {"mode": "raw", "extra": 1},
+            "raw",
+            {"rights": "subscribe"},
+        ):
             with self.subTest(bad), self.assertRaises(ValueError):
                 validate_settings({**base, "corporate_actions": bad})
 
@@ -140,7 +153,8 @@ class PriceSourceTests(unittest.TestCase):
         records = source.load("1441", "1900-01-01", DAYS[-1])
         self.assertEqual(records[2]["close"], D("8.72"))
         self.assertEqual(
-            source.describe(), {"mode": "raw", "actions": [], "uncovered": {}, "restarts": []}
+            source.describe(),
+            {"mode": "raw", "rights": None, "actions": [], "uncovered": {}, "restarts": []},
         )
 
     def test_adjusted_mode_applies_only_events_up_to_the_analysis_date(self):

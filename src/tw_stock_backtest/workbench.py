@@ -16,11 +16,20 @@ from uuid import uuid4
 
 from flask import Flask, abort, redirect, render_template, request, send_file, url_for
 
+from tw_stock_backtest.backtesting.corporate_actions import dilution_total
 from tw_stock_backtest.cli.download_universe import save_progress
 from tw_stock_backtest.config import apply_overrides, load_config
 from tw_stock_backtest.data.universe import NetworkDisabled, ensure_network_allowed, offline_reason
 from tw_stock_backtest.notifications import preview_message
-from tw_stock_backtest.prices import BACKTEST_NOTE, MODE_LABELS, RAW, report_price_mode
+from tw_stock_backtest.prices import (
+    MODE_LABELS,
+    RAW,
+    RIGHTS_LABELS,
+    backtest_note,
+    basis_mismatch,
+    report_price_basis,
+    report_price_mode,
+)
 from tw_stock_backtest.research import program_version
 from tw_stock_backtest.research_digest import (
     differences,
@@ -76,14 +85,14 @@ def report_details(path):
         if summary.get("digest_kind") == "watchlist":
             return {**summary, "kind": "watchlist", "status": "complete"}
         rankings = read_json(path / "rankings.json")
+        settings = (
+            read_json(path / "settings.json") if (path / "settings.json").exists() else {}
+        ).get("settings")
+        mode, rights = report_price_basis(summary, settings)
         return {
             **summary,
-            "price_mode": report_price_mode(
-                summary,
-                (
-                    read_json(path / "settings.json") if (path / "settings.json").exists() else {}
-                ).get("settings"),
-            ),
+            "price_mode": mode,
+            "rights_mode": rights,
             "kind": "research",
             "rankings": rankings,
             "configuration": read_json(path / "settings.json")
@@ -99,24 +108,33 @@ def report_details(path):
             read_json(path / "settings.json") if (path / "settings.json").exists() else {}
         )
         strategy_result = result["strategy"].get("result") or {}
+        events = [
+            {**event, "source": "strategy"}
+            for event in strategy_result.get("corporate_action_events", [])
+        ] + [
+            {**event, "source": "benchmark"}
+            for event in (result["benchmark"].get("result") or {}).get(
+                "corporate_action_events", []
+            )
+        ]
+        declined = [event for event in events if event.get("rights") == "decline"]
         return {
             "kind": "backtest",
             "status": "complete",
             "strategy": result["strategy"]["performance"],
             "benchmark": result["benchmark"]["performance"],
             "market_events": strategy_result.get("market_events", []),
-            # 舊報表沒有價格口徑的紀錄，視為原始價格。
+            "universe_exclusions": strategy_result.get("universe_exclusions", []),
+            # 舊報表沒有價格口徑的紀錄，視為原始價格；沒有現金增資處理方式時視為 refuse。
             "price_mode": report_price_mode(strategy_result, configuration.get("settings")),
-            "corporate_action_events": [
-                {**event, "source": "strategy"}
-                for event in strategy_result.get("corporate_action_events", [])
-            ]
-            + [
-                {**event, "source": "benchmark"}
-                for event in (result["benchmark"].get("result") or {}).get(
-                    "corporate_action_events", []
-                )
-            ],
+            "rights_mode": report_price_basis(strategy_result, configuration.get("settings"))[1],
+            "corporate_action_events": events,
+            # 放棄認購的稀釋損失：已反映在市價，這裡只列明細與合計，不另外扣除。
+            "declined_rights": declined,
+            "dilution_totals": {
+                source: str(dilution_total(e for e in declined if e["source"] == source))
+                for source in ("strategy", "benchmark")
+            },
             "configuration": configuration,
         }
     return {"kind": "unknown", "status": "incomplete"}
@@ -128,11 +146,14 @@ def compare_rankings(left, right):
         for x in (left, right)
     ):
         raise ValueError("只能比較已完成且有排名的研究報表")
-    modes = {
-        report_price_mode(x, (x.get("configuration") or {}).get("settings")) for x in (left, right)
-    }
-    if len(modes) > 1:
-        raise ValueError("兩份報表的價格口徑不同（還原價／原始價格），不比較名次")
+    reason = basis_mismatch(
+        *(
+            report_price_basis(x, (x.get("configuration") or {}).get("settings"))
+            for x in (left, right)
+        )
+    )
+    if reason:
+        raise ValueError(f"兩份報表的{reason}，不比較名次")
     a = {row["stock_id"]: row for row in left["rankings"]}
     b = {row["stock_id"]: row for row in right["rankings"]}
     return [
@@ -608,7 +629,10 @@ def create_app(workbench, dev=False):
     app.jinja_env.globals["market_lag"] = lag_for
     # 報表頁的價格口徑標籤與回測註明（與 CLI 輸出同一段文字）。
     app.jinja_env.globals["price_mode_label"] = lambda mode: MODE_LABELS.get(mode, MODE_LABELS[RAW])
-    app.jinja_env.globals["backtest_price_note"] = BACKTEST_NOTE.lstrip("。")
+    app.jinja_env.globals["backtest_price_note"] = lambda rights=None: backtest_note(
+        rights or "refuse"
+    ).lstrip("。")
+    app.jinja_env.globals["rights_mode_label"] = lambda rights: RIGHTS_LABELS.get(rights, "")
 
     # 導覽列：(圖示, 標籤, 連結, 視為同一區域的路徑開頭)。只列出已註冊路由的項目，不會連到不存在的頁面。
     NAVIGATION = [

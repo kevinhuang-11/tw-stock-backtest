@@ -51,10 +51,12 @@ CI（`.github/workflows/ci.yml`）是 `pip install .` 後**從乾淨目錄**對�
 - **金額一律用 `Decimal`**：費稅、滑價與資金計算不使用 float；費率與捨入方式來自 `[costs]` 設定（`backtesting/costs.py` 的 `CostSettings`）。
 - **時間隔離**：訊號只用截至分析日的資料，成交在訊號之後的行情日；缺價不刪列、不補零。
 - **缺價的處理（研究、回測、個股圖、單檔 CLI 同一套規則）**：共用函式在 `analysis/indicators.py`（`is_valid_price`、`restart_index`、`segmented`、`windowed_moving_average`）與 `data/market_events.py`（`prepare_market_records`）。窗口型指標（SMA、因子、突破、量比）在缺價仍在窗口內時無法評估；遞迴指標（EMA、RSI、MACD）從最後一次缺價的隔天重新暖機。停牌列與無成交價列都保留在序列中，不跳過。來源有該日但開高低收全空的列標為 `NO_PRICE`（無成交價，原因未確認，不認定為停牌）；它和已確認停牌一樣當日不成交、持股沿用最近收盤估值並標示日期。其他股票有行情、這檔卻整列不存在時，回測仍整次失敗（可能是下載缺漏）。已確認停牌清單在 `data/confirmed_halts.json`（套件資料，`load_confirmed_halts` 載入並驗證），每筆是日曆日區間並必須附 https 公開來源；只有查得到官方公告的才加入，不可依缺價或缺列自行推定。來源在停止買賣期間通常不提供該股的列，`load_records` 會在已確認停牌的行情日補上無價格、量為 0 的停牌列，不補價格、不覆寫既有列。
-- **價格口徑**：`[corporate_actions] mode`（預設 `adjusted`，省略時舊報表視為 `raw`）。計算指標、因子、條件的地方一律經 `prices.PriceSource` 讀取或調整行情，不直接對 `load_records` 的結果算指標；逐日引擎用 `analysis/adjustment.AdjustedHistory`，每個訊號日只套用不晚於當日生效的公司行動。成交、估值與顯示用的收盤價維持原始價格；持股與現金由 `backtesting/corporate_actions.py`（`Schedule`、`apply_due`）在生效日開盤前調整，多股票引擎、買進持有基準與單檔引擎共用同一套規則，前瞻報酬也依同樣的權利歸屬計算。結果要記錄 `price_adjustment`（`PriceSource.describe()`）與 `corporate_action_events`；不同口徑的報表不可互相比較（`prices.report_price_mode`）。
+- **價格口徑**：`[corporate_actions] mode`（預設 `adjusted`，省略時舊報表視為 `raw`）。計算指標、因子、條件的地方一律經 `prices.PriceSource` 讀取或調整行情，不直接對 `load_records` 的結果算指標；逐日引擎用 `analysis/adjustment.AdjustedHistory`，每個訊號日只套用不晚於當日生效的公司行動。成交、估值與顯示用的收盤價維持原始價格；持股與現金由 `backtesting/corporate_actions.py`（`Schedule`、`apply_due`）在生效日開盤前調整，多股票引擎、買進持有基準與單檔引擎共用同一套規則，前瞻報酬也依同樣的權利歸屬計算。結果要記錄 `price_adjustment`（`PriceSource.describe()`）與 `corporate_action_events`；不同口徑的報表不可互相比較（`prices.report_price_basis`／`basis_mismatch`）。
+- **現金增資**：`[corporate_actions] rights`（`refuse` 預設／`decline`）。`PriceSource` 讀入時把設定標在每筆現金增資的 `"rights"` 欄，`analysis/adjustment.refuses_rights` 決定指標是否重新起算、回測是否拒絕（`RightsOfferingHeld`）、前瞻報酬是否不評估；沒有標示的一律視為 `refuse`，所以不要繞過 `PriceSource` 把公司行動直接交給引擎。`decline` 的因子用減除股利參考價（`ex_dividend_reference`），回測事件多出 `dilution_loss` 等欄位，只列出不扣除。
+- **股票池與上市日**：`data/universe.listing_exclusions` 依行情庫旁名單的上市日排除回測開始日之後才上市的股票（`run_portfolio`、`compare_strategies`、`compare_periods`），結果記在 `universe_exclusions`；名單不存在或是合成名單時不排除。
 - **報表是不可覆寫的快照**：每次執行寫入新目錄並保存當時的設定、股票池與輸入；未完成時目錄名帶 `.incomplete`，不可當成完成報表讀取。
 - **安全邊界**：`security.py` 負責輸出遮蔽與子程序環境清理；工作台有 Host 與 POST 驗證；郵件憑證只有 `notify_report --send` 才讀環境變數。`tests/test_credential_boundaries.py` 會檢查這些邊界。
 
 ## 已知限制（修改相關程式前應知道）
 
-公司行動調整是簡化（股利於除息日入帳、不扣稅、含現金增資的除權不跨過還原且回測持有跨過時拒絕計算、面額假設 10 元，只涵蓋已下載的期間）；股票池是目前上市名單，存在倖存者偏差；沒有獨立交易日曆。這些是文件中明示的 v1 限制，不要在未被要求時悄悄「修正」或在文件中淡化。
+公司行動調整是簡化（股利於除息日入帳、不扣稅、面額假設 10 元，只涵蓋已下載的期間；含現金增資的除權只有 refuse 與 decline，沒有「認購」）；股票池是目前上市名單，存在倖存者偏差（只排除開始日之後才上市的股票，下市股票仍不在名單內）；沒有獨立交易日曆。這些是文件中明示的 v1 限制，不要在未被要求時悄悄「修正」或在文件中淡化。

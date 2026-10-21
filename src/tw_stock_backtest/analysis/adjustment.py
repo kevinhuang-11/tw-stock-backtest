@@ -7,6 +7,13 @@
 - 股數比 = 每千股配股或換發後的股數 ÷ 1000。生效日以前的成交量乘上它並四捨五入到整股，
   讓量比跨事件可以比較；只發現金股利時為 1。成交金額不調整。
 
+含現金增資的除權依設定 corporate_actions.rights 處理（PriceSource 讀入時標在每筆事件的
+"rights" 欄；沒有標示的視為 refuse）：
+
+- refuse：不跨過生效日還原，序列從生效日重新起算（見 breaks）。
+- decline（放棄認購）：價格因子改用減除股利參考價 ÷ 官方前收，只還原現金股利與無償配股；
+  現金增資造成的價格下跌留在序列中，和不認購的持有人實際承受的報酬一致。
+
 缺價（None）維持 None，不會被補值；原始資料不會被修改，回傳的是新的列。
 """
 
@@ -18,34 +25,59 @@ PRICE_FIELDS = ("open", "high", "low", "close")
 THOUSAND = Decimal("1000")
 ONE = Decimal("1")
 
+# 現金增資的處理方式（設定 corporate_actions.rights）。
+REFUSE = "refuse"
+DECLINE = "decline"
+RIGHTS_MODES = (REFUSE, DECLINE)
+
 
 def is_rights_offering(action):
     """含現金增資認購權的除權（原股東每千股可認購股數大於 0）。"""
     return bool(action.get("rights_per_1000")) and action["rights_per_1000"] > 0
 
 
+def refuses_rights(action):
+    """含現金增資、且處理方式是 refuse（沒有標示時的預設）。"""
+    return is_rights_offering(action) and action.get("rights", REFUSE) == REFUSE
+
+
+def ex_dividend_reference(action):
+    """減除股利參考價（未捨入）：只扣現金股利、只計無償配股，不含現金增資。
+
+    （前收 − 現金股利）÷（1 ＋ 每千股無償配股 ÷ 1000），與證交所除權息表的同名欄位同一個公式。
+    """
+    return (action["previous_close"] - action["cash_dividend"]) / (
+        ONE + action["stock_dividend_per_1000"] / THOUSAND
+    )
+
+
 def breaks(actions):
-    """含現金增資的生效日，由舊到新。
+    """處理方式為 refuse 的現金增資生效日，由舊到新。
 
     官方參考價假設依整個現金增資的比例認購，不符合任何實際持有人（不認購的人價格照市價、
     認購的人另外付了認購款），所以不跨過這一天還原價格：序列從生效日重新起算，
     之前的列不用於指標，窗口型指標在事件仍在窗口內時無法評估，遞迴指標重新暖機。
     """
-    return sorted({a["effective_date"] for a in actions if is_rights_offering(a)})
+    return sorted({a["effective_date"] for a in actions if refuses_rights(a)})
 
 
 def events(actions):
     """公司行動轉成 [(生效日, 價格因子, 股數比)]，依生效日排序；同一天的多筆合併相乘。
 
-    含現金增資的事件不在這裡（見 breaks）。
+    refuse 的現金增資不在這裡（見 breaks）；decline 的價格因子用減除股利參考價。
     """
     merged = {}
     for action in actions:
-        if is_rights_offering(action):
+        if refuses_rights(action):
             continue
         if action["previous_close"] is None or action["previous_close"] <= 0:
             raise ValueError(f"{action['stock_id']} {action['effective_date']} 缺少有效的官方前收")
-        price = action["reference_price"] / action["previous_close"]
+        reference = (
+            ex_dividend_reference(action)
+            if is_rights_offering(action)
+            else action["reference_price"]
+        )
+        price = reference / action["previous_close"]
         if action["kind"] == DIVIDEND:
             shares = ONE + action["stock_dividend_per_1000"] / THOUSAND
         elif action["kind"] in (CAPITAL_REDUCTION, PAR_CHANGE):

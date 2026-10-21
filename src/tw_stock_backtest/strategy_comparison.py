@@ -12,6 +12,7 @@ from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.backtesting.metrics import summarize_exposure, summarize_performance
 from tw_stock_backtest.backtesting.portfolio import run_portfolio_backtest
 from tw_stock_backtest.data.database import load_records
+from tw_stock_backtest.data.universe import listing_exclusions
 from tw_stock_backtest.date_range import parse_date_range
 from tw_stock_backtest.plotting import prepare_series
 from tw_stock_backtest.prices import PriceSource
@@ -34,16 +35,21 @@ def compare_strategies(
     strategies = [validate_strategy(s) for s in strategies]
     if not 2 <= len(strategies) <= 5 or len({s["id"] for s in strategies}) != len(strategies):
         raise ValueError("一次比較 2～5 份不同 ID 的策略")
+    # 開始日還沒上市的股票不納入股票池，原因寫在 common.json。
+    listing_excluded = listing_exclusions(
+        settings["universe"]["stocks"], settings["storage"]["database_path"], start
+    )
+    excluded_ids = {item["stock_id"] for item in listing_excluded}
+    stocks = [sid for sid in settings["universe"]["stocks"] if sid not in excluded_ids]
+    if not stocks:
+        raise ValueError("股票池在回測開始日都還沒上市")
     records = (
         {
             sid: load_records(sid, "1900-01-01", end, db_path=settings["storage"]["database_path"])
-            for sid in settings["universe"]["stocks"]
+            for sid in stocks
         }
         if frozen_records is None
-        else {
-            sid: [r for r in frozen_records[sid] if r["date"] <= end]
-            for sid in settings["universe"]["stocks"]
-        }
+        else {sid: [r for r in frozen_records[sid] if r["date"] <= end] for sid in stocks}
     )
     backtest = settings["backtest"]
     costs = CostSettings(**settings["costs"])
@@ -62,7 +68,8 @@ def compare_strategies(
     bench_performance = performance(benchmark)
     report = ResearchReport(output_root)
     common = {
-        "stocks": settings["universe"]["stocks"],
+        "stocks": stocks,
+        "universe_exclusions": listing_excluded,
         "start": start,
         "end": end,
         "backtest": backtest,
@@ -91,6 +98,7 @@ def compare_strategies(
                 slippage_rate=backtest["slippage_rate"],
                 corporate_actions=corporate_actions,
             )
+            result["universe_exclusions"] = listing_excluded
             if [p["date"] for p in result["equity_curve"]] != [
                 p["date"] for p in benchmark["equity_curve"]
             ]:
@@ -339,6 +347,13 @@ def compare_periods(settings, strategies, periods, output_root):
         results.append(item)
         report.write_json("progress.json", {"periods": results, "report_complete": False})
         try:
+            # 這段期間開始日還沒上市的股票由 compare_strategies 排除，不檢查邊界。
+            late = {
+                item["stock_id"]
+                for item in listing_exclusions(
+                    records, settings["storage"]["database_path"], period["start"]
+                )
+            }
             missing = {
                 sid: [
                     day
@@ -346,6 +361,7 @@ def compare_periods(settings, strategies, periods, output_root):
                     if day not in {r["date"] for r in rs}
                 ]
                 for sid, rs in records.items()
+                if sid not in late
             }
             missing = {sid: days for sid, days in missing.items() if days}
             if missing:

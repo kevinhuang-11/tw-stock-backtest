@@ -7,7 +7,7 @@ from decimal import Decimal, InvalidOperation
 from html import escape
 from pathlib import Path
 
-from tw_stock_backtest.prices import report_price_mode
+from tw_stock_backtest.prices import basis_mismatch, report_price_basis
 from tw_stock_backtest.research import taipei_today
 from tw_stock_backtest.security import public_data
 
@@ -115,10 +115,12 @@ def differences(current, previous):
         reasons.append("策略內容雜湊不同或未保存，不比較不同条件的名次")
     if current["mode"] is None or previous["mode"] is None or current["mode"] != previous["mode"]:
         reasons.append("排名模式不同或未提供")
-    if report_price_mode(current["summary"], current["settings"]) != report_price_mode(
-        previous["summary"], previous["settings"]
-    ):
-        reasons.append("價格口徑不同（還原價／原始價格），不比較名次")
+    basis = basis_mismatch(
+        report_price_basis(current["summary"], current["settings"]),
+        report_price_basis(previous["summary"], previous["settings"]),
+    )
+    if basis:
+        reasons.append(f"{basis}，不比較名次")
     a, b = (x["settings"].get("factors", {}) for x in (current, previous))
     if any(
         k not in a

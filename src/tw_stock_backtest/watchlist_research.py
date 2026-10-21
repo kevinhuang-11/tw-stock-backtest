@@ -15,7 +15,7 @@ from tw_stock_backtest.cli.download_universe import save_progress
 from tw_stock_backtest.data.database import load_records
 from tw_stock_backtest.data.supplemental import timestamp
 from tw_stock_backtest.data.universe import NetworkDisabled
-from tw_stock_backtest.prices import PriceSource, report_price_mode
+from tw_stock_backtest.prices import PriceSource, report_price_basis
 from tw_stock_backtest.research import program_version
 from tw_stock_backtest.research_digest import render_digest
 from tw_stock_backtest.security import public_data
@@ -197,7 +197,7 @@ def compare(current, previous):
         current["specified_pool"] == previous["specified_pool"]
         and current["strategy_snapshot"]["sha256"] == previous["strategy_snapshot"]["sha256"]
         and current.get("requested_date") == previous.get("requested_date")
-        and report_price_mode(current) == report_price_mode(previous)
+        and report_price_basis(current) == report_price_basis(previous)
     )
     result["message"] = (
         "相同策略與自選股票池的可比較前次快照；不是獨立交易日樣本"

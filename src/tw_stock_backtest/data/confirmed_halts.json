@@ -12,6 +12,17 @@
       ]
     },
     {
+      "stock_id": "1589",
+      "start": "2026-04-07",
+      "end": "2026-11-17",
+      "reason": "未依期限公告申報 114 年度財務報告，依證交所營業細則第 50 條之 3 第 1 項第 1 款自 2026-04-07 停止買賣；2026-05-27 因可轉債未償併案停止買賣，2026-10-14 併案列為變更交易方法並維持停止買賣；停止買賣屆滿 6 個月未補正，2026-11-18 終止上市",
+      "sources": [
+        "https://www.twse.com.tw/staticFiles/news/news/tsecnews/8a8216d6a0fa351b01a11ad20a4c00df.pdf",
+        "https://www.twse.com.tw/staticFiles/news/news/tsecnews/8a8216d6a0fa351b01a12f97b68f0114.pdf",
+        "https://www.twse.com.tw/staticFiles/news/news/tsecnews/8a8216d69e5dd6ae019e5ebda3d00029.pdf"
+      ]
+    },
+    {
       "stock_id": "6176",
       "start": "2026-08-13",
       "end": "2026-08-23",

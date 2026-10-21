@@ -232,7 +232,8 @@ def prepare_backtest_market(
         raise ValueError("指定期間沒有可回測的行情")
 
     for stock_id, prices in market.items():
-        for trading_date in trading_dates:
+        # 依日期檢查，訊息回報最早缺的一天。
+        for trading_date in sorted(trading_dates):
             if trading_date not in prices:
                 raise ValueError(
                     f"{stock_id} 缺少 {trading_date} 的行情列（其他股票當天有行情），"
