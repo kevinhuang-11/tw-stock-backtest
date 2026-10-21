@@ -244,6 +244,20 @@ def compare(current, previous):
     return result
 
 
+def snapshot_count(root):
+    """完成的快照份數（與 previous_snapshots 相同的篩選，但不讀內容、不設上限）。"""
+    root = Path(root)
+    if not root.is_dir():
+        return 0
+    return sum(
+        1
+        for p in root.glob("*/summary.json")
+        if not p.is_symlink()
+        and not p.parent.name.endswith(".incomplete")
+        and p.resolve().is_relative_to(root.resolve())
+    )
+
+
 def previous_snapshots(root):
     rows = []
     for p in sorted(Path(root).glob("*/summary.json"), reverse=True)[:100]:

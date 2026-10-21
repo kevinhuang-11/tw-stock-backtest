@@ -73,6 +73,7 @@
     <div class="card-header"><div><h2>已保存的快照</h2><p>保存後才有前次紀錄可比較。</p></div></div>
     {% if snapshots %}
     <ul class="item-list">{% for snap in snapshots %}<li><div class="item-main"><a class="item-title" href="/reports/{{ snap.report_key }}">{{ snap.strategy_snapshot.definition.name }}</a><div class="item-meta">{{ snap.generated_at | dt }} · {{ snap.counts.requested }} 檔</div></div><div class="item-side"><a class="btn btn-sm btn-ghost" href="/reports/{{ snap.report_key }}">查看摘要／郵件預覽</a></div></li>{% endfor %}</ul>
+    {% if snapshot_total > snapshots | length %}<div class="card-footer">共 {{ snapshot_total }} 份快照，這裡只列出最近 {{ snapshots | length }} 份；全部都在<a href="/reports">報表</a>頁。</div>{% endif %}
     {% else %}{{ ui.empty('尚無快照', '按右上角的保存按鈕，固定目前的條件、數值與來源。', icon_name='report') }}{% endif %}
   </section>
 

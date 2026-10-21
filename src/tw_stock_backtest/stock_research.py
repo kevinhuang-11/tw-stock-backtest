@@ -134,12 +134,13 @@ def identities(wb):
     dbpath = Path(wb.settings["storage"]["database_path"])
     if dbpath.is_file():
         with closing(sqlite3.connect(dbpath.resolve().as_uri() + "?mode=ro", uri=True)) as db:
-            for (sid,) in db.execute("SELECT DISTINCT stock_id FROM stock_prices LIMIT 3000"):
+            # 不設筆數上限：名單與行情庫有多少檔就列多少檔，搜尋時再依規則篩選。
+            for (sid,) in db.execute("SELECT DISTINCT stock_id FROM stock_prices"):
                 if re.fullmatch(r"[0-9]{4}", sid):
                     result[sid] = {"stock_id": sid}
     path = dbpath.parent / "listed_stocks.json"
     if path.is_file() and not path.is_symlink():
-        for item in load_universe(path)["stocks"][:3000]:
+        for item in load_universe(path)["stocks"]:
             result[item["stock_id"]] = {k: item.get(k) for k in ("stock_id", "name", "industry")}
     return result
 
@@ -558,6 +559,7 @@ def register_stock_routes(app, wb, token):
                 filter_rows,
                 observations,
                 previous_snapshots,
+                snapshot_count,
             )
 
             entries = notes.items()
@@ -590,6 +592,7 @@ def register_stock_routes(app, wb, token):
                 csrf=token,
                 strategies=wb.library.list(),
                 snapshots=previous_snapshots(wb.state / "watchlist-reports")[:10],
+                snapshot_total=snapshot_count(wb.state / "watchlist-reports"),
             )
         except (OSError, ValueError, sqlite3.Error):
             return "自選清單無法讀取", 503
