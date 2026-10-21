@@ -31,11 +31,17 @@ def _read_document(path: str | Path | None) -> dict[str, Any]:
             .read_text(encoding="utf-8")
         )
     else:
-        text = open(path, encoding="utf-8").read()
+        with open(path, encoding="utf-8") as file:
+            text = file.read()
 
-    document: dict[str, Any] = json.loads(text)
+    document: Any = json.loads(text)
+    # 合法 JSON 但不是物件（陣列、字串、數字、null）也是格式錯誤。
     # schema 1 只有 halts；schema 2 另有 delistings（終止上市）。
-    if document.get("schema_version") not in (1, 2) or not isinstance(document.get("halts"), list):
+    if (
+        not isinstance(document, dict)
+        or document.get("schema_version") not in (1, 2)
+        or not isinstance(document.get("halts"), list)
+    ):
         raise ValueError("已確認停牌清單格式或 schema_version 無效")
     return document
 

@@ -17,7 +17,11 @@ from tw_stock_backtest.backtesting.costs import CostSettings
 from tw_stock_backtest.backtesting.portfolio import run_portfolio_backtest
 from tw_stock_backtest.cli import inspect_db
 from tw_stock_backtest.data.database import load_records, save_records
-from tw_stock_backtest.data.market_events import CONFIRMED_HALTS, load_confirmed_halts
+from tw_stock_backtest.data.market_events import (
+    CONFIRMED_HALTS,
+    load_confirmed_halts,
+    load_delistings,
+)
 
 SOURCE = "https://www.twse.com.tw/example"
 
@@ -80,6 +84,28 @@ class ConfirmedHaltFileTests(unittest.TestCase):
             with self.subTest(name):
                 with self.assertRaises(ValueError):
                     self.load(bad)
+
+    def test_non_object_json_is_a_format_error(self):
+        # 合法 JSON 但不是物件時，原本 document.get 丟 AttributeError。
+        for text in ("[]", '"halts"', "3", "null"):
+            with self.subTest(text):
+                self.path.write_text(text, encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "格式或 schema_version 無效"):
+                    load_confirmed_halts(self.path)
+                # 終止上市清單讀同一個檔案，規則相同。
+                with self.assertRaisesRegex(ValueError, "格式或 schema_version 無效"):
+                    load_delistings(self.path)
+
+    def test_the_file_is_closed_after_reading(self):
+        import gc
+        import warnings
+
+        self.load(entry())
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", ResourceWarning)
+            load_confirmed_halts(self.path)
+            gc.collect()
+        self.assertEqual([w for w in caught if issubclass(w.category, ResourceWarning)], [])
 
     def test_overlapping_ranges_and_unknown_schema_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "重疊"):
