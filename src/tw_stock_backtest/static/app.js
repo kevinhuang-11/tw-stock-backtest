@@ -37,7 +37,50 @@ for (const root of scope.querySelectorAll('[data-tabs]')) {
 }
 }
 enhanceTabs(document);
-window.WorkbenchApp = {enhance: enhanceTabs};
+
+// 最近查看過的股票：只存在這個瀏覽器（localStorage），不送到伺服器。
+// 個股頁以 data-recent-stock 標記；股票選擇器與個股搜尋頁在沒有輸入時列出。
+// 私密瀏覽或封鎖網站資料時讀寫會失敗，這時當成沒有紀錄，頁面照常運作。
+const RECENT_KEY = 'tw-stock-backtest.recent-stocks';
+const RECENT_MAX = 8;
+const recentStocks = {
+  read() {
+    try {
+      const items = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+      return Array.isArray(items) ? items.filter(item => item && /^\d{4}$/.test(item.stock_id)) : [];
+    } catch { return []; }
+  },
+  remember(stock) {
+    if (!stock || !/^\d{4}$/.test(stock.stock_id)) return;
+    const items = [stock, ...recentStocks.read().filter(item => item.stock_id !== stock.stock_id)];
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(items.slice(0, RECENT_MAX))); } catch { /* 無法保存時略過 */ }
+  },
+};
+const viewed = document.querySelector('[data-recent-stock]');
+if (viewed) {
+  recentStocks.remember({
+    stock_id: viewed.dataset.recentStock,
+    name: viewed.dataset.recentName || '',
+    industry: viewed.dataset.recentIndustry || '',
+  });
+}
+// 個股搜尋頁：沒有輸入時，把最近查看的股票填進預留的區塊。
+for (const box of document.querySelectorAll('[data-recent-list]')) {
+  const items = recentStocks.read();
+  if (!items.length) continue;
+  const list = box.querySelector('ul');
+  list.replaceChildren(...items.map(item => {
+    const li = document.createElement('li');
+    const link = document.createElement('a');
+    link.className = 'chip';
+    link.href = '/stocks/' + item.stock_id;
+    link.textContent = item.name ? item.stock_id + ' ' + item.name : item.stock_id;
+    li.append(link);
+    return li;
+  }));
+  box.hidden = false;
+}
+window.WorkbenchApp = {enhance: enhanceTabs, recentStocks};
 
 // 一般表單送出後，按鈕顯示處理中並避免重複送出。
 // 由其他腳本以 fetch 送出的表單不加 data-loading，維持各自的處理方式。

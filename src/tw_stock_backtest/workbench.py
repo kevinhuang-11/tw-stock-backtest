@@ -811,9 +811,11 @@ def create_app(workbench, dev=False):
     @app.get("/api/stock-options")
     def stock_options():
         from tw_stock_backtest.stock_research import identities
+        from tw_stock_backtest.stock_search import industries
 
         try:
-            return {"stocks": list(identities(workbench).values())}
+            stocks = list(identities(workbench).values())
+            return {"stocks": stocks, "industries": industries(stocks)}
         except (OSError, ValueError):
             return {"error": "股票名單無法讀取"}, 503
 

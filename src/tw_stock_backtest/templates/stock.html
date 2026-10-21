@@ -5,5 +5,5 @@
 {% block scripts %}{{ assets.scripts() }}<script src="/static/supplemental.js" defer></script><script src="/static/stock.js" defer></script>{% endblock %}
 {% block content %}
 <p id="loading" class="loading-line" role="status"></p>
-<div id="stock-panel">{% include 'stock_panel.html' %}</div>
+<div id="stock-panel" data-recent-stock="{{ stock.stock_id }}" data-recent-name="{{ stock.metadata.get('name') or '' }}" data-recent-industry="{{ stock.metadata.get('industry') or '' }}">{% include 'stock_panel.html' %}</div>
 {% endblock %}

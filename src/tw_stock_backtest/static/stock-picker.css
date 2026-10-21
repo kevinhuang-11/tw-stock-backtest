@@ -58,6 +58,20 @@
 .sp-option-name { color: var(--c-text, #1b2230); }
 .sp-option-industry { margin-left: auto; font-size: .75rem; color: var(--c-text-3, #8490a1); white-space: nowrap; }
 .sp-empty { padding: 10px 12px; color: var(--c-text-2, #566072); }
+/* 沒有輸入時的分組標題（自選股、最近查看）與清單底部的筆數說明；都不能選。 */
+.sp-group { padding: 8px 12px 2px; font-size: .75rem; font-weight: 600; color: var(--c-text-2, #566072); }
+.sp-note {
+  position: sticky; bottom: -4px;
+  padding: 8px 12px; border-top: 1px solid var(--c-border, #dde1e8);
+  background: var(--c-surface, #fff);
+  font-size: .75rem; color: var(--c-text-2, #566072);
+}
+.sp-option-chosen { margin-left: auto; font-size: .75rem; font-weight: 600; color: var(--c-primary, #3a4ac6); white-space: nowrap; }
+.stock-picker .sp-industry {
+  min-height: 32px; max-width: 12em; padding: 0 6px; margin: 0;
+  border: 1px solid var(--c-border, #dde1e8); border-radius: var(--radius-1, 6px);
+  background: var(--c-surface, #fff); color: var(--c-text, #1b2230); font: inherit; font-size: .8125rem;
+}
 
 .sp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; margin-left: auto; }
 .stock-picker .sp-action {
@@ -78,4 +92,5 @@
   .stock-picker .sp-remove { width: 34px; height: 34px; }
   .stock-picker .sp-input { flex-basis: 100%; min-height: 38px; font-size: 1rem; }
   .stock-picker .sp-action { min-height: 40px; }
+  .stock-picker .sp-industry { min-height: 40px; max-width: none; }
 }
