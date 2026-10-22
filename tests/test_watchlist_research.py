@@ -271,6 +271,28 @@ class WatchResearchTests(unittest.TestCase):
         self.assertEqual(len(previous_snapshots(root)), 2)
         self.assertTrue(list(root.glob("*.incomplete")))
 
+    def test_snapshot_saves_corporate_action_prices_as_strings(self):
+        # 還原價模式下 price_adjustment 會帶公司行動的參考價（Decimal），保存時不可失敗。
+        d = self.data()
+        d["price_adjustment"]["actions"] = [
+            {
+                "stock_id": "2330",
+                "effective_date": "2026-09-16",
+                "kind": "dividend",
+                "previous_close": Decimal("1255.00"),
+                "reference_price": Decimal("1249.99"),
+                "needs_review": False,
+                "sources": [],
+            }
+        ]
+        path = save_snapshot(d, self.wb.state / "watchlist-reports")
+        saved = json.loads((path / "summary.json").read_text(encoding="utf-8"))
+        action = saved["price_adjustment"]["actions"][0]
+        self.assertEqual(
+            (action["previous_close"], action["reference_price"]), ("1255.00", "1249.99")
+        )
+        self.assertEqual(len(previous_snapshots(self.wb.state / "watchlist-reports")), 1)
+
     def test_digest_numbers_are_formatted_for_display_only(self):
         import re
 

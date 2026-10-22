@@ -18,7 +18,7 @@ from tw_stock_backtest.prices import PriceSource, report_price_basis
 from tw_stock_backtest.research import program_version
 from tw_stock_backtest.research_digest import render_digest
 from tw_stock_backtest.security import public_data
-from tw_stock_backtest.serialization import save_progress
+from tw_stock_backtest.serialization import json_default, save_progress
 from tw_stock_backtest.stock_research import (
     CONDITION_LABELS,
     MAX_ROWS,
@@ -300,6 +300,8 @@ def save_snapshot(data, root):
     saved = public_data(
         {**data, "run_id": run_id, "comparison": compare(data, previous), "report_complete": True}
     )
+    # 公司行動的參考價是 Decimal；和其他報表一樣先轉成 JSON 的值，保存與郵件內容才會一致。
+    saved = json.loads(json.dumps(saved, default=json_default))
     # All saved fields originate from the public observation allowlist, not notes.
     output = io.StringIO()
     writer = csv.writer(output)
