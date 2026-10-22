@@ -20,6 +20,15 @@ def check_valuation_mode(mode: str) -> None:
         raise ValueError("delisted_valuation 必須是 last_close 或 zero")
 
 
+def final_valuation_note(mode: str) -> str:
+    """期末持股的估值說明（不含結尾句號），CLI 開頭與回測報表頁共用。"""
+    delisted = "以 0 估值，壓力測試" if mode == "zero" else "以最後收盤凍結估值"
+    return (
+        "期末不強制賣出，以結束日收盤估值。停牌、無成交價或缺列的持股沿用最近一筆收盤並標示日期；"
+        f"已終止上市的列為無法變現（{delisted}），不占持股名額也不能動用"
+    )
+
+
 def retire_delisted(
     holdings: dict[str, int],
     unrealizable: dict[str, Row],

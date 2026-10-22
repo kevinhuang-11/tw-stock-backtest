@@ -8,6 +8,7 @@ from tw_stock_backtest.backtesting.benchmark import (
 )
 from tw_stock_backtest.backtesting.corporate_actions import declined_text, dilution_total
 from tw_stock_backtest.backtesting.costs import CostSettings
+from tw_stock_backtest.backtesting.delisting import final_valuation_note
 from tw_stock_backtest.backtesting.metrics import (
     summarize_exposure,
     summarize_performance,
@@ -28,7 +29,12 @@ from tw_stock_backtest.data.restrictions import (
 )
 from tw_stock_backtest.data.universe import listing_exclusions
 from tw_stock_backtest.date_range import parse_date_range
-from tw_stock_backtest.prices import PriceSource, describe_prices
+from tw_stock_backtest.prices import (
+    PriceSource,
+    backtest_scope,
+    describe_prices,
+    report_price_basis,
+)
 from tw_stock_backtest.reporting import export_portfolio_report
 
 
@@ -280,9 +286,11 @@ def _print_overview(run):
     first_date = result["equity_curve"][0]["date"]
     last_date = result["equity_curve"][-1]["date"]
 
+    # 計算範圍依這次的價格口徑、現金增資與終止上市的估值方式，與回測報表頁同一段文字。
+    mode, rights = report_price_basis(result)
     print("多股票回測：每日排名，下一行情日開盤調整持股")
-    print("含設定費稅與固定比例滑價；未計股利、拆股與精確零股成交")
-    print("期末持股按收盤價估值，不強制賣出")
+    print(f"含設定費稅與固定比例滑價；{backtest_scope(mode, rights)}；未精確模擬零股成交")
+    print(final_valuation_note(run.settings["halts"]["delisted_valuation"]))
     print(f"\n股票池：{', '.join(stocks)}")
     for item in listing_excluded:
         print(f"未納入股票池：{item['stock_id']}（{item['reason']}）")

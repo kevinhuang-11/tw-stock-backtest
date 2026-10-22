@@ -20,7 +20,7 @@ from tw_stock_backtest.data.market_events import (
 )
 from tw_stock_backtest.data.universe import listing_exclusions
 from tw_stock_backtest.date_range import parse_date_range
-from tw_stock_backtest.prices import PriceSource, describe_prices
+from tw_stock_backtest.prices import PriceSource, describe_prices, forward_return_scope
 
 
 def parse_arguments():
@@ -275,7 +275,7 @@ def _print_header(args, run, ranking_history):
         run.prices,
     )
     print("選股能力評估：下一行情日開盤 → 第 N 個行情日收盤")
-    print("進場日算第 1 日；未計費稅、滑價、股利與拆股")
+    print(f"進場日算第 1 日；未計費稅與滑價；{forward_return_scope(prices.mode, prices.rights)}")
     print("每日樣本可能重疊；平均報酬不是累積帳戶報酬")
     print(f"\n股票池：{', '.join(stocks)}")
     for item in excluded:
@@ -285,10 +285,7 @@ def _print_header(args, run, ranking_history):
     print(f"實際訊號期間：{trading_dates[0]} ～ {trading_dates[-1]}")
     print(f"行情資料截止：{end}")
     print(f"訊號日數：{len(ranking_history)}")
-    print(
-        describe_prices(prices.describe())
-        + ("；前瞻報酬計入股利與股數變動" if prices.mode == "adjusted" else "；前瞻報酬只計價格")
-    )
+    print(describe_prices(prices.describe()))
     print("評估名次使用 --top，不使用設定檔的 top_n")
     gaps = unconfirmed_gaps(market)
     for gap in gaps:

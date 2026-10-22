@@ -17,6 +17,7 @@ from uuid import uuid4
 from flask import Flask, abort, redirect, render_template, request, send_file, url_for
 
 from tw_stock_backtest.backtesting.corporate_actions import dilution_total
+from tw_stock_backtest.backtesting.delisting import final_valuation_note
 from tw_stock_backtest.config import apply_overrides, load_config
 from tw_stock_backtest.data.universe import NetworkDisabled, ensure_network_allowed, offline_reason
 from tw_stock_backtest.notifications import preview_message
@@ -25,6 +26,7 @@ from tw_stock_backtest.prices import (
     RAW,
     RIGHTS_LABELS,
     backtest_note,
+    backtest_scope,
     basis_mismatch,
     report_price_basis,
     report_price_mode,
@@ -663,6 +665,8 @@ def create_app(workbench, dev=False):
         rights or "refuse"
     ).lstrip("。")
     app.jinja_env.globals["rights_mode_label"] = lambda rights: RIGHTS_LABELS.get(rights, "")
+    app.jinja_env.globals["backtest_scope"] = backtest_scope
+    app.jinja_env.globals["final_valuation_note"] = final_valuation_note
 
     # 導覽列：(圖示, 標籤, 連結, 視為同一區域的路徑開頭)。只列出已註冊路由的項目，不會連到不存在的頁面。
     NAVIGATION = [

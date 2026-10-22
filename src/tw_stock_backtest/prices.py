@@ -222,3 +222,24 @@ RIGHTS_NOTES = {
         "稀釋損失已反映在市價，另列明細不重複扣除"
     ),
 }
+RAW_BACKTEST_SCOPE = "未調整除權息、減資與變更面額，報酬不含股利與股數變動"
+RIGHTS_SCOPES = {REFUSE: RIGHTS_NOTES[REFUSE], DECLINE: "含現金增資的除權一律放棄認購"}
+
+
+def backtest_scope(mode, rights=None):
+    """回測計入哪些公司行動的一句話（不含句號），CLI 開頭與報表頁共用。"""
+    if mode != ADJUSTED:
+        return RAW_BACKTEST_SCOPE
+    return (
+        "現金股利與減資退還股款於生效日入帳，配股、減資換股與變更面額調整股數；"
+        f"{RIGHTS_SCOPES.get(rights or REFUSE, RIGHTS_SCOPES[REFUSE])}"
+    )
+
+
+def forward_return_scope(mode, rights=None):
+    """前瞻報酬計入哪些公司行動的一句話（不含句號），與 analysis/forward_returns.py 的計算一致。"""
+    if mode != ADJUSTED:
+        return "前瞻報酬只計價格，不含股利與股數變動"
+    if (rights or REFUSE) == DECLINE:
+        return "前瞻報酬計入現金股利、減資退還股款與股數變動；含現金增資的除權視為放棄認購"
+    return "前瞻報酬計入現金股利、減資退還股款與股數變動；跨過含現金增資除權的樣本不計算"
